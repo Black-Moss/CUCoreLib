@@ -71,6 +71,10 @@ dotnet build "CUCoreLib.sln" -c Debug -p:BepInExDir="C:\EDIT_THIS_PATH\TO\CUCore
 
 ## Contributing
 
+<div align="center">
+<img width="648" height="424" alt="image" src="https://github.com/user-attachments/assets/178ae7b4-5b9e-4d53-be1c-f65357c6bb25" />
+</div>
+
 Contributions are welcome! We especially like fixes and improvements that make CUCoreLib a more stable shared modding foundation.
 
 Before opening a change:
