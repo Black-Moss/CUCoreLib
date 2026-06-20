@@ -1,4 +1,4 @@
-import type { Ingredient, ItemState, Page, PageId, RecipeState } from "./types";
+import type { Ingredient, ItemState, Page, PageId, RecipeState } from "./types.ts";
 
 export const pages: Page[] = [
   {
@@ -991,7 +991,7 @@ function welcomePage(): string {
       </code></pre>
       
       <p>As always, this documentation is a work in progress. </p>
-      <p>If you have suggestions, PRs are available in <a href="https://github.com/jimmyking9999999/CUCoreLib-Private/tree/main/CUCoreLibWebapp" target="_blank">the github</a></p>
+      <p>If you have suggestions, PRs are available in <a href="https://github.com/jimmyking9999999/CUCoreLib" target="_blank">the github</a></p>
       <p>Questions? Check out the <a href="https://discord.gg/FuuEDPkQT" target="_blank">Discord</a> <a href="https://discord.com/channels/1360913627288178788/1506616266713202828" target="_blank">thread</a></p>
     </section>
     
@@ -1128,8 +1128,9 @@ function setupPage(): string {
         <li>Open <a href="https://github.com/05126619z/ScavTemplate" target="_blank" rel="noopener">05126619z/ScavTemplate</a>.</li>
         <li>Create a new repository from the template or clone/download it.</li>
         <pre><code>git clone https://github.com/05126619z/ScavTemplate</code></pre>
-        <li>Open the solution (Template.sln) in ScavTemplate, via Visual Studio. You'll want the C# devkit installed.</li>
+        <li>Open the folder in whichever C# editor you prefer, or stay in the terminal and build with <span class="inline-code">dotnet</span>.</li>
       </ol>
+      <p><span class="inline-code">Template.sln</span> works in Visual Studio or Rider, but it is not required. VS Code users can open the folder directly once the .NET SDK and C# tooling are installed.</p>
     </section>
 
     <section class="lesson-card">
@@ -1137,16 +1138,23 @@ function setupPage(): string {
       <p><span class="inline-code">CUCoreLib</span> is a library that provides a ton of useful functionality for BepInEx modding.</p>
       <ol>
         <li>Open <a href="https://github.com/jimmyking9999999/CUCoreLib/releases/" target="_blank" rel="noopener">jimmyking9999999/CUCoreLib/releases/</a>.</li>
-        <li>Download the latest CuCoreLib.dll and place it into your BepInEx\\plugins folder.</li>
+        <li>Download the latest <span class="inline-code">CUCoreLib.dll</span> and place it into your BepInEx\\plugins folder.</li>
         <pre><code>C:\\Program Files (x86)\\Steam\\steamapps\\common\\Casualties Unknown Playtest\\BepInEx\\plugins</code></pre>
-        <li>Add the DLL as a reference in your Visual Studio project.</li>
-        <ul>
-          <li>Open the Dependancies dropdown -> Right click on Assemblies in Solution Explorer -> Add Reference</li>
-          <li>Browse -> Find the CUCoreLib.dll you downloaded and add it.</li>
-          <img src="images/assembly-location.png" alt="Add Reference screenshot" class="screenshot" />
-
-        </ul>
+        <li>Add the DLL as a reference in your mod project. The most universal way is to edit the <span class="inline-code">.csproj</span> file directly.</li>
       </ol>
+      <pre><code>&lt;ItemGroup&gt;
+  &lt;Reference Include="CUCoreLib"&gt;
+    &lt;HintPath&gt;..\\..\\BepInEx\\plugins\\CUCoreLib.dll&lt;/HintPath&gt;
+  &lt;/Reference&gt;
+&lt;/ItemGroup&gt;</code></pre>
+      <p>If your project lives somewhere else, change the <span class="inline-code">HintPath</span> so it points to the DLL you downloaded.</p>
+      <p>Editor shortcuts if you prefer the UI:</p>
+      <ul>
+        <li>Visual Studio: right-click the project, choose <span class="inline-code">Add &gt; Reference</span>, then browse to <span class="inline-code">CUCoreLib.dll</span>.</li>
+        <li>Rider: open the project file editor or project settings and add a local assembly reference.</li>
+        <li>VS Code: edit the <span class="inline-code">.csproj</span> directly. That is the normal path there.</li>
+      </ul>
+      <img src="images/assembly-location.png" alt="Add Reference screenshot" class="screenshot" />
     </section>
 
     <section class="lesson-card">
@@ -1164,9 +1172,11 @@ function setupPage(): string {
       <h2>Testing the mod</h2>
       <p>The ScavTemplate deploys your DLL when it builds. </p>
       <ol>
-        <li>Build the project in Visual Studio with <span class="inline-code">Build &gt; Build Solution</span> (Ctrl + Shift + B), or run <span class="inline-code">dotnet build</span> from the project folder via the terminal.</li>
+          <li>Build the project in Visual Studio with <span class="inline-code">Build &gt; Build Solution</span> (Ctrl + Shift + B), or run <span class="inline-code">dotnet build</span> from the project folder via the terminal.</li>
         <li>Start the game. BepInEx will load your mod from <span class="inline-code">BepInEx/plugins/&lt;ProjectName&gt;/&lt;ProjectName&gt;.dll</span>.</li>
       </ol>
+      <pre><code>dotnet build</code></pre>
+      <p>If you are using an IDE, it is just calling the same build underneath. Visual Studio and Rider can both build the solution normally after the reference is added.</p>
       <p>The compiled DLL also exists in your project output folder, <span class="inline-code">bin/Debug/net48/&lt;ProjectName&gt;.dll</span>. </p>
 
       <p>If you are getting a 'skipping due to missing net.cucorelib' error, ensure that the CUCoreLib.dll is placed in the correct BepInEx\\plugins folder and that the reference is properly added to your project.</p>
@@ -2059,7 +2069,7 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">Bandage</span></td><td><span class="inline-code">BandageProperties</span></td><td>Installs a vanilla-style <span class="inline-code">BandageMinigame</span> limb action and applies limb healing, pain reduction, and bandage slow values.</td></tr>
             <tr><td><span class="inline-code">Syringe</span></td><td><span class="inline-code">SyringeProperties</span></td><td>Adds syringe-style liquid injection behavior through <span class="inline-code">WaterContainerItem</span> and <span class="inline-code">SyringeMinigame</span>.</td></tr>
             <tr><td><span class="inline-code">Tool</span></td><td><span class="inline-code">ToolProperties</span></td><td>Builds a vanilla <span class="inline-code">AttackInfo</span> and calls <span class="inline-code">Body.Attack</span> for melee-style tools or weapons.</td></tr>
-            <tr><td><span class="inline-code">SpawnComponents</span></td><td><span class="inline-code">List&lt;string&gt;</span></td><td>Qualified <span class="inline-code">MonoBehaviour</span> type names CUCoreLib adds to the spawned item GameObject the first time the item appears.</td></tr>
+            <tr><td><span class="inline-code">SpawnComponents</span></td><td><span class="inline-code">List&lt;string&gt;</span></td><td>Qualified <span class="inline-code">MonoBehaviour</span> type names CUCoreLib adds to the spawned item GameObject the first time the item appears. For plugin-defined scripts, use the assembly-qualified form like <span class="inline-code">"YourNamespace.YourClass, YourModDll"</span>.</td></tr>
             <tr><td><span class="inline-code">CustomData</span></td><td><span class="inline-code">Dictionary&lt;string, object&gt;</span></td><td>Registration-time metadata for your own mod code. Read it later with <span class="inline-code">ItemRegistry.TryGetCustomData&lt;T&gt;</span>.</td></tr>
           </tbody>
         </table>
@@ -2413,6 +2423,26 @@ decayInfo = (byte)(
 );</code></pre>
       <p><span class="inline-code">BatteryDecay (16)</span> changes decay from normal item condition loss into battery drain. Use it for battery-powered items that should consume charge over time instead of rotting or breaking down normally.</p>
       <p>Note: The item still needs <span class="inline-code">decayMinutes</span> for decay speed.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>SpawnComponents type names</h2>
+      <p><span class="inline-code">SpawnComponents</span> strings need to be resolved with <span class="inline-code">Type.GetType(...)</span>. Plain names like <span class="inline-code">nameof(SomeScript)</span> usually will not resolve for a <span class="inline-code">MonoBehaviour</span> declared inside your plugin DLL, so CUCoreLib skips that component.</p>
+      <pre><code>ItemRegistry.Register(
+    "ToggleBlade",
+    new CustomItemInfo
+    {
+        fullName = "Toggle blade",
+        category = "weapon",
+        SpawnComponents = new List&lt;string&gt;
+        {
+            "YourNamespace.ToggleBladeScript, YourModDll"
+        }
+    },
+    icon
+);</code></pre>
+      <p>Use the full type name plus the assembly name without the <span class="inline-code">.dll</span> extension. Example: if the class is <span class="inline-code">TestModd.ToggleBladeScript</span> inside <span class="inline-code">TestModd.dll</span>, register <span class="inline-code">"TestModd.ToggleBladeScript, TestModd"</span>.</p>
+      <p>Current runtime note: if <span class="inline-code">Type.GetType(...)</span> returns <span class="inline-code">null</span>, <span class="inline-code">ApplyCustomSpawnComponents</span> silently skips that entry, so a bad string will fail with no warning.</p>
     </section>
 
     <section class="lesson-card">

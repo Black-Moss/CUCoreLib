@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/generate-app-pages.mjs && node scripts/generate-machine-docs.mjs",
+    "predev": "node scripts/generate-app-pages.mjs && node scripts/generate-machine-docs.mjs",
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/postbuild-fixup.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

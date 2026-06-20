@@ -1,0 +1,14 @@
+{
+  "id": "tools",
+  "label": "Tools",
+  "crumb": "Tools",
+  "title": "Custom item tools",
+  "lead": "A dedicated place for richer CUCoreLib item creation helpers.",
+  "appUrl": "/tools/",
+  "machineUrl": "/api/topics/tools.json",
+  "bodyHtml": "\n    <section class=\"lesson-card\">\n      <h2>We're working on it~</h2>\n      <p>This page will eventually hold dedicated tools with more room to experiment than the inline Item form.</p>\n    </section>\n  ",
+  "bodyText": "We're working on it~ This page will eventually hold dedicated tools with more room to experiment than the inline Item form.",
+  "codeTitle": "CustomItemTool.cs",
+  "codeLanguage": "csharp",
+  "code": "// Custom item tool page\n//  working on it~\n"
+}

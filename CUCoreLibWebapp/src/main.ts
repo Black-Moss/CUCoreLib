@@ -2,10 +2,11 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import "./styles.css";
-import { currentCode, codeTitle } from "./codeSnippets";
-import { hoverPanels } from "./hoverPanels";
-import { pageBody, pages } from "./docsPages";
-import type { HoverPanel, Ingredient, ItemState, Page, PageId, RecipeState } from "./types";
+import { currentCode, codeTitle } from "./codeSnippets.ts";
+import { hoverPanels } from "./hoverPanels.ts";
+import { machineExportDefaultIngredients, machineExportDefaultItemState, machineExportDefaultRecipeState, machineExportEnabledPageIds } from "./machineExport.ts";
+import { pageBody, pages } from "./docsPages.ts";
+import type { HoverPanel, Ingredient, ItemState, Page, PageId, RecipeState } from "./types.ts";
 
 declare global {
   interface Window {
@@ -19,53 +20,16 @@ window.MonacoEnvironment = {
   }
 };
 
-const ingredientDefaults: Ingredient[] = [
-  { mode: "specific", id: "glass", amount: "1", isLiquid: false, destroyItem: true },
-  { mode: "specific", id: "glass", amount: "1", isLiquid: false, destroyItem: true },
-  { mode: "specific", id: "glass", amount: "1", isLiquid: false, destroyItem: true },
-  { mode: "quality", id: "heatsource", amount: "10", isLiquid: false, destroyItem: false },
-  { mode: "quality", id: "water", amount: "50", isLiquid: true, destroyItem: true }
-];
+const ingredientDefaults: Ingredient[] = machineExportDefaultIngredients;
 
 const currentPageStorageKey = "cucorelib.docs.currentPage";
 const pageScrollStoragePrefix = "cucorelib.docs.scroll.";
 
 let ingredients: Ingredient[] = ingredientDefaults.map((item) => ({ ...item }));
 
-const itemState: ItemState = {
-  id: "sunpear",
-  name: "Sunpear",
-  description: "A pale yellow fruit. Probably edible.",
-  category: "food",
-  sprite: "sunpear.png",
-  weight: "0.4",
-  value: "4",
-  spawnFrequency: "1",
-  decayMinutes: "180",
-  recognition: "2",
-  tags: "cangetwet",
-  usable: true,
-  usableOnLimb: false,
-  sickness: "0",
-  limbSkinHealth: "0",
-  limbMuscleHealth: "0",
-  limbPain: "0",
-  limbTemperature: "-1",
-  limbChillSeconds: "100",
-  eat: "12",
-  drink: "4",
-  happiness: "1",
-  sound: "eatCrunch"
-};
+const itemState: ItemState = machineExportDefaultItemState;
 
-const recipeState: RecipeState = {
-  resultId: "conicalFlask",
-  category: "Tools",
-  intRequirement: "2",
-  resultAmount: "1",
-  resultCondition: "1",
-  isLiquidResult: false
-};
+const recipeState: RecipeState = machineExportDefaultRecipeState;
 
 const navGroups: Array<{ label: string; pages: PageId[] }> = [
   { label: "Introduction", pages: ["welcome", "unity-csharp", "setup", "harmony0"] },
@@ -110,7 +74,7 @@ const navGroups: Array<{ label: string; pages: PageId[] }> = [
     ]
   }
 ];
-const enabledPageIds = new Set<PageId>(["welcome", "unity-csharp", "setup", "harmony0", "assets", "audio", "item", "advanced-item", "recipe", "liquids", "player", "statuses", "moodles", "building-entities", "advanced-building-entities", "minigames", "tiles", "traps", "utils", "console", "tools", "settings", "locale", "saving", "multi-mod-compatibility"]);
+const enabledPageIds = new Set<PageId>(machineExportEnabledPageIds);
 const navOrder = navGroups.flatMap((group) => group.pages).filter((page) => enabledPageIds.has(page));
 let currentPage: PageId = loadStoredPage();
 
@@ -145,7 +109,7 @@ root.innerHTML = `
                     if (!enabledPageIds.has(page.id)) {
                       return `<span class="api-menu-placeholder" aria-disabled="true">${page.label}</span>`;
                     }
-                    return `<a href="${pageId === "tools" ? "/tools/#tools" : `/#${page.id}`}" data-page="${page.id}">${page.label}</a>`;
+                    return `<a href="${pagePath(page.id)}" data-page="${page.id}">${page.label}</a>`;
                   }).join("")}
                 </div>
               </details>
@@ -344,6 +308,11 @@ function isPageId(value: string | null): value is PageId {
 }
 
 function loadStoredPage(): PageId {
+  const routePage = pageFromRoute();
+  if (routePage) {
+    return routePage;
+  }
+
   const hashPage = pageFromHash();
   if (hashPage) {
     return hashPage;
@@ -365,6 +334,21 @@ function loadStoredPage(): PageId {
 function pageFromHash(): PageId | null {
   const hash = decodeURIComponent(window.location.hash.replace(/^#\/?/, ""));
   return isPageId(hash) ? hash : null;
+}
+
+function pageFromRoute(): PageId | null {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  if (path === "/tools") {
+    return "tools";
+  }
+
+  const match = path.match(/^\/docs\/([^/]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const page = decodeURIComponent(match[1]);
+  return isPageId(page) ? page : null;
 }
 
 function storeCurrentPage(): void {
@@ -415,6 +399,7 @@ function renderPage(restoreScroll = true): void {
   applyScaledScreenshots();
   bindCurrentPageInputs();
   syncRangeLabels();
+  syncHeadMetadata(page);
   updateChrome();
   updateEditor();
   void highlightLessonCode();
@@ -751,27 +736,35 @@ function setPage(page: PageId): void {
 }
 
 function syncPathForPage(page: PageId): void {
-  const nextPath = `${page === "tools" ? "/tools/" : "/"}#${page}`;
+  const nextPath = pagePath(page);
   if (`${window.location.pathname}${window.location.hash}` === nextPath) return;
 
   window.history.pushState({ page }, "", nextPath);
 }
 
 function replacePathForPage(page: PageId): void {
-  const nextPath = `${page === "tools" ? "/tools/" : "/"}#${page}`;
+  const nextPath = pagePath(page);
   if (`${window.location.pathname}${window.location.hash}` === nextPath) return;
 
   window.history.replaceState({ page }, "", nextPath);
 }
 
 function syncPageFromLocation(): void {
-  const nextPage = pageFromHash() ?? loadStoredPage();
+  const nextPage = pageFromRoute() ?? pageFromHash() ?? loadStoredPage();
   if (nextPage === currentPage) return;
 
   storeCurrentScroll();
   currentPage = nextPage;
   storeCurrentPage();
   renderPage();
+}
+
+function pagePath(page: PageId): string {
+  if (page === "tools") {
+    return "/tools/";
+  }
+
+  return `/docs/${encodeURIComponent(page)}/`;
 }
 
 function jumpToPendingSearchMatch(): boolean {
@@ -925,6 +918,32 @@ function normalizedIndexToOriginalRange(value: string, normalizedIndex: number, 
 function movePage(delta: number): void {
   const next = navOrder[pageIndex(currentPage) + delta];
   if (next) setPage(next);
+}
+
+function syncHeadMetadata(page: Page): void {
+  const title = `${page.title} | CUCoreLib Docs`;
+  const description = page.lead.trim();
+  const canonicalUrl = page.id === "tools"
+    ? "https://cucorelib.jimmyking.dev/tools/"
+    : `https://cucorelib.jimmyking.dev/docs/${encodeURIComponent(page.id)}/`;
+
+  document.title = title;
+  setHeadMeta('meta[name="description"]', "content", description);
+  setHeadMeta('link[rel="canonical"]', "href", canonicalUrl);
+  setHeadMeta('meta[property="og:title"]', "content", title);
+  setHeadMeta('meta[property="og:description"]', "content", description);
+  setHeadMeta('meta[property="og:url"]', "content", canonicalUrl);
+  setHeadMeta('meta[name="twitter:title"]', "content", title);
+  setHeadMeta('meta[name="twitter:description"]', "content", description);
+}
+
+function setHeadMeta(selector: string, attribute: "content" | "href", value: string): void {
+  const element = document.head.querySelector<HTMLElement>(selector);
+  if (!element) {
+    return;
+  }
+
+  element.setAttribute(attribute, value);
 }
 
 function updateChrome(): void {

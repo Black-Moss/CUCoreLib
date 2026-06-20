@@ -1,5 +1,5 @@
-import type { Ingredient, ItemState, PageId, RecipeState } from "./types";
-import { pages } from "./docsPages";
+import type { Ingredient, ItemState, PageId, RecipeState } from "./types.ts";
+import { pages } from "./docsPages.ts";
 
 let currentPage: PageId;
 let itemState: ItemState;

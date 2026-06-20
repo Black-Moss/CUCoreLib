@@ -8,7 +8,11 @@
     ],
     "rewrites": [
       {
-        "source": "**",
+        "source": "/tools/**",
+        "destination": "/index.html"
+      },
+      {
+        "source": "!/@(robots.txt|sitemap.xml|api/**|docs/**)",
         "destination": "/index.html"
       }
     ]

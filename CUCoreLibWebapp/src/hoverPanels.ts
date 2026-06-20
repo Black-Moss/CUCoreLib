@@ -1,4 +1,4 @@
-import type { HoverPanel } from "./types";
+import type { HoverPanel } from "./types.ts";
 
 export const hoverPanels: Record<string, HoverPanel> = {
   ModOptionsRegistry: {
