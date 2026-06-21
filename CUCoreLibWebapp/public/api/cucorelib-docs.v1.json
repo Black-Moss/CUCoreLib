@@ -2,7 +2,7 @@
   "version": "1.0",
   "library": "CUCoreLib",
   "description": "Machine-readable CUCoreLib web docs generated from the interactive docs sources.",
-  "generatedAt": "2026-06-20T16:34:39.451Z",
+  "generatedAt": "2026-06-21T06:08:59.476Z",
   "baseUrl": "/",
   "topics": [
     {
@@ -40,6 +40,15 @@
       "lead": "What is this, music theory?",
       "appUrl": "/docs/harmony0/",
       "machineUrl": "/api/topics/harmony0.json"
+    },
+    {
+      "id": "tutorial-first-mod",
+      "label": "Making A First Mod",
+      "crumb": "Tutorial",
+      "title": "Making a first mod",
+      "lead": "Build a tiny acid-themed mod from start to finish with one custom item, one liquid, one building entity, recipes, and asset plus sound loading.",
+      "appUrl": "/docs/tutorial-first-mod/",
+      "machineUrl": "/api/topics/tutorial-first-mod.json"
     },
     {
       "id": "assets",

@@ -30,6 +30,13 @@ export const pages: Page[] = [
     lead: "What is this, music theory?"
   },
   {
+    id: "tutorial-first-mod",
+    label: "Making A First Mod",
+    crumb: "Tutorial",
+    title: "Making a first mod",
+    lead: "Build a tiny acid-themed mod from start to finish with one custom item, one liquid, one building entity, recipes, and asset plus sound loading."
+  },
+  {
     id: "assets",
     label: "Loading Assets",
     crumb: "Content APIs",
@@ -245,6 +252,7 @@ export function pageBody(page: PageId, nextItemState: ItemState, nextRecipeState
   else if (page === "unity-csharp") content = unityCsharpPage();
   else if (page === "setup") content = setupPage();
   else if (page === "harmony0") content = harmony0Page();
+  else if (page === "tutorial-first-mod") content = tutorialFirstModPage();
   else if (page === "recipe") content = recipePage();
   else if (page === "assets") content = assetPage();
   else if (page === "audio") content = audioPage();
@@ -378,6 +386,59 @@ function buildingEntitiesPage(): string {
           </tbody>
         </table>
       </div>
+    </section>
+  `;
+}
+
+function tutorialFirstModPage(): string {
+  return `
+    <section class="lesson-card">
+      <h2>What we are building</h2>
+      <p>This page is a start-to-finish example that ties the core APIs together. We will add one custom item called <span class="inline-code">acidshroom</span>, one custom liquid called <span class="inline-code">hydrochloricacid</span>, one buildingEntity called <span class="inline-code">acidmushroom</span>, and two simple recipes.</p>
+      <p>The code sample on the right is intentionally written as one compact registration flow so you can copy it into a first mod and then split it into files later.</p>
+      <ul>
+        <li>The mushroom building drops and feeds the content loop.</li>
+        <li>The acid liquid demonstrates <span class="inline-code">LiquidRegistry.Register</span>.</li>
+        <li>The recipes show both a direct harvest reward and a crafted battery upgrade.</li>
+      </ul>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Folder layout and assets</h2>
+      <p>Create three embedded resources in your project: <span class="inline-code">Images.acidshroom.png</span>, <span class="inline-code">Images.acidmushroom.png</span>, and <span class="inline-code">Audio.acid-pop.wav</span>. Set each file's Build Action to <span class="inline-code">Embedded Resource</span>.</p>
+      <p>If you need a refresher on the loaders themselves, the dedicated <a href="/docs/assets/" data-page="assets">Loading Assets</a> and <a href="/docs/audio/" data-page="audio">Audio</a> pages go deeper on suffix matching, caching, and loose file loading.</p>
+      <pre><code>// Examples used by this tutorial
+Sprite acidShroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidshroom.png");
+Sprite acidMushroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidmushroom.png", 8f);
+AudioClip acidPop = AssetLoader.LoadEmbeddedAudio("Audio.acid-pop.wav");</code></pre>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Register the item and liquid</h2>
+      <p>The <span class="inline-code">acidshroom</span> item is a normal pickup item that can be eaten for a tiny benefit and a little risk. The custom liquid uses <span class="inline-code">CustomLiquidInfo</span> so it can later be put into containers or recipe inputs.</p>
+      <p>For more field-by-field references, see <a href="/docs/item/" data-page="item">Item API</a>, <a href="/docs/advanced-item/" data-page="advanced-item">Advanced Item API</a>, and <a href="/docs/liquids/" data-page="liquids">Liquid API</a>.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Register the building entity</h2>
+      <p>The <span class="inline-code">acidmushroom</span> buildingEntity is a simple floor plant. It uses the embedded sprite, reuses the loaded sound as a custom hit sound, and drops the harvest item when destroyed.</p>
+      <p>If you want to expand this into a more interactive machine later, jump to <a href="/docs/building-entities/" data-page="building-entities">Building Entities</a> and <a href="/docs/advanced-building-entities/" data-page="advanced-building-entities">Advanced Buildings</a>.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Register the recipes</h2>
+      <p>This walkthrough uses two recipes:</p>
+      <ul>
+        <li><span class="inline-code">acidmushroom</span> into <span class="inline-code">40</span> biochem.</li>
+        <li><span class="inline-code">2 acidshroom</span> plus <span class="inline-code">processedcopper</span> into one <span class="inline-code">mediumbattery</span>.</li>
+      </ul>
+      <p>The dedicated <a href="/docs/recipe/" data-page="recipe">Recipe API</a> page explains the recipe object model in more depth, especially when you start mixing qualities, liquids, and condition values.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Where to go next</h2>
+      <p>Once this works, the next useful additions are usually <a href="/docs/locale/" data-page="locale">Locale</a> for explicit translations, <a href="/docs/console/" data-page="console">Console</a> for spawn/debug commands, and <a href="/docs/utils/" data-page="utils">CUCoreUtils</a> for delayed startup or world-ready checks.</p>
+      <p>The tutorial sample keeps everything in one place on purpose. When you are ready, split it into <span class="inline-code">RegisterItems.cs</span>, <span class="inline-code">RegisterLiquids.cs</span>, <span class="inline-code">RegisterBuildings.cs</span>, and <span class="inline-code">RegisterRecipes.cs</span>.</p>
     </section>
   `;
 }

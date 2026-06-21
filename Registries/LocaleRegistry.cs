@@ -179,15 +179,9 @@ namespace CUCoreLib.Registries
                 Directory.CreateDirectory(directory);
             }
 
-            string json;
-            using (var textWriter = new StringWriter())
-            using (var jsonWriter = new JsonTextWriter(textWriter))
-            {
-                jsonWriter.Formatting = Formatting.Indented;
-                output.WriteTo(jsonWriter);
-                jsonWriter.Flush();
-                json = textWriter.ToString();
-            }
+            // Serialize a plain CLR graph so locale generation does not depend on
+            // JToken.WriteTo, which can fail when another mod loads an older Newtonsoft.Json first.
+            string json = JsonConvert.SerializeObject(ConvertTokenToPlainObject(output), Formatting.Indented);
 
             File.WriteAllText(path, json);
             return path;
@@ -220,6 +214,43 @@ namespace CUCoreLib.Registries
                 default:
                     return "other";
             }
+        }
+
+        private static object ConvertTokenToPlainObject(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            {
+                return null;
+            }
+
+            if (token is JObject obj)
+            {
+                Dictionary<string, object> result = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (JProperty property in obj.Properties())
+                {
+                    result[property.Name] = ConvertTokenToPlainObject(property.Value);
+                }
+
+                return result;
+            }
+
+            if (token is JArray array)
+            {
+                List<object> result = new List<object>();
+                foreach (JToken entry in array)
+                {
+                    result.Add(ConvertTokenToPlainObject(entry));
+                }
+
+                return result;
+            }
+
+            if (token is JValue value)
+            {
+                return value.Value;
+            }
+
+            return token.ToString(Formatting.None);
         }
 
     }

@@ -78,6 +78,175 @@ namespace ModNamespace
 }`;
 }
 
+function tutorialFirstModCode(): string {
+  return `using System.Collections.Generic;
+using BepInEx;
+using BepInEx.Logging;
+using CUCoreLib.Data;
+using CUCoreLib.Helpers;
+using CUCoreLib.Registries;
+using UnityEngine;
+
+namespace AcidShroomTutorial
+{
+    [BepInPlugin(ModGuid, ModName, ModVersion)]
+    [BepInDependency("net.cucorelib", BepInDependency.DependencyFlags.HardDependency)]
+    public sealed class Plugin : BaseUnityPlugin
+    {
+        private const string ModGuid = "com.example.acidshroomtutorial";
+        private const string ModName = "Acid Shroom Tutorial";
+        private const string ModVersion = "1.0.0";
+
+        internal static new ManualLogSource Logger;
+
+        private Sprite acidShroomSprite;
+        private Sprite acidMushroomSprite;
+        private AudioClip acidPopSound;
+
+        private void Awake()
+        {
+            Logger = base.Logger;
+
+            LoadAssets();
+            RegisterLiquids();
+            RegisterItems();
+            RegisterBuildings();
+            RegisterRecipes();
+
+            Logger.LogInfo("Acid Shroom tutorial content registered.");
+        }
+
+        private void LoadAssets()
+        {
+            acidShroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidshroom.png");
+            acidMushroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidmushroom.png", 8f);
+            acidPopSound = AssetLoader.LoadEmbeddedAudio("Audio.acid-pop.wav");
+
+            AssetLoader.CacheSprite("acidshroomtutorial.acidshroom", acidShroomSprite);
+            AssetLoader.CacheSprite("acidshroomtutorial.acidmushroom", acidMushroomSprite);
+            AssetLoader.CacheAudioClip("acidshroomtutorial.acid.pop", acidPopSound);
+        }
+
+        private void RegisterLiquids()
+        {
+            LiquidRegistry.Register("hydrochloricacid", new CustomLiquidInfo
+            {
+                name = "Hydrochloric acid",
+                description = "A nasty industrial acid with a sharp chemical smell.",
+                color = new Color(0.77f, 0.96f, 0.28f),
+                valuePerLiter = 32f,
+                onDrink = (ml, body) =>
+                {
+                    float dose = ml * 0.01f;
+                    body.Drink(dose * 2f);
+                    body.sicknessAmount = Mathf.Clamp(body.sicknessAmount + dose * 18f, 0f, 100f);
+                    body.happiness -= dose * 6f;
+                },
+                onHealthUse = (ml, limb) =>
+                {
+                    float dose = ml * 0.01f;
+                    limb.skinHealth = Mathf.Clamp(limb.skinHealth - dose * 22f, 0f, 100f);
+                    limb.pain = Mathf.Clamp(limb.pain + dose * 25f, 0f, 100f);
+                }
+            });
+        }
+
+        private void RegisterItems()
+        {
+            ItemRegistry.Register("acidshroom", new ItemInfo
+            {
+                fullName = "Acid shroom",
+                description = "A caustic mushroom that tingles in all the wrong ways.",
+                category = "food",
+                weight = 0.2f,
+                value = 5,
+                usable = true,
+                tags = "cangetwet",
+                rec = new Recognition(2),
+                useAction = (body, item) =>
+                {
+                    body.Eat(6f, 0.4f);
+                    body.happiness += 0.5f;
+                    body.sicknessAmount = Mathf.Clamp(body.sicknessAmount + 1.5f, 0f, 100f);
+                    item.condition -= 1f;
+                    Sound.Play("eatCrunch", body.transform.position);
+                }
+            }, acidShroomSprite, 1);
+        }
+
+        private void RegisterBuildings()
+        {
+            BuildingEntityRegistry.Register("acidmushroom", new CustomBuildingEntityDefinition
+            {
+                Name = "Acid mushroom",
+                Description = "A dangerous mushroom cluster that leaks acidic slime.",
+                Sprite = acidMushroomSprite,
+                Health = 120f,
+                Placement = BuildingPlacementType.Floor,
+                SurfaceOffset = 0.5f,
+                SpawnMinPerChunk = 0.03f,
+                SpawnMaxPerChunk = 0.06f,
+                HitSound = acidPopSound,
+                ItemsDropOnDestroy = new[]
+                {
+                    BuildingEntityRegistry.AddDrop("acidshroom", 1f, 1f, 2f)
+                }
+            });
+        }
+
+        private void RegisterRecipes()
+        {
+            RecipeRegistry.Register(new Recipe
+            {
+                INT = 0,
+                category = Recipes.RecipeCategory.Materials,
+                result = new RecipeResult
+                {
+                    id = "biochem",
+                    amount = 40,
+                    isLiquid = false,
+                    resultCondition = 1f
+                },
+                items = new List<RecipeItem>
+                {
+                    new RecipeItem(1f)
+                    {
+                        specific = true,
+                        specificId = "acidmushroom"
+                    }
+                }
+            });
+
+            RecipeRegistry.Register(new Recipe
+            {
+                INT = 2,
+                category = Recipes.RecipeCategory.Tools,
+                result = new RecipeResult
+                {
+                    id = "mediumbattery",
+                    amount = 1,
+                    isLiquid = false,
+                    resultCondition = 1f
+                },
+                items = new List<RecipeItem>
+                {
+                    new RecipeItem(2f)
+                    {
+                        specific = true,
+                        specificId = "acidshroom"
+                    },
+                    new RecipeItem(1f)
+                    {
+                        specific = true,
+                        specificId = "processedcopper"
+                    }
+                }
+            });
+        }
+    }
+}`;
+}
+
 function itemCode(): string {
   const id = itemState.id.trim() || "myitem";
   const spriteVariable = `${csharpIdentifier(id, "item")}Sprite`;
@@ -369,6 +538,7 @@ export function currentCode(nextPage: PageId, nextItemState: ItemState, nextReci
   if (currentPage === "unity-csharp") return unityCsharpCode();
   if (currentPage === "setup") return setupCode();
   if (currentPage === "harmony0") return harmony0Code();
+  if (currentPage === "tutorial-first-mod") return tutorialFirstModCode();
   if (currentPage === "recipe") return recipeCode();
   if (currentPage === "assets") return assetCode();
   if (currentPage === "audio") return audioCode();
@@ -398,6 +568,7 @@ export function codeTitle(currentPage: PageId): string {
   if (currentPage === "unity-csharp") return "MyFirstPlugin.cs";
   if (currentPage === "setup") return "Plugin.cs";
   if (currentPage === "harmony0") return "HarmonyPatches.cs";
+  if (currentPage === "tutorial-first-mod") return "AcidShroomTutorial.cs";
   if (currentPage === "recipe") return "RegisterRecipes.cs";
   if (currentPage === "saving") return "MarkerSaveProvider.cs";
   if (currentPage === "assets") return "LoadAssets.cs";

@@ -33,6 +33,7 @@ const recipeState: RecipeState = machineExportDefaultRecipeState;
 
 const navGroups: Array<{ label: string; pages: PageId[] }> = [
   { label: "Introduction", pages: ["welcome", "unity-csharp", "setup", "harmony0"] },
+  { label: "Tutorial", pages: ["tutorial-first-mod"] },
   {
     label: "Items / Liquids",
     pages: [
