@@ -48,6 +48,24 @@ namespace CUCoreLib.Patches
             ApplyCustomItemRuntime(__instance);
         }
 
+        [HarmonyPatch(typeof(WaterContainerItem), "Start")]
+        [HarmonyPrefix]
+        private static void ApplyCustomLiquidMaskBeforeWaterContainerStart(WaterContainerItem __instance)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            Item item = __instance.GetComponent<Item>();
+            if (!ItemRegistry.TryGetCustomInfo(item, out var def))
+            {
+                return;
+            }
+
+            __instance.fillSprite = def.LiquidMask;
+        }
+
         internal static void ApplyCustomItemRuntime(Item item, bool preferWornSprite = false)
         {
             if (item == null || string.IsNullOrWhiteSpace(item.id))
@@ -263,6 +281,8 @@ namespace CUCoreLib.Patches
                 bool createdWaterContainer = wat == null;
                 if (wat == null) wat = item.gameObject.AddComponent<WaterContainerItem>();
 
+                wat.fillSprite = def.LiquidMask;
+
                 if (createdWaterContainer && (wat.stack == null || wat.stack.Count == 0))
                 {
                     wat.stack = CopyLiquidStacks(def.defaultContents);
@@ -280,6 +300,8 @@ namespace CUCoreLib.Patches
                 WaterContainerItem wat = item.GetComponent<WaterContainerItem>();
                 bool createdWaterContainer = wat == null;
                 if (wat == null) wat = item.gameObject.AddComponent<WaterContainerItem>();
+
+                wat.fillSprite = def.LiquidMask;
 
                 if (createdWaterContainer && (wat.stack == null || wat.stack.Count == 0))
                 {

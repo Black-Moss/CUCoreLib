@@ -6,9 +6,12 @@ using UnityEngine;
 
     public class CustomItemInfo : LiquidItemInfo
     {
+        private bool destroyAtZeroConditionWasExplicitlySet;
+
         public string ID;
         public Sprite Icon;
         public Sprite WornSprite;
+        public Sprite LiquidMask;
         public string IconAnimationId;
         public string WornSpriteAnimationId;
         public Vector2 HeldSpriteOffset;
@@ -24,6 +27,23 @@ using UnityEngine;
         public ToolProperties Tool;
         public List<string> SpawnComponents = new List<string>();
         public Dictionary<string, object> CustomData = new Dictionary<string, object>();
+
+        public new bool destroyAtZeroCondition
+        {
+            get => base.destroyAtZeroCondition;
+            set
+            {
+                base.destroyAtZeroCondition = value;
+                destroyAtZeroConditionWasExplicitlySet = true;
+            }
+        }
+
+        internal bool DestroyAtZeroConditionWasExplicitlySet => destroyAtZeroConditionWasExplicitlySet;
+
+        internal void SetDestroyAtZeroConditionDefault(bool value)
+        {
+            base.destroyAtZeroCondition = value;
+        }
     }
 
     [System.Serializable]

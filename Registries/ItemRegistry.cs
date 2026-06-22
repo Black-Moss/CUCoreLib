@@ -159,6 +159,7 @@ namespace CUCoreLib.Registries
                     ["defaultContents"] = NetworkSnapshotSerialization.WriteLiquidStacks(info.defaultContents),
                     ["icon"] = NetworkSnapshotSerialization.WriteSprite(info.Icon),
                     ["wornSprite"] = NetworkSnapshotSerialization.WriteSprite(info.WornSprite),
+                    ["liquidMask"] = NetworkSnapshotSerialization.WriteSprite(info.LiquidMask),
                     ["heldSpriteOffsetX"] = info.HeldSpriteOffset.x,
                     ["heldSpriteOffsetY"] = info.HeldSpriteOffset.y,
                     ["wornSpriteOffsetX"] = info.WornSpriteOffset.x,
@@ -287,6 +288,7 @@ namespace CUCoreLib.Registries
                     defaultContents = NetworkSnapshotSerialization.ReadLiquidStacks(obj["defaultContents"]),
                     Icon = NetworkSnapshotSerialization.ReadSprite(obj["icon"]),
                     WornSprite = NetworkSnapshotSerialization.ReadSprite(obj["wornSprite"]),
+                    LiquidMask = NetworkSnapshotSerialization.ReadSprite(obj["liquidMask"]),
                     SpriteScale = obj.Value<float?>("spriteScale") ?? 1f,
                     SpriteScaleDimensions = new SpriteScaleDimensions(
                         obj.Value<float?>("spriteScaleWidth") ?? 0f,
@@ -561,20 +563,66 @@ namespace CUCoreLib.Registries
 
         private static void ApplySmartDefaults(ItemInfo info)
         {
-            if (info.destroyAtZeroCondition) return;
+            if (WasDestroyAtZeroConditionExplicitlySet(info))
+            {
+                return;
+            }
+
+            if (IsStandardLiquidContainer(info))
+            {
+                return;
+            }
 
             if (info.decayMinutes > 0)
             {
-                info.destroyAtZeroCondition = true;
+                SetDestroyAtZeroConditionDefault(info, true);
             }
             else if (info.usable && !info.autoAttack && info.category != "tool" && info.category != "weapon")
             {
-                info.destroyAtZeroCondition = true;
+                SetDestroyAtZeroConditionDefault(info, true);
             }
             else if (info.category == "trash")
             {
-                info.destroyAtZeroCondition = true;
+                SetDestroyAtZeroConditionDefault(info, true);
             }
+        }
+
+        private static bool WasDestroyAtZeroConditionExplicitlySet(ItemInfo info)
+        {
+            if (info == null)
+            {
+                return false;
+            }
+
+            if (info is CustomItemInfo customInfo)
+            {
+                return customInfo.DestroyAtZeroConditionWasExplicitlySet;
+            }
+
+            return info.destroyAtZeroCondition;
+        }
+
+        private static void SetDestroyAtZeroConditionDefault(ItemInfo info, bool value)
+        {
+            if (info is CustomItemInfo customInfo)
+            {
+                customInfo.SetDestroyAtZeroConditionDefault(value);
+                return;
+            }
+
+            info.destroyAtZeroCondition = value;
+        }
+
+        private static bool IsStandardLiquidContainer(ItemInfo info)
+        {
+            if (!(info is LiquidItemInfo liquidInfo))
+            {
+                return false;
+            }
+
+            return liquidInfo.capacity > 0f ||
+                (liquidInfo.defaultContents != null && liquidInfo.defaultContents.Count > 0) ||
+                liquidInfo.autoFill;
         }
 
         private static void ApplyMedicalActions(CustomItemInfo info)

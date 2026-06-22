@@ -119,6 +119,12 @@ namespace CUCoreLib.Helpers
             var item = obj.GetComponent<Item>();
             if (item) item.id = id;
 
+            WaterContainerItem waterContainer = obj.GetComponent<WaterContainerItem>();
+            if (waterContainer != null)
+            {
+                waterContainer.fillSprite = info != null ? info.LiquidMask : null;
+            }
+
             var sr = obj.GetComponent<SpriteRenderer>();
             if (sr && info.Icon != null)
             {

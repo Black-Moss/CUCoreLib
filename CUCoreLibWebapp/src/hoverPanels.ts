@@ -222,7 +222,11 @@ export const hoverPanels: Record<string, HoverPanel> = {
   },
   CustomItemInfo: {
     title: "CustomItemInfo",
-    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, SpawnFrequency, SpriteScale, SpriteScaleDimensions, or CustomData."
+    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, LiquidMask, SpawnFrequency, SpriteScale, SpriteScaleDimensions, or CustomData."
+  },
+  LiquidMask: {
+    title: "LiquidMask",
+    body: "Optional sprite used as the vanilla-style liquid fill overlay for a custom WaterContainerItem. Use a white or neutral grayscale mask with transparency defining the visible fill area, because the game tints the sprite to the liquid color at render time."
   },
   WornSpriteOffset: {
     title: "WornSpriteOffset",
