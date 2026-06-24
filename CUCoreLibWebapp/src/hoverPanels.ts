@@ -52,6 +52,11 @@ export const hoverPanels: Record<string, HoverPanel> = {
     title: "ConsoleCommandRegistry",
     body: "CUCoreLib wrapper for adding commands to ConsoleScript.Commands without writing your own Harmony postfix."
   },
+  ContentReloadEntry: {
+    title: "ContentReloadEntry",
+    signature: "[ContentReloadEntry(ContentReloadEntryStage stage, Order = 0)]",
+    body: "Attribute that opts a parameterless method into strict content reload. CUCoreLib replays tagged methods by stage, then by Order, without rerunning your plugin Awake."
+  },
   ConsoleCheckForWorld: {
     title: "ConsoleCheckForWorld",
     body: "CUCoreUtils wrapper around the game's console world check. Call it before command logic that needs PlayerCamera, body, world, or run state."

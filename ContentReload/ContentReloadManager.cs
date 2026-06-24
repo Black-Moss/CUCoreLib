@@ -2,26 +2,25 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Newtonsoft.Json;
 using BepInEx;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
 using Mono.Cecil;
+using UnityEngine;
 
 namespace CUCoreLib.ContentReload
 {
     public static class ContentReloadManager
     {
-        private const string ConfigFileName = "ContentReload.json";
+        private const string AutoHotReloadPathKeyPrefix = "CUCoreLib.AutoHotReload.Path.";
+        private const string AutoHotReloadEnabledKeyPrefix = "CUCoreLib.AutoHotReload.Enabled.";
 
         private static readonly Dictionary<string, ContentReloadState> StateByModGuid =
             new Dictionary<string, ContentReloadState>(StringComparer.OrdinalIgnoreCase);
 
         private static bool initialized;
-        private static ContentReloadConfig config;
-
-        internal static string ConfigDirectoryPath { get; private set; }
+        private static readonly ContentReloadConfig config = new ContentReloadConfig();
 
         internal static void Initialize()
         {
@@ -31,8 +30,7 @@ namespace CUCoreLib.ContentReload
             }
 
             initialized = true;
-            ConfigDirectoryPath = Path.Combine(Paths.ConfigPath, "CUCoreLib");
-            config = LoadConfig();
+            RestorePersistedAutoHotReloadSettings();
             ContentWatchService.Initialize();
         }
 
@@ -127,7 +125,7 @@ namespace CUCoreLib.ContentReload
 
             modConfig.OverrideDllPath = normalizedPath;
             modConfig.WatchEnabled = enabled;
-            SaveConfig();
+            PersistAutoHotReloadSetting(modGuid, normalizedPath, enabled);
 
             string label = string.IsNullOrWhiteSpace(modName) ? modGuid : modName + " (" + modGuid + ")";
             message = (enabled ? "Enabled" : "Disabled") + " automatic hot reload for " + label + " using " + normalizedPath + ".";
@@ -189,23 +187,17 @@ namespace CUCoreLib.ContentReload
 
         public static void WriteReloadSummaryToConsole(ConsoleScript console, ContentReloadResult result)
         {
-            string headline = BuildResultHeadline(result);
-            // if (result != null && !result.Succeeded)
-            // {
-            //     CUCoreLibPlugin.Log?.LogWarning(headline);
-            // }
-            // else
-            // {
-            //     CUCoreLibPlugin.Log?.LogInfo(headline);
-            // }
-            if (console != null)
+            if (result != null && result.Succeeded)
             {
-                CUCoreUtils.ConsoleLog(console, headline);
+                string reloadLabel = GetReloadedFileName(result.SourcePath);
+                if (console != null)
+                {
+                    CUCoreUtils.ConsoleLog(console, "Reloaded " + reloadLabel + "!");
+                }
+
+                return;
             }
 
-            WriteMessages(console, result != null ? result.RecognizedMethods.Select(method => "Recognized method: " + method).ToArray() : Array.Empty<string>());
-            WriteMessages(console, result != null ? result.Info.ToArray() : Array.Empty<string>());
-            WriteMessages(console, result != null ? result.Skipped.ToArray() : Array.Empty<string>());
             WriteMessages(console, result != null ? result.Errors.ToArray() : Array.Empty<string>());
             if (result != null && !string.IsNullOrWhiteSpace(result.UnsupportedReason))
             {
@@ -225,61 +217,60 @@ namespace CUCoreLib.ContentReload
             return state;
         }
 
-        private static ContentReloadConfig LoadConfig()
+        private static void RestorePersistedAutoHotReloadSettings()
         {
-            try
+            foreach (string modGuid in GetLoadedModGuids())
             {
-                Directory.CreateDirectory(ConfigDirectoryPath);
-                string configPath = Path.Combine(ConfigDirectoryPath, ConfigFileName);
-                if (!File.Exists(configPath))
+                string normalizedModGuid = (modGuid ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(normalizedModGuid))
                 {
-                    ContentReloadConfig created = new ContentReloadConfig();
-                    File.WriteAllText(configPath, JsonConvert.SerializeObject(created, Formatting.Indented));
-                    return created;
+                    continue;
                 }
 
-                ContentReloadConfig loaded = JsonConvert.DeserializeObject<ContentReloadConfig>(File.ReadAllText(configPath));
-                if (loaded == null)
+                string persistedPath = CUCoreUtils.GetString(GetAutoHotReloadPathKey(normalizedModGuid), string.Empty);
+                bool watchEnabled = CUCoreUtils.GetBool(GetAutoHotReloadEnabledKey(normalizedModGuid), false);
+                if (string.IsNullOrWhiteSpace(persistedPath) && !watchEnabled)
                 {
-                    return new ContentReloadConfig();
+                    continue;
                 }
 
-                if (loaded.Mods == null)
+                if (config.Mods == null)
                 {
-                    loaded.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
+                    config.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
                 }
 
-                if (loaded.PollIntervalSeconds <= 0)
+                if (!config.Mods.TryGetValue(normalizedModGuid, out ContentReloadModConfig modConfig) || modConfig == null)
                 {
-                    loaded.PollIntervalSeconds = 2;
+                    modConfig = new ContentReloadModConfig();
+                    config.Mods[normalizedModGuid] = modConfig;
                 }
 
-                if (loaded.DebounceMilliseconds <= 0)
-                {
-                    loaded.DebounceMilliseconds = 1200;
-                }
-
-                return loaded;
-            }
-            catch (Exception ex)
-            {
-                CUCoreLibPlugin.Log?.LogWarning("Failed to load strict content reload config.\n" + ex);
-                return new ContentReloadConfig();
+                modConfig.OverrideDllPath = NormalizeExistingOrTargetPath(persistedPath);
+                modConfig.WatchEnabled = watchEnabled;
             }
         }
 
-        private static void SaveConfig()
+        private static void PersistAutoHotReloadSetting(string modGuid, string dllPath, bool enabled)
         {
-            try
+            string normalizedModGuid = (modGuid ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedModGuid))
             {
-                Directory.CreateDirectory(ConfigDirectoryPath);
-                string configPath = Path.Combine(ConfigDirectoryPath, ConfigFileName);
-                File.WriteAllText(configPath, JsonConvert.SerializeObject(config ?? new ContentReloadConfig(), Formatting.Indented));
+                return;
             }
-            catch (Exception ex)
-            {
-                CUCoreLibPlugin.Log?.LogWarning("Failed to save strict content reload config.\n" + ex);
-            }
+
+            CUCoreUtils.SetString(GetAutoHotReloadPathKey(normalizedModGuid), dllPath ?? string.Empty);
+            CUCoreUtils.SetBool(GetAutoHotReloadEnabledKey(normalizedModGuid), enabled);
+            PlayerPrefs.Save();
+        }
+
+        private static string GetAutoHotReloadPathKey(string modGuid)
+        {
+            return AutoHotReloadPathKeyPrefix + modGuid;
+        }
+
+        private static string GetAutoHotReloadEnabledKey(string modGuid)
+        {
+            return AutoHotReloadEnabledKeyPrefix + modGuid;
         }
 
         private static bool IsMultiplayerActive()
@@ -394,6 +385,24 @@ namespace CUCoreLib.ContentReload
                 ", " + result.Info.Count + " info, " +
                 result.Skipped.Count + " skipped, " +
                 result.Errors.Count + " errors." + suffix;
+        }
+
+        private static string GetReloadedFileName(string sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                return "content DLL";
+            }
+
+            try
+            {
+                string fileName = Path.GetFileName(sourcePath);
+                return string.IsNullOrWhiteSpace(fileName) ? "content DLL" : fileName;
+            }
+            catch
+            {
+                return "content DLL";
+            }
         }
 
         private static void WriteMessages(ConsoleScript console, IEnumerable<string> messages)

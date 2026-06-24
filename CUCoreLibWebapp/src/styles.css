@@ -224,6 +224,15 @@ textarea,
   white-space: nowrap;
 }
 
+.topbar-link-icon {
+  margin-right: 0.38rem;
+  font-family: "Symbols Nerd Font";
+  font-size: 0.96em;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+}
+
 .topbar-link:hover,
 .topbar-link:focus-visible {
   border-color: var(--line-hover);

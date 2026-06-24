@@ -70,7 +70,7 @@ namespace CUCoreLib.ContentReload
 
             if (candidate == null || string.IsNullOrWhiteSpace(candidate.SelectedPath))
             {
-                report.UnsupportedReason = "No rebuilt DLL source path was found. The loaded plugin path and configured override path were both unavailable.";
+                report.UnsupportedReason = "No rebuilt DLL source path was found. The loaded plugin path and runtime override path were both unavailable.";
                 return report;
             }
 

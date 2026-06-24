@@ -159,21 +159,37 @@ namespace CUCoreLib.ContentReload
 
         private static void FinalizeRuntimeRefresh(IEnumerable<string> buildingIds)
         {
+            if (Recipes.recipes != null)
+            {
+                LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
+                RecipeRegistry.InjectRegisteredRecipes();
+            }
+
             try
             {
-                if (Recipes.recipes != null)
-                {
-                    LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
-                    RecipeRegistry.InjectRegisteredRecipes();
-                }
-
                 BuildingEntityRegistry.RefreshLiveInstances(buildingIds);
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload building refresh failed.\n" + ex);
+            }
+
+            try
+            {
                 ConsolePatch.RefreshRuntimeAutofill();
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload console autofill refresh failed.\n" + ex);
+            }
+
+            try
+            {
                 RecipeRegistryPatches.RefreshCraftingUi();
             }
             catch (Exception ex)
             {
-                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload post-refresh failed.\n" + ex);
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload crafting UI refresh failed.\n" + ex);
             }
         }
 

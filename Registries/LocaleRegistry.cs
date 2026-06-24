@@ -349,12 +349,28 @@ namespace CUCoreLib.Registries
                 return result;
             }
 
+            if (token is JProperty propertyToken)
+            {
+                return ConvertTokenToPlainObject(propertyToken.Value);
+            }
+
             if (token is JValue value)
             {
                 return value.Value;
             }
 
-            return token.ToString(Formatting.None);
+            if (token is JContainer container)
+            {
+                List<object> result = new List<object>();
+                foreach (JToken child in container.Children())
+                {
+                    result.Add(ConvertTokenToPlainObject(child));
+                }
+
+                return result;
+            }
+
+            return null;
         }
 
         private sealed class OwnerScope : IDisposable

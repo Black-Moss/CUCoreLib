@@ -142,8 +142,7 @@ namespace CUCoreLib.ContentReload
                 return path;
             }
 
-            string baseDirectory = ContentReloadManager.ConfigDirectoryPath;
-            return string.IsNullOrWhiteSpace(baseDirectory) ? path : Path.Combine(baseDirectory, path);
+            return path;
         }
 
         private static string NormalizeExistingPath(string path)

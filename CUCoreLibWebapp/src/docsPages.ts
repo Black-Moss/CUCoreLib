@@ -220,10 +220,10 @@ export const pages: Page[] = [
   },
   {
     id: "debug-testing",
-    label: "Debugging / Testing",
+    label: "Hot Reload / Testing",
     crumb: "Debug APIs",
     title: "Debugging, testing, and hot reload",
-    lead: "Speed up iteration with logs, tutorial-friendly config toggles, console harnesses, and CUCoreLib's strict content reload flow."
+    lead: "Are you tired of restarting the game to test your mod?"
   },
   {
     id: "utils",
@@ -2804,28 +2804,15 @@ function debugTestingPage(): string {
     <section class="lesson-card">
       <h2>Fast mod-testing loop</h2>
       <p>Most CUCoreLib iteration gets faster when you separate startup-only work from content registration. Keep console commands, Harmony patches, and other one-time setup in <span class="inline-code">Awake()</span>, but move content into split methods like <span class="inline-code">LoadAssets()</span>, <span class="inline-code">RegisterItems()</span>, <span class="inline-code">RegisterLiquids()</span>, and <span class="inline-code">RegisterRecipes()</span>.</p>
-      <p>That split helps even before hot reload enters the picture: it keeps your mod easier to reason about, gives you narrow places to debug, and lines up with the strict CUCoreLib content reload flow.</p>
-      <ol>
-        <li>Build the mod.</li>
-        <li>Watch the BepInEx console or <span class="inline-code">BepInEx/LogOutput.log</span>.</li>
-        <li>Use temporary console commands to spawn or verify exactly what you changed.</li>
-        <li>If the mod follows the strict content shape, rebuild and run <span class="inline-code">reloadcontent &lt;modGuid&gt;</span> in singleplayer.</li>
-      </ol>
+      <p>That split helps even before hot reload enters the picture. However, hot reload makes this much much faster. Let's learn how to use it.</p>
     </section>
 
     <section class="lesson-card">
-      <h2>Strict content reload</h2>
-      <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads item, liquid, recipe, and locale/text content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support buildings, save providers, moodles, Harmony setup, mod options, or multiplayer registration.</p>
-      ${docsVideo(externalVideoUrls.hotReload, "/videos/hot-reload.mp4", "screenshot docs-video")}
-      <pre><code>reloadcontent com.example.mymod
-listhotreload
-reloaddll com.example.mymod</code></pre>
-      <ul>
-        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> loads the rebuilt DLL, clears the previous owner-scoped content, and replays only recognized content methods.</li>
-        <li><span class="inline-code">listhotreload</span> shows which loaded mods are compatible, which methods were recognized, and the selected DLL source path.</li>
-        <li><span class="inline-code">reloaddll</span> is now a strict-mode help/inspection command rather than a generic runtime assembly swap.</li>
-      </ul>
-      <p>The preferred entrypoint contract is now an explicit attribute on parameterless methods, so mods are not forced to use specific method names.</p>
+     
+      
+      <h2>Usage</h2>
+      
+      <p>The preferred entrypoint contract is an explicit attribute on parameterless methods:</p>
       <pre><code>[ContentReloadEntry(ContentReloadEntryStage.LoadAssets)]
 private void LoadAcidAssets() { ... }
 
@@ -2835,22 +2822,60 @@ private void RegisterAcidItems() { ... }
 [ContentReloadEntry(ContentReloadEntryStage.RegisterRecipes, Order = 10)]
 private void RegisterLateRecipes() { ... }</code></pre>
       <p>Methods are replayed by stage, then by optional <span class="inline-code">Order</span>. Mods that want strict content reload support must opt in with <span class="inline-code">[ContentReloadEntry(...)]</span> on parameterless methods.</p>
-    </section>
+      ${docsVideo(externalVideoUrls.hotReload, "/videos/hot-reload.mp4", "screenshot docs-video")}
+
+      <h2>Commands</h2>
+      <pre><code>
+      reloadcontent com.example.mymod
+      autohotreload C:/Users/you/source/MyMod/bin/Debug/net48/MyMod.dll true
+      autohotreload C:/Users/you/source/MyMod/bin/Debug/net48/MyMod.dll false
+      </code></pre>
+      <ul>
+        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> loads the rebuilt DLL, clears the previous content, and replays only recognized content methods.</li>
+        <li><span class="inline-code">autohotreload &lt;filepath&gt; true</span> enables persistent watch mode for that DLL, which automatically hot reloads if it detects a file hash change.</li>
+        <li><span class="inline-code">autohotreload &lt;filepath&gt; false</span> disables the saved watch mode for that DLL.</li>
+      </ul>
+
+       <h2>Limitations</h2>
+      <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads item, liquid, recipe, and locale/text content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support save providers, moodles, Harmony patches, mod options, or multiplayer registration just yet.</p>
+      </section>
+
 
     <section class="lesson-card">
-      <h2>Watch mode and override DLL paths</h2>
-      <p>Strict content reload also has an optional watch loop. It is configured per mod in <span class="inline-code">BepInEx/config/CUCoreLib/ContentReload.json</span>.</p>
-      <pre><code>{
-  "PollIntervalSeconds": 2,
-  "DebounceMilliseconds": 1200,
-  "Mods": {
-    "com.example.mymod": {
-      "OverrideDllPath": "C:/Users/you/source/MyMod/bin/Debug/net48/MyMod.dll",
-      "WatchEnabled": true
-    }
-  }
-}</code></pre>
-      <p>Use an override path when the loaded plugin DLL is not the file you are actively rebuilding. Watch mode compares timestamp and size first, then hashes when needed, so it avoids doing heavy work every poll.</p>
+      <h2>Launch overrides and optimizations</h2>
+      <p>For testing elements that are not covered by hot reload, CUCoreLib has a configuration for loading directly into a test world or tutorial.</p>
+      <p>In BepInEx -> Config -> CUCoreLib.cfg, there are options to instantly load the debug world or tutorial on launch.</p>
+      <img src="images/cucorelib-config.png" alt="CUCoreLib .cfg config" class="screenshot">
+      <p>Similarly, you may want to consider a batch script for automating the testing process. For instance, a .bat script:</p>
+      <pre><code>
+@echo off
+setlocal EnableExtensions
+
+set "GAME_DIR=C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Demo"
+set "PLUGIN_DIR=%GAME_DIR%\BepInEx\plugins"
+set "SOURCE_DLL=PATH_TO_bin\Debug\FILENAME.dll"
+
+echo Closing scav
+taskkill /F /IM "CasualtiesUnknown.exe" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+echo.
+echo Copying .dll file
+copy /Y "%SOURCE_DLL%" "%PLUGIN_DIR%\" >nul
+
+echo.
+echo Launching through Steam...
+start "" "steam://rungameid/4576510"
+
+timeout /t 3 /nobreak >nul
+tasklist /FI "IMAGENAME eq CasualtiesUnknown.exe" | find /I "CasualtiesUnknown.exe" >nul
+if errorlevel 1 (
+    echo Steam launch did not start the game (offline?). Falling back to local executable...
+    start "" "%GAME_DIR%\CasualtiesUnknown.exe"
+)
+endlocal
+exit /b 0
+      </pre></code>
     </section>
 
 

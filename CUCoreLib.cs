@@ -61,7 +61,7 @@ namespace CUCoreLib
             {
                 string path = args.Length > 1 ? args[1] : null;
                 string writtenPath = LocaleRegistry.WriteLocaleFile(path);
-                Log.LogInfo($"Locale file written to {writtenPath}");
+                Log.LogInfo($"created locale at {writtenPath}");
             }, null, ("path", "Optional output path. Defaults to BepInEx/config/CUCoreLib/Locales/EN.json."));
 
             ConsoleCommandRegistry.Register("modlist", "Prints the loaded BepInEx plugin list to the in-game console and Unity log.",
@@ -111,12 +111,12 @@ namespace CUCoreLib
                 [0] = ContentReloadManager.GetLoadedModGuids().ToList()
             }, ("modGuid", "BepInEx plugin GUID to strictly reload from a rebuilt DLL."));
 
-            ConsoleCommandRegistry.Register("autoHotRefresh", "Enables automatic hot reloading after detecting a .dll file change.",
+            ConsoleCommandRegistry.Register("autohotreload", "Enables automatic hot reloading after detecting a .dll file change.",
             delegate (string[] args)
             {
                 if (args.Length < 3)
                 {
-                    throw new System.Exception("Usage: autoHotRefresh [pathToDllFile] [enable]");
+                    throw new System.Exception("Usage: autohotreload [pathToDllFile] [enable]");
                 }
 
                 string dllPath = args[1];

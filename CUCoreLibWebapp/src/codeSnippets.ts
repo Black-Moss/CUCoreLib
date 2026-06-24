@@ -91,68 +91,76 @@ namespace AcidShroomTutorial
 {
     [BepInPlugin(ModGuid, ModName, ModVersion)]
     [BepInDependency("net.cucorelib", BepInDependency.DependencyFlags.HardDependency)]
-    public sealed class Plugin : BaseUnityPlugin
+    public class Plugin : BaseUnityPlugin
     {
+        // Change the following to something unique to your mod!
         private const string ModGuid = "com.example.acidshroomtutorial";
         private const string ModName = "Acid Shroom Tutorial";
         private const string ModVersion = "1.0.0";
 
         internal static new ManualLogSource Logger;
 
-        private Sprite acidShroomSprite;
-        private Sprite acidMushroomSprite;
-        private AudioClip acidPopSound;
-
         private void Awake()
         {
             Logger = base.Logger;
 
-            LoadAssets();
             RegisterLiquids();
             RegisterItems();
             RegisterBuildings();
             RegisterRecipes();
 
-            Logger.LogInfo("Acid Shroom tutorial content registered.");
+            Logger.LogInfo("Acid Shroom mod loaded!");
         }
 
-        private void LoadAssets()
-        {
-            acidShroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidshroom.png");
-            acidMushroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidmushroom.png", 8f);
-            acidPopSound = AssetLoader.LoadEmbeddedAudio("Audio.acid-pop.wav");
-
-            AssetLoader.CacheSprite("acidshroomtutorial.acidshroom", acidShroomSprite);
-            AssetLoader.CacheSprite("acidshroomtutorial.acidmushroom", acidMushroomSprite);
-            AssetLoader.CacheAudioClip("acidshroomtutorial.acid.pop", acidPopSound);
-        }
 
         private void RegisterLiquids()
         {
+            // Creates a new custom liquid
             LiquidRegistry.Register("hydrochloricacid", new CustomLiquidInfo
             {
                 name = "Hydrochloric acid",
-                description = "A nasty industrial acid with a sharp chemical smell.",
-                color = new Color(0.77f, 0.96f, 0.28f),
-                valuePerLiter = 32f,
+                description = "A very highly corrosive liquid. Don't drink it!",
+                color = new Color(0.8f, 0.8f, 0.8f),
+                valuePerLiter = 22f,
+                healthUsable = true,
+                injectionSickness = 100f,
+                // On drink effects
                 onDrink = (ml, body) =>
                 {
-                    float dose = ml * 0.01f;
-                    body.Drink(dose * 2f);
-                    body.sicknessAmount = Mathf.Clamp(body.sicknessAmount + dose * 18f, 0f, 100f);
-                    body.happiness -= dose * 6f;
+                    float liters = ml * 0.01f; // Convert ml to 100ml for more intuitive values. 100ml is a sip.
+                    body.Drink(liters * 9f);
+                    body.temperature -= liters * 3f;
+                    body.limbs[0].pain += 100f;
+                    body.brainHealth -= liters * 32f;
+                    body.talker.EatBad();
                 },
+                // On health panel limb use effects
                 onHealthUse = (ml, limb) =>
                 {
-                    float dose = ml * 0.01f;
-                    limb.skinHealth = Mathf.Clamp(limb.skinHealth - dose * 22f, 0f, 100f);
-                    limb.pain = Mathf.Clamp(limb.pain + dose * 25f, 0f, 100f);
+                    float dose = ml * 0.01f; // 100ml 
+
+                    limb.pain += dose * 100f;
+                    limb.skinHealth -= dose * 50f;
+                    limb.muscleHealth -= dose * 50f;
+
+                    limb.infectionAmount -= dose * 10f;
+                    limb.disinfectionTime += dose * 1000f;
+
+                },
+                // Crafting qualties for the liquid
+                qualities = new List<CraftingQuality>
+                {
+                    new CraftingQuality("water", 0.5f)
                 }
             });
         }
 
         private void RegisterItems()
         {
+           
+            Sprite acidShroomSprite = AssetLoader.LoadEmbeddedSprite("glowshroom.png");
+
+            // Add new item
             ItemRegistry.Register("acidshroom", new ItemInfo
             {
                 fullName = "Acid shroom",
@@ -163,12 +171,13 @@ namespace AcidShroomTutorial
                 usable = true,
                 tags = "cangetwet",
                 rec = new Recognition(2),
+                // On use effects
                 useAction = (body, item) =>
                 {
-                    body.Eat(6f, 0.4f);
-                    body.happiness += 0.5f;
-                    body.sicknessAmount = Mathf.Clamp(body.sicknessAmount + 1.5f, 0f, 100f);
+                    body.Eat(10f, 0.4f);
+                    body.limbs[0].pain += 100f;
                     item.condition -= 1f;
+                    
                     Sound.Play("eatCrunch", body.transform.position);
                 }
             }, acidShroomSprite, 1);
@@ -176,17 +185,17 @@ namespace AcidShroomTutorial
 
         private void RegisterBuildings()
         {
-            BuildingEntityRegistry.Register("acidmushroom", new CustomBuildingEntityDefinition
+            // Add new world entity
+            BuildingEntityRegistry.Register("acidmushroomcolony", new CustomBuildingEntityDefinition
             {
-                Name = "Acid mushroom",
-                Description = "A dangerous mushroom cluster that leaks acidic slime.",
-                Sprite = acidMushroomSprite,
-                Health = 120f,
+                Name = "Acid mushroom colony",
+                Description = "A dangerous mushroom cluster that leaks acidic fumes.",
+                Sprite = AssetLoader.LoadEmbeddedSprite("Images/glowshroom_plant"),
+                Health = 250f,
                 Placement = BuildingPlacementType.Floor,
                 SurfaceOffset = 0.5f,
-                SpawnMinPerChunk = 0.03f,
-                SpawnMaxPerChunk = 0.06f,
-                HitSound = acidPopSound,
+                SpawnMinPerChunk = 0.3f,
+                SpawnMaxPerChunk = 0.4f,
                 ItemsDropOnDestroy = new[]
                 {
                     BuildingEntityRegistry.AddDrop("acidshroom", 1f, 1f, 2f)
@@ -196,30 +205,30 @@ namespace AcidShroomTutorial
 
         private void RegisterRecipes()
         {
+            // Add new recipes
             RecipeRegistry.Register(new Recipe
             {
-                INT = 0,
+                INT = 6,
                 category = Recipes.RecipeCategory.Materials,
                 result = new RecipeResult
                 {
                     id = "biochem",
-                    amount = 40,
-                    isLiquid = false,
-                    resultCondition = 1f
+                    isLiquid = true,
+                    resultCondition = 40f
                 },
                 items = new List<RecipeItem>
                 {
                     new RecipeItem(1f)
                     {
                         specific = true,
-                        specificId = "acidmushroom"
+                        specificId = "acidshroom"
                     }
                 }
             });
 
             RecipeRegistry.Register(new Recipe
             {
-                INT = 2,
+                INT = 9,
                 category = Recipes.RecipeCategory.Tools,
                 result = new RecipeResult
                 {
@@ -230,14 +239,20 @@ namespace AcidShroomTutorial
                 },
                 items = new List<RecipeItem>
                 {
-                    new RecipeItem(2f)
+                    new RecipeItem()
                     {
                         specific = true,
                         specificId = "acidshroom"
                     },
-                    new RecipeItem(1f)
+                    new RecipeItem()
                     {
                         specific = true,
+                        specificId = "acidshroom"
+                    },
+                    new RecipeItem()
+                    {
+                        specific = true,
+                        minimumCondition = 0.5f,
                         specificId = "processedcopper"
                     }
                 }
@@ -1401,8 +1416,7 @@ namespace AcidShroomTutorial
 
         private void Awake()
         {
-            RegisterDebugCommands();
-
+        
             // Keep content in split methods so strict reload can replay it.
             LoadAcidAssets();
             RegisterAcidItems();
@@ -1458,30 +1472,6 @@ namespace AcidShroomTutorial
             });
         }
 
-        private void RegisterDebugCommands()
-        {
-            ConsoleCommandRegistry.Register(
-                "acidshroom",
-                "Spawns one Acid Shroom next to the player.",
-                args =>
-                {
-                    CUCoreUtils.ConsoleCheckForWorld(ConsoleScript.instance);
-
-                    Vector3 spawnPos = PlayerCamera.main.body.transform.position + Vector3.right;
-                    Utils.Create("acidshroom", spawnPos, 0f);
-                    CUCoreUtils.ConsoleLog(ConsoleScript.instance, "Spawned acidshroom.");
-                }
-            );
-
-            ConsoleCommandRegistry.Register(
-                "acidreload",
-                "Runs strict content reload for this mod.",
-                args =>
-                {
-                    CUCoreUtils.ConsoleRunCommand(ConsoleScript.instance, "reloadcontent " + ModGuid);
-                }
-            );
-        }
     }
 }`;
 }

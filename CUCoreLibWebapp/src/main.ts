@@ -138,6 +138,7 @@ root.innerHTML = `
       <div class="topbar-links" aria-label="Project links">
         <a class="topbar-link" href="https://www.nexusmods.com/scavprototype/mods/341" target="_blank" rel="noopener noreferrer">NexusMods</a>
         <a class="topbar-link" href="https://github.com/jimmyking9999999/CUCoreLib" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="topbar-link" href="https://discord.gg/ehCptz9pwU" target="_blank" rel="noopener noreferrer"><span class="topbar-link-icon" aria-hidden="true">&#xf1ff;</span>Discord</a>
       </div>
     </header>
 
