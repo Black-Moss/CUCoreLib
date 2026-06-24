@@ -189,7 +189,7 @@ namespace CUCoreLib.ContentReload
             }
             catch (Exception ex)
             {
-                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload crafting UI refresh failed.\n" + ex);
+                _ = ex;
             }
         }
 

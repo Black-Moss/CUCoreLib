@@ -18,7 +18,7 @@ namespace CUCoreLib
     {
         public const string GUID = "net.cucorelib";
         public const string MODNAME = "CUCoreLib";
-        public const string VERSION = "1.0.0";
+        public const string VERSION = "1.0.1";
         // Alllright. Let's get this party rolling.
 
 
@@ -56,12 +56,14 @@ namespace CUCoreLib
 
         private static void RegisterBuiltInCommands() // SetTile also added, but not here
         {
-            ConsoleCommandRegistry.Register("createLocale", "Writes or updates CUCoreLib generated locale data.",
+            ConsoleCommandRegistry.Register("createLocale", "Writes or updates CUCoreLib generated locale data. WARNING: Overrides EN.json",
             delegate (string[] args)
             {
                 string path = args.Length > 1 ? args[1] : null;
                 string writtenPath = LocaleRegistry.WriteLocaleFile(path);
-                Log.LogInfo($"created locale at {writtenPath}");
+                string message = $"created locale at {writtenPath}";
+                Log.LogInfo(message);
+                CUCoreUtils.ConsoleLog(ConsoleScript.instance, message);
             }, null, ("path", "Optional output path. Defaults to BepInEx/config/CUCoreLib/Locales/EN.json."));
 
             ConsoleCommandRegistry.Register("modlist", "Prints the loaded BepInEx plugin list to the in-game console and Unity log.",

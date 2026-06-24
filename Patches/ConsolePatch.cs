@@ -97,6 +97,7 @@ namespace CUCoreLib.Patches
             }, BuildSetTileAutofill(), ("tileIndex", "Registered custom tile index."), ("position", "Tile position.")));
 
             ConsoleCommandRegistry.InjectRegisteredCommands();
+            RefreshRuntimeAutofill();
         }
 
         private static Dictionary<int, List<string>> BuildSpawnAutofill()

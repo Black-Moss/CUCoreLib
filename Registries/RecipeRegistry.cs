@@ -265,7 +265,19 @@ namespace CUCoreLib.Registries
                 return LiquidRegistry.TryGetCustomInfo(id, out _) || Liquids.Registry.ContainsKey(id);
             }
 
-            return ItemRegistry.TryGetItemInfo(id, out _) || Resources.Load<GameObject>(id) != null;
+            if (ItemRegistry.TryGetCustomInfo(id, out _))
+            {
+                return true;
+            }
+
+            if (Item.GlobalItems == null)
+            {
+                // Recipe registration commonly runs during plugin Awake, before vanilla item tables exist.
+                // Defer vanilla-item validation until runtime instead of warning on valid base-game IDs.
+                return true;
+            }
+
+            return Item.GlobalItems.ContainsKey(id) || Resources.Load<GameObject>(id) != null;
         }
 
         private static string BuildIngredientKey(List<RecipeItem> items)
