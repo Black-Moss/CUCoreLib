@@ -297,6 +297,7 @@ function normalizeMediaUrls(value: string): string {
 const externalVideoUrls = {
   setup: "https://jimmyking9999999.github.io/Metadata-generator/videos/setup.mp4",
   embeddingImages: "https://jimmyking9999999.github.io/Metadata-generator/videos/embedding-images.mp4",
+  hotReload: "https://jimmyking9999999.github.io/Metadata-generator/videos/hot-reload.mp4",
   sporeTrap: "https://jimmyking9999999.github.io/Metadata-generator/videos/spore-trap-ingame.mp4"
 } as const;
 
@@ -2815,6 +2816,7 @@ function debugTestingPage(): string {
     <section class="lesson-card">
       <h2>Strict content reload</h2>
       <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads item, liquid, recipe, and locale/text content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support buildings, save providers, moodles, Harmony setup, mod options, or multiplayer registration.</p>
+      ${docsVideo(externalVideoUrls.hotReload, "/videos/hot-reload.mp4", "screenshot docs-video")}
       <pre><code>reloadcontent com.example.mymod
 listhotreload
 reloaddll com.example.mymod</code></pre>

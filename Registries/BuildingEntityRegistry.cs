@@ -18,6 +18,8 @@ namespace CUCoreLib.Registries
 
         private static readonly Dictionary<string, GameObject> PrefabCache =
             new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> DefinitionOwners =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly HashSet<CustomBuildingRuntime> ActiveRuntimes =
             new HashSet<CustomBuildingRuntime>();
@@ -26,6 +28,8 @@ namespace CUCoreLib.Registries
         private static readonly string[] EmptyCategories = new string[0];
         private static readonly int GroundMask = LayerMask.GetMask("Ground");
         private static readonly int GroundLayer = LayerMask.NameToLayer("Ground");
+        private const string DefaultHitSoundReferenceId = "glowplant";
+        private static string ActiveOwnerId;
 
         public static event Action<string, CustomBuildingEntityDefinition, bool> Registered;
 
@@ -34,7 +38,10 @@ namespace CUCoreLib.Registries
 
         public static void Register(string id, CustomBuildingEntityDefinition definition)
         {
-            ContentReloadSession.AssertNotActive("BuildingEntityRegistry.Register()", "Buildings are excluded from strict content reload.");
+            ContentReloadSession.AssertAllowed(
+                ContentReloadSurface.Buildings,
+                "BuildingEntityRegistry.Register()",
+                "Only basic/scriptless building definitions are supported during strict content reload.");
 
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -51,6 +58,13 @@ namespace CUCoreLib.Registries
             definition.ID = id;
             bool replacingExisting = RegisteredDefinitions.ContainsKey(id);
             RegisteredDefinitions[id] = definition;
+            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+                ? ActiveOwnerId
+                : ContentReloadSession.ResolveAmbientOwnerId();
+            if (!string.IsNullOrWhiteSpace(ownerId))
+            {
+                DefinitionOwners[id] = ownerId;
+            }
             PrefabCache.Remove(id);
             Registered?.Invoke(id, definition, replacingExisting);
 
@@ -65,6 +79,11 @@ namespace CUCoreLib.Registries
             }
 
             CUCoreLib.Networking.MultiplayerSyncRegistry.QueueHostSnapshotBroadcast();
+        }
+
+        public static IDisposable BeginOwnerRegistration(string ownerId)
+        {
+            return new OwnerScope(ownerId);
         }
 
         public static bool TryGetDefinition(string id, out CustomBuildingEntityDefinition definition)
@@ -115,6 +134,83 @@ namespace CUCoreLib.Registries
         internal static CustomBuildingRuntime[] GetActiveRuntimes()
         {
             return ActiveRuntimes.Where(runtime => runtime != null && runtime.isActiveAndEnabled).ToArray();
+        }
+
+        internal static Dictionary<string, CustomBuildingEntityDefinition> CaptureOwnerEntries(string ownerId)
+        {
+            if (string.IsNullOrWhiteSpace(ownerId))
+            {
+                return new Dictionary<string, CustomBuildingEntityDefinition>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            string normalizedOwnerId = ownerId.Trim();
+            return DefinitionOwners
+                .Where(entry => string.Equals(entry.Value, normalizedOwnerId, StringComparison.OrdinalIgnoreCase))
+                .Select(entry => entry.Key)
+                .Where(id => RegisteredDefinitions.TryGetValue(id, out _))
+                .ToDictionary(id => id, id => RegisteredDefinitions[id], StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal static void RestoreOwnerEntries(string ownerId, IDictionary<string, CustomBuildingEntityDefinition> entries)
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, CustomBuildingEntityDefinition> entry in entries)
+            {
+                Register(entry.Key, entry.Value);
+            }
+        }
+
+        internal static void ClearOwnerEntries(string ownerId, ContentReloadResult result)
+        {
+            if (string.IsNullOrWhiteSpace(ownerId))
+            {
+                return;
+            }
+
+            string normalizedOwnerId = ownerId.Trim();
+            string[] ids = DefinitionOwners
+                .Where(entry => string.Equals(entry.Value, normalizedOwnerId, StringComparison.OrdinalIgnoreCase))
+                .Select(entry => entry.Key)
+                .ToArray();
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                string id = ids[i];
+                RegisteredDefinitions.Remove(id);
+                DefinitionOwners.Remove(id);
+                PrefabCache.Remove(id);
+            }
+
+            if (ids.Length > 0)
+            {
+                result?.AddInfo("Cleared " + ids.Length + " building registrations owned by '" + normalizedOwnerId + "'.");
+            }
+        }
+
+        internal static void RefreshLiveInstances(IEnumerable<string> definitionIds = null)
+        {
+            HashSet<string> filteredIds = definitionIds != null
+                ? new HashSet<string>(definitionIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()), StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            foreach (CustomBuildingRuntime runtime in GetActiveRuntimes())
+            {
+                if (runtime == null || string.IsNullOrWhiteSpace(runtime.DefinitionId))
+                {
+                    continue;
+                }
+
+                if (filteredIds != null && !filteredIds.Contains(runtime.DefinitionId))
+                {
+                    continue;
+                }
+
+                RefreshLiveInstance(runtime.gameObject, runtime.DefinitionId);
+            }
         }
 
         internal static JObject CaptureNetworkSnapshot()
@@ -430,6 +526,74 @@ namespace CUCoreLib.Registries
             AttachSeatingListener(building, world);
         }
 
+        internal static void RefreshLiveInstance(GameObject instance, string id)
+        {
+            if (instance == null || string.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            if (!TryGetDefinition(id, out CustomBuildingEntityDefinition definition) || definition == null)
+            {
+                return;
+            }
+
+            instance.name = id.Trim();
+
+            SpriteRenderer renderer = instance.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.sprite = definition.Sprite;
+                renderer.sortingOrder = definition.SortingOrder;
+                if (!string.IsNullOrWhiteSpace(definition.SpriteAnimationId))
+                {
+                    AssetLoader.TryApplyAnimation(renderer, definition.SpriteAnimationId);
+                }
+            }
+
+            instance.transform.localScale = definition.Scale == Vector3.zero ? Vector3.one : definition.Scale;
+            instance.layer = definition.Layer ?? GetReferenceLayer(GetRenderReference(definition), GroundLayer);
+
+            BoxCollider2D collider = instance.GetComponent<BoxCollider2D>();
+            if (collider != null)
+            {
+                if (definition.ColliderSize.HasValue)
+                {
+                    collider.size = definition.ColliderSize.Value;
+                }
+                else if (definition.Sprite != null)
+                {
+                    collider.size = definition.Sprite.bounds.size;
+                }
+
+                if (definition.ColliderOffset.HasValue)
+                {
+                    collider.offset = definition.ColliderOffset.Value;
+                }
+                else if (definition.Sprite != null)
+                {
+                    collider.offset = definition.Sprite.bounds.center;
+                }
+
+                collider.isTrigger = definition.ColliderIsTrigger;
+            }
+
+            BuildingEntity building = instance.GetComponent<BuildingEntity>();
+            if (building != null)
+            {
+                ApplyBuildingFields(building, definition);
+                if (!string.IsNullOrEmpty(definition.Name))
+                {
+                    building.fullName = LocaleRegistry.Get("building", id, definition.Name);
+                }
+
+                if (!string.IsNullOrEmpty(definition.Description))
+                {
+                    building.description = LocaleRegistry.Get("building", id + "dsc", definition.Description);
+                }
+            }
+        }
+
         private static GameObject CreatePrefab(string id, CustomBuildingEntityDefinition definition)
         {
             GameObject go = new GameObject(id);
@@ -527,7 +691,9 @@ namespace CUCoreLib.Registries
             building.itemsDropOnDestroy = EmptyDrops;
             building.alwaysDrop = EmptyDrops;
             building.itemCategoriesToAdd = EmptyCategories;
-            building.hitSound = definition.HitSound ?? ResolveHitSound(definition.HitSoundReferenceId);
+            building.hitSound = definition.HitSound
+                ?? ResolveHitSound(definition.HitSoundReferenceId)
+                ?? ResolveHitSound(DefaultHitSoundReferenceId);
             building.blockFootstepSoundId = definition.BlockFootstepSoundId;
             building.skipDescriptionSet = false;
         }
@@ -757,6 +923,22 @@ namespace CUCoreLib.Registries
             if (isNearPlayer && obj.GetComponent<Rigidbody2D>() != null && obj.GetComponent<SpriteRenderer>() != null)
             {
                 obj.AddComponent<FreshItemDrop>();
+            }
+        }
+
+        private sealed class OwnerScope : IDisposable
+        {
+            private readonly string previousOwnerId;
+
+            public OwnerScope(string ownerId)
+            {
+                previousOwnerId = ActiveOwnerId;
+                ActiveOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId.Trim();
+            }
+
+            public void Dispose()
+            {
+                ActiveOwnerId = previousOwnerId;
             }
         }
 

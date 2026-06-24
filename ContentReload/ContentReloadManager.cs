@@ -7,6 +7,7 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
+using Mono.Cecil;
 
 namespace CUCoreLib.ContentReload
 {
@@ -90,6 +91,49 @@ namespace CUCoreLib.ContentReload
             return config != null && config.PollIntervalSeconds > 0 ? config.PollIntervalSeconds : 2;
         }
 
+        public static bool ConfigureAutoHotRefresh(string dllPath, bool enabled, out string message)
+        {
+            Initialize();
+
+            string normalizedPath = NormalizeExistingOrTargetPath(dllPath);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                message = "DLL path was invalid.";
+                return false;
+            }
+
+            if (!File.Exists(normalizedPath))
+            {
+                message = "DLL path does not exist: " + normalizedPath;
+                return false;
+            }
+
+            if (!TryResolvePluginGuidFromDll(normalizedPath, out string modGuid, out string modName, out string reason))
+            {
+                message = reason;
+                return false;
+            }
+
+            if (config.Mods == null)
+            {
+                config.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (!config.Mods.TryGetValue(modGuid, out ContentReloadModConfig modConfig) || modConfig == null)
+            {
+                modConfig = new ContentReloadModConfig();
+                config.Mods[modGuid] = modConfig;
+            }
+
+            modConfig.OverrideDllPath = normalizedPath;
+            modConfig.WatchEnabled = enabled;
+            SaveConfig();
+
+            string label = string.IsNullOrWhiteSpace(modName) ? modGuid : modName + " (" + modGuid + ")";
+            message = (enabled ? "Enabled" : "Disabled") + " automatic hot reload for " + label + " using " + normalizedPath + ".";
+            return true;
+        }
+
         internal static void PollWatchers()
         {
             if (!initialized || IsMultiplayerActive())
@@ -146,14 +190,14 @@ namespace CUCoreLib.ContentReload
         public static void WriteReloadSummaryToConsole(ConsoleScript console, ContentReloadResult result)
         {
             string headline = BuildResultHeadline(result);
-            if (result != null && !result.Succeeded)
-            {
-                CUCoreLibPlugin.Log?.LogWarning(headline);
-            }
-            else
-            {
-                CUCoreLibPlugin.Log?.LogInfo(headline);
-            }
+            // if (result != null && !result.Succeeded)
+            // {
+            //     CUCoreLibPlugin.Log?.LogWarning(headline);
+            // }
+            // else
+            // {
+            //     CUCoreLibPlugin.Log?.LogInfo(headline);
+            // }
             if (console != null)
             {
                 CUCoreUtils.ConsoleLog(console, headline);
@@ -224,9 +268,114 @@ namespace CUCoreLib.ContentReload
             }
         }
 
+        private static void SaveConfig()
+        {
+            try
+            {
+                Directory.CreateDirectory(ConfigDirectoryPath);
+                string configPath = Path.Combine(ConfigDirectoryPath, ConfigFileName);
+                File.WriteAllText(configPath, JsonConvert.SerializeObject(config ?? new ContentReloadConfig(), Formatting.Indented));
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("Failed to save strict content reload config.\n" + ex);
+            }
+        }
+
         private static bool IsMultiplayerActive()
         {
             return MultiplayerBridge.IsAvailable && MultiplayerBridge.IsRunning;
+        }
+
+        private static string NormalizeExistingOrTargetPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            try
+            {
+                return Path.GetFullPath(path.Trim().Trim('"'));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool TryResolvePluginGuidFromDll(string dllPath, out string modGuid, out string modName, out string reason)
+        {
+            modGuid = null;
+            modName = null;
+            reason = null;
+
+            try
+            {
+                using (AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(dllPath))
+                {
+                    foreach (TypeDefinition type in EnumerateTypes(assembly.MainModule.Types))
+                    {
+                        if (type == null || !type.HasCustomAttributes)
+                        {
+                            continue;
+                        }
+
+                        foreach (CustomAttribute attribute in type.CustomAttributes)
+                        {
+                            if (!string.Equals(attribute.AttributeType.FullName, "BepInEx.BepInPlugin", StringComparison.Ordinal))
+                            {
+                                continue;
+                            }
+
+                            if (attribute.ConstructorArguments.Count > 0)
+                            {
+                                modGuid = attribute.ConstructorArguments[0].Value as string;
+                            }
+
+                            if (attribute.ConstructorArguments.Count > 1)
+                            {
+                                modName = attribute.ConstructorArguments[1].Value as string;
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(modGuid))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                reason = "No [BepInPlugin] GUID was found in " + dllPath + ".";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                reason = "Failed to inspect DLL '" + dllPath + "': " + ex.Message;
+                return false;
+            }
+        }
+
+        private static IEnumerable<TypeDefinition> EnumerateTypes(IEnumerable<TypeDefinition> roots)
+        {
+            if (roots == null)
+            {
+                yield break;
+            }
+
+            foreach (TypeDefinition type in roots)
+            {
+                if (type == null)
+                {
+                    continue;
+                }
+
+                yield return type;
+                foreach (TypeDefinition nested in EnumerateTypes(type.NestedTypes))
+                {
+                    yield return nested;
+                }
+            }
         }
 
         private static string BuildResultHeadline(ContentReloadResult result)
@@ -261,7 +410,7 @@ namespace CUCoreLib.ContentReload
                     continue;
                 }
 
-                CUCoreLibPlugin.Log?.LogInfo(message);
+                // CUCoreLibPlugin.Log?.LogInfo(message);
                 if (console != null)
                 {
                     CUCoreUtils.ConsoleLog(console, message);

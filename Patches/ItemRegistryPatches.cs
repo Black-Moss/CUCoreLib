@@ -14,6 +14,10 @@ namespace CUCoreLib.Patches
     [HarmonyPatch(typeof(Item))]
     internal static class ItemRegistryPatches
     {
+        private sealed class PendingBatteryInitializationMarker : MonoBehaviour
+        {
+        }
+
         private static readonly FieldInfo NotSpawnWithBatteryField =
             AccessTools.Field(typeof(BatteryItem), "notSpawnWithBattery");
 
@@ -248,7 +252,8 @@ namespace CUCoreLib.Patches
                 bool createdBattery = bat == null;
                 if (bat == null) bat = item.gameObject.AddComponent<BatteryItem>();
 
-                ApplyBatteryProperties(item, bat, def, initializeState: createdBattery, forceBatteryType: createdBattery);
+                bool initializeBatteryState = createdBattery || ConsumePendingBatteryInitialization(item.gameObject);
+                ApplyBatteryProperties(item, bat, def, initializeState: initializeBatteryState, forceBatteryType: createdBattery || initializeBatteryState);
 
                 if (def.decayInfo == 0)
                 {
@@ -381,6 +386,33 @@ namespace CUCoreLib.Patches
                 default:
                     return "mediumbattery";
             }
+        }
+
+        internal static void MarkPendingBatteryInitialization(GameObject obj)
+        {
+            if (obj == null || obj.GetComponent<PendingBatteryInitializationMarker>() != null)
+            {
+                return;
+            }
+
+            obj.AddComponent<PendingBatteryInitializationMarker>();
+        }
+
+        private static bool ConsumePendingBatteryInitialization(GameObject obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+
+            PendingBatteryInitializationMarker marker = obj.GetComponent<PendingBatteryInitializationMarker>();
+            if (marker == null)
+            {
+                return false;
+            }
+
+            UnityEngine.Object.Destroy(marker);
+            return true;
         }
 
         internal static void ApplyBatteryProperties(Item item, BatteryItem bat, CustomItemInfo def, bool initializeState, bool forceBatteryType)

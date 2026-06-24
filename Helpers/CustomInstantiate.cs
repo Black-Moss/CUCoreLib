@@ -58,6 +58,11 @@ namespace CUCoreLib.Helpers
             if (obj == null) return null;
 
             obj.SetActive(true);
+            if (obj.GetComponent<Item>() != null)
+            {
+                ItemRegistryPatches.MarkPendingBatteryInitialization(obj);
+            }
+
             if (condition.HasValue)
             {
                 var itemComp = obj.GetComponent<Item>();

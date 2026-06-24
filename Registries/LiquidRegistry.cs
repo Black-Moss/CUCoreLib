@@ -33,9 +33,12 @@ namespace CUCoreLib.Registries
 
             id = id.Trim();
             RegisteredLiquids[id] = info;
-            if (!string.IsNullOrWhiteSpace(ActiveOwnerId))
+            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+                ? ActiveOwnerId
+                : ContentReloadSession.ResolveAmbientOwnerId();
+            if (!string.IsNullOrWhiteSpace(ownerId))
             {
-                LiquidOwners[id] = ActiveOwnerId;
+                LiquidOwners[id] = ownerId;
             }
 
             InjectSingleLiquid(id, info);

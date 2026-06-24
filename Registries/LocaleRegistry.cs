@@ -71,9 +71,12 @@ namespace CUCoreLib.Registries
             }
 
             CustomLocales[type][key] = value;
-            if (!string.IsNullOrWhiteSpace(ActiveOwnerId))
+            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+                ? ActiveOwnerId
+                : ContentReloadSession.ResolveAmbientOwnerId();
+            if (!string.IsNullOrWhiteSpace(ownerId))
             {
-                LocaleOwners[type][key] = ActiveOwnerId;
+                LocaleOwners[type][key] = ownerId;
             }
         }
 

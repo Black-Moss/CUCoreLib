@@ -37,9 +37,12 @@ namespace CUCoreLib.Registries
             }
 
             RegisteredRecipes.Add(recipe);
-            if (!string.IsNullOrWhiteSpace(ActiveOwnerId))
+            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+                ? ActiveOwnerId
+                : ContentReloadSession.ResolveAmbientOwnerId();
+            if (!string.IsNullOrWhiteSpace(ownerId))
             {
-                RecipeOwners[key] = ActiveOwnerId;
+                RecipeOwners[key] = ownerId;
             }
 
             if (Recipes.recipes != null)

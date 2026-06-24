@@ -96,9 +96,12 @@ namespace CUCoreLib.Registries
             // Store or replace the registry entry, apply defaults and inject into runtime tables.
             bool replacingExisting = RegisteredItems.ContainsKey(id);
             RegisteredItems[id] = info;
-            if (!string.IsNullOrWhiteSpace(ActiveOwnerId))
+            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+                ? ActiveOwnerId
+                : ContentReloadSession.ResolveAmbientOwnerId();
+            if (!string.IsNullOrWhiteSpace(ownerId))
             {
-                ItemOwners[id] = ActiveOwnerId;
+                ItemOwners[id] = ownerId;
             }
 
             if (Item.GlobalItems != null)
@@ -638,14 +641,42 @@ namespace CUCoreLib.Registries
                 return;
             }
 
+            ApplyBatteryDefaults(info);
             ApplyDestroyAtZeroConditionDefault(info);
             ApplyUsableDefaults(info);
+        }
+
+        private static void ApplyBatteryDefaults(CustomItemInfo info)
+        {
+            if (info?.Battery == null || !string.IsNullOrWhiteSpace(info.Battery.BatteryType))
+            {
+                return;
+            }
+
+            switch (info.Battery.Preset)
+            {
+                case BatteryItem.BatteryPreset.Small:
+                    info.Battery.BatteryType = "smallbattery";
+                    break;
+                case BatteryItem.BatteryPreset.Large:
+                    info.Battery.BatteryType = "largebattery";
+                    break;
+                default:
+                    info.Battery.BatteryType = "mediumbattery";
+                    break;
+            }
         }
 
         private static void ApplyDestroyAtZeroConditionDefault(CustomItemInfo info)
         {
             if (info == null || info.WasExplicitlySet(CustomItemExplicitField.DestroyAtZeroCondition))
             {
+                return;
+            }
+
+            if (info.Battery != null)
+            {
+                info.SetDefault(CustomItemExplicitField.DestroyAtZeroCondition, false);
                 return;
             }
 

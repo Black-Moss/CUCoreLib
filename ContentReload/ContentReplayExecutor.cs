@@ -80,6 +80,7 @@ namespace CUCoreLib.ContentReload
             using (LiquidRegistry.BeginOwnerRegistration(report.ModGuid))
             using (RecipeRegistry.BeginOwnerRegistration(report.ModGuid))
             using (LocaleRegistry.BeginOwnerRegistration(report.ModGuid))
+            using (BuildingEntityRegistry.BeginOwnerRegistration(report.ModGuid))
             {
                 for (int i = 0; i < methods.Length; i++)
                 {
@@ -107,14 +108,7 @@ namespace CUCoreLib.ContentReload
                 }
             }
 
-            if (Recipes.recipes != null)
-            {
-                LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
-                RecipeRegistry.InjectRegisteredRecipes();
-            }
-
-            ConsolePatch.RefreshRuntimeAutofill();
-            RecipeRegistryPatches.RefreshCraftingUi();
+            FinalizeRuntimeRefresh(existingContent.Buildings != null ? existingContent.Buildings.Keys : null);
 
             result.AddInfo("Strict content reload completed.");
             return result;
@@ -127,7 +121,8 @@ namespace CUCoreLib.ContentReload
                 Items = ItemRegistry.CaptureOwnerEntries(modGuid),
                 Liquids = LiquidRegistry.CaptureOwnerEntries(modGuid),
                 Recipes = RecipeRegistry.CaptureOwnerEntries(modGuid),
-                Locales = LocaleRegistry.CaptureOwnerEntries(modGuid)
+                Locales = LocaleRegistry.CaptureOwnerEntries(modGuid),
+                Buildings = BuildingEntityRegistry.CaptureOwnerEntries(modGuid)
             };
         }
 
@@ -137,6 +132,7 @@ namespace CUCoreLib.ContentReload
             LiquidRegistry.ClearOwnerEntries(modGuid, result);
             RecipeRegistry.ClearOwnerEntries(modGuid, result);
             LocaleRegistry.ClearOwnerEntries(modGuid, result);
+            BuildingEntityRegistry.ClearOwnerEntries(modGuid, result);
         }
 
         private static void Rollback(string modGuid, ContentOwnerSnapshot snapshot, ContentReloadResult result)
@@ -147,23 +143,38 @@ namespace CUCoreLib.ContentReload
             using (LiquidRegistry.BeginOwnerRegistration(modGuid))
             using (RecipeRegistry.BeginOwnerRegistration(modGuid))
             using (LocaleRegistry.BeginOwnerRegistration(modGuid))
+            using (BuildingEntityRegistry.BeginOwnerRegistration(modGuid))
             {
                 ItemRegistry.RestoreOwnerEntries(modGuid, snapshot.Items);
                 LiquidRegistry.RestoreOwnerEntries(modGuid, snapshot.Liquids);
                 RecipeRegistry.RestoreOwnerEntries(modGuid, snapshot.Recipes);
                 LocaleRegistry.RestoreOwnerEntries(modGuid, snapshot.Locales);
+                BuildingEntityRegistry.RestoreOwnerEntries(modGuid, snapshot.Buildings);
             }
 
-            if (Recipes.recipes != null)
-            {
-                LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
-                RecipeRegistry.InjectRegisteredRecipes();
-            }
-
-            ConsolePatch.RefreshRuntimeAutofill();
-            RecipeRegistryPatches.RefreshCraftingUi();
+            FinalizeRuntimeRefresh(snapshot.Buildings != null ? snapshot.Buildings.Keys : null);
 
             result.AddSkipped("Reload failed. Restored the previous successful content state for '" + modGuid + "'.");
+        }
+
+        private static void FinalizeRuntimeRefresh(IEnumerable<string> buildingIds)
+        {
+            try
+            {
+                if (Recipes.recipes != null)
+                {
+                    LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
+                    RecipeRegistry.InjectRegisteredRecipes();
+                }
+
+                BuildingEntityRegistry.RefreshLiveInstances(buildingIds);
+                ConsolePatch.RefreshRuntimeAutofill();
+                RecipeRegistryPatches.RefreshCraftingUi();
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload post-refresh failed.\n" + ex);
+            }
         }
 
         private static object CreatePluginReplayInstance(Type pluginType, ContentCompatibilityReport report)
@@ -265,6 +276,7 @@ namespace CUCoreLib.ContentReload
             public IDictionary<string, CustomLiquidInfo> Liquids;
             public IEnumerable<Recipe> Recipes;
             public IDictionary<int, Dictionary<string, string>> Locales;
+            public IDictionary<string, CustomBuildingEntityDefinition> Buildings;
         }
     }
 }

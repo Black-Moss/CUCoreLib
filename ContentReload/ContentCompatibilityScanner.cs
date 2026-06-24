@@ -10,6 +10,50 @@ namespace CUCoreLib.ContentReload
     internal static class ContentCompatibilityScanner
     {
         private const string ContentReloadEntryAttributeFullName = "CUCoreLib.Data.ContentReloadEntryAttribute";
+        private static readonly string[] AllowedBuildingDefinitionMembers =
+        {
+            "ID",
+            "Name",
+            "Description",
+            "Sprite",
+            "SpriteAnimationId",
+            "SortingOrder",
+            "UseGlowPlantMaterial",
+            "Scale",
+            "ColliderSize",
+            "ColliderOffset",
+            "ColliderIsTrigger",
+            "Layer",
+            "AddRigidbody2D",
+            "RigidbodyBodyType",
+            "RigidbodyGravityScale",
+            "Health",
+            "RequireGround",
+            "Metallic",
+            "CantHit",
+            "Animal",
+            "IgnoreBodyOptimize",
+            "DropChanceMultiplier",
+            "ItemsDropOnDestroy",
+            "AlwaysDrop",
+            "ItemCategoriesToAdd",
+            "GuaranteedDropAmount",
+            "Placement",
+            "GenerationStyle",
+            "SpawnMinPerChunk",
+            "SpawnMaxPerChunk",
+            "SurfaceOffset",
+            "RandomFlip",
+            "SpawnInGround",
+            "HitSoundReferenceId",
+            "HitSound",
+            "BlockFootstepSoundId",
+            "RenderReferenceId",
+            "CopyGlowPlantLayer",
+            "HeatRadius",
+            "HeatPerSecond",
+            "MaxHeatBodyTemperature"
+        };
 
         internal static ContentCompatibilityReport Scan(ContentReloadCandidate candidate)
         {
@@ -375,7 +419,21 @@ namespace CUCoreLib.ContentReload
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.BuildingEntityRegistry", StringComparison.Ordinal))
                 {
-                    return "it calls BuildingEntityRegistry." + methodName + "(). Buildings are excluded from strict content reload.";
+                    if (string.Equals(methodName, "AddDrop", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (!string.Equals(methodName, "Register", StringComparison.Ordinal))
+                    {
+                        return "it calls BuildingEntityRegistry." + methodName + "(). Only basic building registration is supported during strict content reload.";
+                    }
+
+                    string buildingDefinitionIssue = FindUnsupportedBuildingDefinitionUsage(method, calledMethod);
+                    if (!string.IsNullOrWhiteSpace(buildingDefinitionIssue))
+                    {
+                        return buildingDefinitionIssue;
+                    }
                 }
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.ModOptionsRegistry", StringComparison.Ordinal))
@@ -436,6 +494,80 @@ namespace CUCoreLib.ContentReload
                 if (!string.IsNullOrWhiteSpace(nestedForbiddenCall))
                 {
                     return nestedForbiddenCall;
+                }
+            }
+
+            return null;
+        }
+
+        private static string FindUnsupportedBuildingDefinitionUsage(MethodDefinition callingMethod, MethodReference calledMethod)
+        {
+            if (callingMethod == null || !callingMethod.HasBody || calledMethod == null)
+            {
+                return null;
+            }
+
+            IList<Instruction> instructions = callingMethod.Body.Instructions;
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                if (!ReferenceEquals(instructions[i].Operand, calledMethod))
+                {
+                    continue;
+                }
+
+                for (int scanIndex = i - 1; scanIndex >= 0; scanIndex--)
+                {
+                    Instruction scan = instructions[scanIndex];
+                    MethodReference ctorReference = scan.Operand as MethodReference;
+                    if (scan.OpCode != OpCodes.Newobj || ctorReference == null)
+                    {
+                        continue;
+                    }
+
+                    TypeReference ctorDeclaringType = ctorReference.DeclaringType;
+                    if (ctorDeclaringType == null ||
+                        !string.Equals(ctorDeclaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition", StringComparison.Ordinal))
+                    {
+                        break;
+                    }
+
+                    return ValidateBuildingDefinitionInitialization(instructions, scanIndex, i);
+                }
+
+                return null;
+            }
+
+            return null;
+        }
+
+        private static string ValidateBuildingDefinitionInitialization(IList<Instruction> instructions, int startIndex, int endIndex)
+        {
+            HashSet<string> allowedMembers = new HashSet<string>(AllowedBuildingDefinitionMembers, StringComparer.Ordinal);
+            for (int i = startIndex + 1; i < endIndex; i++)
+            {
+                Instruction instruction = instructions[i];
+                MemberReference member = instruction.Operand as MemberReference;
+                TypeReference declaringType = member != null ? member.DeclaringType : null;
+                if (member == null ||
+                    declaringType == null ||
+                    !string.Equals(declaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string memberName = member.Name ?? string.Empty;
+                if (string.Equals(memberName, "ConfigurePrefab", StringComparison.Ordinal) ||
+                    string.Equals(memberName, "ConfigureInstance", StringComparison.Ordinal) ||
+                    string.Equals(memberName, "PlaceCheck", StringComparison.Ordinal) ||
+                    string.Equals(memberName, "Components", StringComparison.Ordinal) ||
+                    string.Equals(memberName, "SpawnComponents", StringComparison.Ordinal))
+                {
+                    return "it registers a building definition using unsupported member '" + memberName + "'. Only basic/scriptless building definitions can be hot reloaded.";
+                }
+
+                if (instruction.OpCode == OpCodes.Stfld && !allowedMembers.Contains(memberName))
+                {
+                    return "it registers a building definition using unsupported member '" + memberName + "'. Only basic/scriptless building definitions can be hot reloaded.";
                 }
             }
 

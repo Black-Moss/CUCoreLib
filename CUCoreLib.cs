@@ -108,8 +108,33 @@ namespace CUCoreLib
                 ContentReloadManager.WriteReloadSummaryToConsole(ConsoleScript.instance, result);
             }, new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<string>>
             {
-                [1] = ContentReloadManager.GetLoadedModGuids().ToList()
+                [0] = ContentReloadManager.GetLoadedModGuids().ToList()
             }, ("modGuid", "BepInEx plugin GUID to strictly reload from a rebuilt DLL."));
+
+            ConsoleCommandRegistry.Register("autoHotRefresh", "Enables automatic hot reloading after detecting a .dll file change.",
+            delegate (string[] args)
+            {
+                if (args.Length < 3)
+                {
+                    throw new System.Exception("Usage: autoHotRefresh [pathToDllFile] [enable]");
+                }
+
+                string dllPath = args[1];
+                if (!bool.TryParse(args[2], out bool enabled))
+                {
+                    throw new System.Exception("Enable must be 'true' or 'false'.");
+                }
+
+                bool success = ContentReloadManager.ConfigureAutoHotRefresh(dllPath, enabled, out string message);
+                if (!success)
+                {
+                    throw new System.Exception(message);
+                }
+
+                CUCoreUtils.ConsoleLog(ConsoleScript.instance, message);
+            }, null,
+            ("pathToDllFile", "Path to the rebuilt DLL that should be watched."),
+            ("enable", "true to enable watch mode for that DLL, false to disable it."));
         }
     }
 }

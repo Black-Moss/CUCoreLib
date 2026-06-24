@@ -16,6 +16,7 @@ namespace CUCoreLib.Patches
             RefreshSpawnAutofill();
             RefreshCustomSpawnAutofill();
             RefreshAddLiquidAutofill();
+            RefreshReloadContentAutofill();
             RefreshSetTileAutofill();
         }
 
@@ -39,8 +40,11 @@ namespace CUCoreLib.Patches
                     pos = parsedPosition;
                 }
 
-                float condition = 1f;
-                if (args.Length > 3) float.TryParse(args[3], out condition);
+                float? condition = null;
+                if (args.Length > 3 && float.TryParse(args[3], out float parsedCondition))
+                {
+                    condition = parsedCondition;
+                }
 
                 int count = 1;
                 if (args.Length > 4) int.TryParse(args[4], out count);
@@ -270,6 +274,22 @@ namespace CUCoreLib.Patches
             if (setTileCommand == null) return;
 
             setTileCommand.argAutofill = BuildSetTileAutofill();
+        }
+
+        private static Dictionary<int, List<string>> BuildReloadContentAutofill()
+        {
+            return new Dictionary<int, List<string>>
+            {
+                { 0, ContentReload.ContentReloadManager.GetLoadedModGuids().ToList() }
+            };
+        }
+
+        private static void RefreshReloadContentAutofill()
+        {
+            Command reloadContentCommand = ConsoleScript.SearchExact("reloadcontent");
+            if (reloadContentCommand == null) return;
+
+            reloadContentCommand.argAutofill = BuildReloadContentAutofill();
         }
 
         private static string FindBestMatch(string query)

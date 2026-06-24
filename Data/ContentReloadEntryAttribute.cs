@@ -9,6 +9,7 @@ namespace CUCoreLib.Data
         RegisterLocale = 200,
         RegisterLiquids = 300,
         RegisterItems = 400,
+        RegisterBuildings = 450,
         RegisterRecipes = 500
     }
 

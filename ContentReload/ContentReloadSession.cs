@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Diagnostics;
+using System.Linq;
+using BepInEx.Bootstrap;
 
 namespace CUCoreLib.ContentReload
 {
@@ -14,6 +17,62 @@ namespace CUCoreLib.ContentReload
         internal static Assembly GetSourceAssemblyOverride()
         {
             return current != null ? current.SourceAssembly : null;
+        }
+
+        internal static string ResolveAmbientOwnerId()
+        {
+            if (current != null && !string.IsNullOrWhiteSpace(current.ModGuid))
+            {
+                return current.ModGuid;
+            }
+
+            try
+            {
+                StackTrace trace = new StackTrace();
+                foreach (StackFrame frame in trace.GetFrames() ?? Array.Empty<StackFrame>())
+                {
+                    MethodBase method = frame.GetMethod();
+                    Type declaringType = method != null ? method.DeclaringType : null;
+                    Assembly assembly = declaringType != null ? declaringType.Assembly : null;
+                    if (assembly == null || assembly == typeof(CUCoreLibPlugin).Assembly)
+                    {
+                        continue;
+                    }
+
+                    string location = null;
+                    try
+                    {
+                        location = assembly.Location;
+                    }
+                    catch
+                    {
+                        location = null;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(location))
+                    {
+                        continue;
+                    }
+
+                    foreach (var pluginInfo in Chainloader.PluginInfos.Values)
+                    {
+                        if (pluginInfo == null || pluginInfo.Metadata == null)
+                        {
+                            continue;
+                        }
+
+                        if (string.Equals(pluginInfo.Location, location, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return pluginInfo.Metadata.GUID;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
         }
 
         internal static string GetPluginDirectoryOverride()
@@ -68,7 +127,7 @@ namespace CUCoreLib.ContentReload
         private static string BuildDisallowedMessage(string apiName, string guidance)
         {
             string message = "Strict content reload for '" + current.ModGuid + "' does not allow " + apiName +
-                ". Only item, liquid, recipe, and locale/text registration are supported.";
+                ". Only item, liquid, recipe, locale/text, and basic building registration are supported.";
 
             if (!string.IsNullOrWhiteSpace(guidance))
             {

@@ -11,7 +11,8 @@ namespace CUCoreLib.ContentReload
         Liquids = 1 << 1,
         Recipes = 1 << 2,
         Locale = 1 << 3,
-        AllAllowed = Items | Liquids | Recipes | Locale
+        Buildings = 1 << 4,
+        AllAllowed = Items | Liquids | Recipes | Locale | Buildings
     }
 
     public sealed class ContentReloadResult
