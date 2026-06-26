@@ -19,7 +19,7 @@ namespace CUCoreLib.Helpers
 
         private void Update()
         {
-            if (menu == null || menu.content == null) return;
+            if (!menu || !menu.content) return;
 
             var maxScroll = GetMaxScroll();
             if (maxScroll <= 0f)
@@ -29,7 +29,7 @@ namespace CUCoreLib.Helpers
             }
 
             var viewport = menu.content.parent as RectTransform;
-            if (viewport == null ||
+            if (!viewport ||
                 !RectTransformUtility.RectangleContainsScreenPoint(viewport, Input.mousePosition)) return;
 
             var scroll = Input.mouseScrollDelta.y;

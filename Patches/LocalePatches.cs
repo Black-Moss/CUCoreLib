@@ -30,7 +30,6 @@ namespace CUCoreLib.Patches
                 string.IsNullOrWhiteSpace(fallbackText)) return true;
             __result = fallbackText;
             return false;
-
         }
     }
 

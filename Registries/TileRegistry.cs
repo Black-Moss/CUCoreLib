@@ -58,7 +58,8 @@ namespace CUCoreLib.Registries
 
         public static bool Register(ushort tileIndex, CustomTileDefinition definition)
         {
-            ContentReloadSession.AssertNotActive("TileRegistry.Register()", "Tile registration is excluded from strict content reload.");
+            ContentReloadSession.AssertNotActive("TileRegistry.Register()",
+                "Tile registration is excluded from strict content reload.");
 
             if (tileIndex < FirstCustomTileIndex)
             {

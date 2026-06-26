@@ -1,45 +1,38 @@
 using System;
-using System.IO;
-using System.Reflection;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using BepInEx.Bootstrap;
 
 namespace CUCoreLib.ContentReload
 {
     internal static class ContentReloadSession
     {
-        [ThreadStatic]
-        private static SessionState current;
+        [ThreadStatic] private static SessionState current;
 
         internal static bool IsActive => current != null;
 
         internal static Assembly GetSourceAssemblyOverride()
         {
-            return current != null ? current.SourceAssembly : null;
+            return current?.SourceAssembly;
         }
 
         internal static string ResolveAmbientOwnerId()
         {
-            if (current != null && !string.IsNullOrWhiteSpace(current.ModGuid))
-            {
-                return current.ModGuid;
-            }
+            if (current != null && !string.IsNullOrWhiteSpace(current.ModGuid)) return current.ModGuid;
 
             try
             {
-                StackTrace trace = new StackTrace();
-                foreach (StackFrame frame in trace.GetFrames() ?? Array.Empty<StackFrame>())
+                var trace = new StackTrace();
+                foreach (var frame in trace.GetFrames() ?? Array.Empty<StackFrame>())
                 {
-                    MethodBase method = frame.GetMethod();
-                    Type declaringType = method != null ? method.DeclaringType : null;
-                    Assembly assembly = declaringType != null ? declaringType.Assembly : null;
-                    if (assembly == null || assembly == typeof(CUCoreLibPlugin).Assembly)
-                    {
-                        continue;
-                    }
+                    var method = frame.GetMethod();
+                    var declaringType = method != null ? method.DeclaringType : null;
+                    var assembly = declaringType?.Assembly;
+                    if (assembly == null || assembly == typeof(CUCoreLibPlugin).Assembly) continue;
 
-                    string location = null;
+                    string location;
                     try
                     {
                         location = assembly.Location;
@@ -49,27 +42,19 @@ namespace CUCoreLib.ContentReload
                         location = null;
                     }
 
-                    if (string.IsNullOrWhiteSpace(location))
-                    {
-                        continue;
-                    }
+                    if (string.IsNullOrWhiteSpace(location)) continue;
 
-                    foreach (var pluginInfo in Chainloader.PluginInfos.Values)
+                    foreach (var pluginInfo in Chainloader.PluginInfos.Values
+                                 .Where(pluginInfo => pluginInfo?.Metadata != null)
+                                 .Where(pluginInfo => string.Equals(pluginInfo.Location, location, StringComparison.OrdinalIgnoreCase)))
                     {
-                        if (pluginInfo == null || pluginInfo.Metadata == null)
-                        {
-                            continue;
-                        }
-
-                        if (string.Equals(pluginInfo.Location, location, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return pluginInfo.Metadata.GUID;
-                        }
+                        return pluginInfo.Metadata.GUID;
                     }
                 }
             }
             catch
             {
+                // ignored
             }
 
             return null;
@@ -77,17 +62,15 @@ namespace CUCoreLib.ContentReload
 
         internal static string GetPluginDirectoryOverride()
         {
-            if (current == null || string.IsNullOrWhiteSpace(current.SourceDllPath))
-            {
-                return null;
-            }
+            if (current == null || string.IsNullOrWhiteSpace(current.SourceDllPath)) return null;
 
             return Path.GetDirectoryName(current.SourceDllPath);
         }
 
-        internal static IDisposable Begin(string modGuid, Assembly sourceAssembly, string sourceDllPath, ContentReloadSurface allowedSurfaces)
+        internal static IDisposable Begin(string modGuid, Assembly sourceAssembly, string sourceDllPath,
+            ContentReloadSurface allowedSurfaces)
         {
-            SessionState previous = current;
+            var previous = current;
             current = new SessionState
             {
                 ModGuid = modGuid,
@@ -101,48 +84,36 @@ namespace CUCoreLib.ContentReload
 
         internal static void AssertAllowed(ContentReloadSurface surface, string apiName, string guidance = null)
         {
-            if (current == null)
-            {
-                return;
-            }
+            if (current == null) return;
 
-            if ((current.AllowedSurfaces & surface) != 0)
-            {
-                return;
-            }
+            if ((current.AllowedSurfaces & surface) != 0) return;
 
             throw new InvalidOperationException(BuildDisallowedMessage(apiName, guidance));
         }
 
         internal static void AssertNotActive(string apiName, string guidance = null)
         {
-            if (current == null)
-            {
-                return;
-            }
+            if (current == null) return;
 
             throw new InvalidOperationException(BuildDisallowedMessage(apiName, guidance));
         }
 
         private static string BuildDisallowedMessage(string apiName, string guidance)
         {
-            string message = "Strict content reload for '" + current.ModGuid + "' does not allow " + apiName +
-                ". Only item, liquid, recipe, locale/text, and basic building registration are supported.";
+            var message = "Strict content reload for '" + current.ModGuid + "' does not allow " + apiName +
+                          ". Only item, liquid, recipe, locale/text, and basic building registration are supported.";
 
-            if (!string.IsNullOrWhiteSpace(guidance))
-            {
-                message += " " + guidance;
-            }
+            if (!string.IsNullOrWhiteSpace(guidance)) message += " " + guidance;
 
             return message;
         }
 
         private sealed class SessionState
         {
+            public ContentReloadSurface AllowedSurfaces;
             public string ModGuid;
             public Assembly SourceAssembly;
             public string SourceDllPath;
-            public ContentReloadSurface AllowedSurfaces;
         }
 
         private sealed class Scope : IDisposable

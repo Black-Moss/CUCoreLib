@@ -4,11 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
-using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using CUCoreLib.Data;
-using CUCoreLib.Helpers;
 using CUCoreLib.Patches;
 using CUCoreLib.Registries;
 
@@ -18,12 +16,12 @@ namespace CUCoreLib.ContentReload
     {
         internal static ContentReloadResult Execute(ContentCompatibilityReport report)
         {
-            ContentReloadResult result = new ContentReloadResult
+            var result = new ContentReloadResult
             {
-                ModGuid = report != null ? report.ModGuid : null,
-                ModName = report != null ? report.ModName : null,
-                SourcePath = report != null ? report.SelectedPath : null,
-                SourceHash = report != null ? report.SelectedHash : null,
+                ModGuid = report?.ModGuid,
+                ModName = report?.ModName,
+                SourcePath = report?.SelectedPath,
+                SourceHash = report?.SelectedHash,
                 UnsupportedReason = report != null ? report.UnsupportedReason : "Compatibility report was null."
             };
 
@@ -33,32 +31,28 @@ namespace CUCoreLib.ContentReload
                 return result;
             }
 
-            for (int i = 0; i < report.RecognizedMethods.Count; i++)
-            {
-                result.AddRecognizedMethod(report.RecognizedMethods[i]);
-            }
+            foreach (var recognizedMethod in report.RecognizedMethods)
+                result.AddRecognizedMethod(recognizedMethod);
 
             if (!report.IsSupported)
             {
-                if (!string.IsNullOrWhiteSpace(report.UnsupportedReason))
-                {
-                    result.AddError(report.UnsupportedReason);
-                }
+                if (!string.IsNullOrWhiteSpace(report.UnsupportedReason)) result.AddError(report.UnsupportedReason);
 
                 return result;
             }
 
-            byte[] bytes = File.ReadAllBytes(report.SelectedPath);
-            Assembly assembly = Assembly.Load(bytes);
-            Type pluginType = assembly.GetType(report.PluginTypeFullName, throwOnError: false);
+            var bytes = File.ReadAllBytes(report.SelectedPath);
+            var assembly = Assembly.Load(bytes);
+            var pluginType = assembly.GetType(report.PluginTypeFullName, false);
             if (pluginType == null)
             {
                 result.AddError("Reloaded assembly did not contain plugin type '" + report.PluginTypeFullName + "'.");
                 return result;
             }
 
-            MethodInfo[] methods = report.RecognizedMethods
-                .Select(methodName => pluginType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            var methods = report.RecognizedMethods
+                .Select(methodName => pluginType.GetMethod(methodName,
+                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
                 .Where(method => method != null && method.GetParameters().Length == 0)
                 .ToArray();
 
@@ -68,23 +62,23 @@ namespace CUCoreLib.ContentReload
                 return result;
             }
 
-            object pluginInstance = methods.Any(method => !method.IsStatic)
+            var pluginInstance = methods.Any(method => !method.IsStatic)
                 ? CreatePluginReplayInstance(pluginType, report)
                 : null;
 
-            ContentOwnerSnapshot existingContent = CaptureExistingContent(report.ModGuid);
+            var existingContent = CaptureExistingContent(report.ModGuid);
             ClearExistingContent(report.ModGuid, result);
 
-            using (ContentReloadSession.Begin(report.ModGuid, assembly, report.SelectedPath, ContentReloadSurface.AllAllowed))
+            using (ContentReloadSession.Begin(report.ModGuid, assembly, report.SelectedPath,
+                       ContentReloadSurface.AllAllowed))
             using (ItemRegistry.BeginOwnerRegistration(report.ModGuid))
             using (LiquidRegistry.BeginOwnerRegistration(report.ModGuid))
             using (RecipeRegistry.BeginOwnerRegistration(report.ModGuid))
             using (LocaleRegistry.BeginOwnerRegistration(report.ModGuid))
             using (BuildingEntityRegistry.BeginOwnerRegistration(report.ModGuid))
             {
-                for (int i = 0; i < methods.Length; i++)
+                foreach (var method in methods)
                 {
-                    MethodInfo method = methods[i];
                     try
                     {
                         method.Invoke(method.IsStatic ? null : pluginInstance, null);
@@ -92,23 +86,25 @@ namespace CUCoreLib.ContentReload
                     }
                     catch (TargetInvocationException ex)
                     {
-                        Exception inner = ex.InnerException ?? ex;
+                        var inner = ex.InnerException ?? ex;
                         Rollback(report.ModGuid, existingContent, result);
                         result.AddError("Method '" + method.Name + "' failed: " + inner.Message);
-                        CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" + method.Name + "' for '" + report.ModGuid + "'.\n" + inner);
+                        CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" +
+                                                        method.Name + "' for '" + report.ModGuid + "'.\n" + inner);
                         return result;
                     }
                     catch (Exception ex)
                     {
                         Rollback(report.ModGuid, existingContent, result);
                         result.AddError("Method '" + method.Name + "' failed: " + ex.Message);
-                        CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" + method.Name + "' for '" + report.ModGuid + "'.\n" + ex);
+                        CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" +
+                                                        method.Name + "' for '" + report.ModGuid + "'.\n" + ex);
                         return result;
                     }
                 }
             }
 
-            FinalizeRuntimeRefresh(existingContent.Buildings != null ? existingContent.Buildings.Keys : null);
+            FinalizeRuntimeRefresh(existingContent.Buildings?.Keys);
 
             result.AddInfo("Strict content reload completed.");
             return result;
@@ -152,7 +148,7 @@ namespace CUCoreLib.ContentReload
                 BuildingEntityRegistry.RestoreOwnerEntries(modGuid, snapshot.Buildings);
             }
 
-            FinalizeRuntimeRefresh(snapshot.Buildings != null ? snapshot.Buildings.Keys : null);
+            FinalizeRuntimeRefresh(snapshot.Buildings?.Keys);
 
             result.AddSkipped("Reload failed. Restored the previous successful content state for '" + modGuid + "'.");
         }
@@ -161,7 +157,7 @@ namespace CUCoreLib.ContentReload
         {
             if (Recipes.recipes != null)
             {
-                LiquidRegistry.InjectRegisteredLiquids(logSummary: false);
+                LiquidRegistry.InjectRegisteredLiquids();
                 RecipeRegistry.InjectRegisteredRecipes();
             }
 
@@ -195,7 +191,7 @@ namespace CUCoreLib.ContentReload
 
         private static object CreatePluginReplayInstance(Type pluginType, ContentCompatibilityReport report)
         {
-            object instance = FormatterServices.GetUninitializedObject(pluginType);
+            var instance = FormatterServices.GetUninitializedObject(pluginType);
             TryAssignPluginInfo(pluginType, instance, report);
             TryAssignLoggerField(pluginType, instance);
             return instance;
@@ -205,48 +201,36 @@ namespace CUCoreLib.ContentReload
         {
             try
             {
-                PropertyInfo infoProperty = GetProperty(pluginType, "Info");
-                FieldInfo infoField = GetField(pluginType, "<Info>k__BackingField");
-                if (infoProperty == null && infoField == null)
-                {
-                    return;
-                }
+                var infoProperty = GetProperty(pluginType, "Info");
+                var infoField = GetField(pluginType, "<Info>k__BackingField");
+                if (infoProperty == null && infoField == null) return;
 
-                PluginInfo currentInfo = Chainloader.PluginInfos.TryGetValue(report.ModGuid, out var loadedInfo) ? loadedInfo : null;
-                if (currentInfo == null)
-                {
-                    return;
-                }
+                var currentInfo = Chainloader.PluginInfos.TryGetValue(report.ModGuid, out var loadedInfo)
+                    ? loadedInfo
+                    : null;
+                if (currentInfo == null) return;
 
                 if (infoField != null)
-                {
                     infoField.SetValue(instance, currentInfo);
-                }
+                // infoProperty != null always ture
                 else if (infoProperty != null && infoProperty.CanWrite)
-                {
                     infoProperty.SetValue(instance, currentInfo, null);
-                }
             }
             catch
             {
+                // ignored
             }
         }
 
         private static void TryAssignLoggerField(Type pluginType, object instance)
         {
-            FieldInfo[] fields = pluginType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            for (int i = 0; i < fields.Length; i++)
+            var fields = pluginType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
+                                              BindingFlags.NonPublic);
+            foreach (var field in fields)
             {
-                FieldInfo field = fields[i];
-                if (field.FieldType != typeof(ManualLogSource))
-                {
-                    continue;
-                }
+                if (field.FieldType != typeof(ManualLogSource)) continue;
 
-                if (field.Name.IndexOf("logger", StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
+                if (field.Name.IndexOf("logger", StringComparison.OrdinalIgnoreCase) < 0) continue;
 
                 try
                 {
@@ -254,19 +238,18 @@ namespace CUCoreLib.ContentReload
                 }
                 catch
                 {
+                    // ignored
                 }
             }
         }
 
         private static PropertyInfo GetProperty(Type type, string propertyName)
         {
-            for (Type current = type; current != null; current = current.BaseType)
+            for (var current = type; current != null; current = current.BaseType)
             {
-                PropertyInfo property = current.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-                if (property != null)
-                {
-                    return property;
-                }
+                var property = current.GetProperty(propertyName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (property != null) return property;
             }
 
             return null;
@@ -274,13 +257,11 @@ namespace CUCoreLib.ContentReload
 
         private static FieldInfo GetField(Type type, string fieldName)
         {
-            for (Type current = type; current != null; current = current.BaseType)
+            for (var current = type; current != null; current = current.BaseType)
             {
-                FieldInfo field = current.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-                if (field != null)
-                {
-                    return field;
-                }
+                var field = current.GetField(fieldName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (field != null) return field;
             }
 
             return null;
@@ -288,11 +269,11 @@ namespace CUCoreLib.ContentReload
 
         private sealed class ContentOwnerSnapshot
         {
+            public IDictionary<string, CustomBuildingEntityDefinition> Buildings;
             public IDictionary<string, CustomItemInfo> Items;
             public IDictionary<string, CustomLiquidInfo> Liquids;
-            public IEnumerable<Recipe> Recipes;
             public IDictionary<int, Dictionary<string, string>> Locales;
-            public IDictionary<string, CustomBuildingEntityDefinition> Buildings;
+            public IEnumerable<Recipe> Recipes;
         }
     }
 }

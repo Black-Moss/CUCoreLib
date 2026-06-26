@@ -30,7 +30,6 @@ namespace CUCoreLib.Patches
                 && !BuildingEntityRegistry.IsRegistered(id)) return true;
             __result = CustomInstantiate.InstantiateReturn(id, pos, Quaternion.Euler(0f, 0f, rot));
             return false;
-
         }
     }
 }

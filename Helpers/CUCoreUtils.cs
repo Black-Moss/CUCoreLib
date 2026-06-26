@@ -41,23 +41,23 @@ namespace CUCoreLib.Helpers
 
         public static Coroutine StartCoroutine(IEnumerator routine)
         {
-            if (routine == null) return null;
-
-            return CoroutineRunner.Instance.StartCoroutine(routine);
+            return routine == null 
+                ? null 
+                : CoroutineRunner.Instance.StartCoroutine(routine);
         }
 
         public static Coroutine StartCoroutine(Func<IEnumerator> routineFactory)
         {
-            if (routineFactory == null) return null;
-
-            return StartCoroutine(routineFactory());
+            return routineFactory == null
+                ? null
+                : StartCoroutine(routineFactory());
         }
 
         public static Coroutine DelayCall(float delaySeconds, Action action)
         {
-            if (action == null) return null;
-
-            return StartCoroutine(DelayCallRoutine(delaySeconds, action));
+            return action == null
+                ? null
+                : StartCoroutine(DelayCallRoutine(delaySeconds, action));
         }
 
         public static Coroutine CallWhen(Func<bool> condition, Action action, float checkRepeatTimeSeconds = 0f)
@@ -237,10 +237,9 @@ namespace CUCoreLib.Helpers
             item = null;
             if (!TryGetBody(out var body)) return false;
 
-            foreach (var uiCast in UIUtil.GetEventSystemRaycastResults())
+            foreach (var uiCast in UIUtil.GetEventSystemRaycastResults()
+                         .Where(uiCast => uiCast.gameObject != null))
             {
-                if (uiCast.gameObject == null) continue;
-
                 if (!uiCast.gameObject.TryGetComponent(out ItemLabel label) || label == null ||
                     label.refItem == null) continue;
                 item = label.refItem;
@@ -249,7 +248,7 @@ namespace CUCoreLib.Helpers
 
             // maybe System.NullReferenceException
             var collider = Physics2D.OverlapPoint(
-                Camera.main.ScreenToWorldPoint(Input.mousePosition),
+                Camera.main.ScreenToWorldPoint(Input.mousePosition),    // maybe null
                 LayerMask.GetMask("Item"));
 
             if (collider == null) return false;
@@ -542,13 +541,11 @@ namespace CUCoreLib.Helpers
             {
                 get
                 {
-                    if (_instance == null)
-                    {
-                        var obj = new GameObject("CUCoreUtils_CoroutineRunner");
-                        DontDestroyOnLoad(obj);
-                        obj.hideFlags = HideFlags.HideAndDontSave;
-                        _instance = obj.AddComponent<CoroutineRunner>();
-                    }
+                    if (_instance != null) return _instance;
+                    var obj = new GameObject("CUCoreUtils_CoroutineRunner");
+                    DontDestroyOnLoad(obj);
+                    obj.hideFlags = HideFlags.HideAndDontSave;
+                    _instance = obj.AddComponent<CoroutineRunner>();
 
                     return _instance;
                 }

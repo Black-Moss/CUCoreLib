@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
+using CUCoreLib.Helpers;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -20,25 +21,18 @@ namespace CUCoreLib
 
         public static void Initialize(ManualLogSource logger)
         {
-            if (_initialized)
-            {
-                return;
-            }
+            if (_initialized) return;
 
             _initialized = true;
             _logger = logger;
 
             if (Chainloader.PluginInfos.TryGetValue(CUCoreLibPlugin.GUID, out var pluginInfo) &&
                 pluginInfo?.Metadata?.Version != null)
-            {
                 _currentVersion = "v" + pluginInfo.Metadata.Version;
-            }
             else
-            {
                 _currentVersion = "v" + CUCoreLibPlugin.VERSION;
-            }
 
-            GameObject go = new GameObject("CUCoreLib_UpdateChecker");
+            var go = new GameObject("CUCoreLib_UpdateChecker");
             DontDestroyOnLoad(go);
             go.hideFlags = HideFlags.HideAndDontSave;
             _instance = go.AddComponent<UpdateChecker>();
@@ -47,14 +41,11 @@ namespace CUCoreLib
 
         private IEnumerator CheckForUpdates()
         {
-            if (_hasChecked)
-            {
-                yield break;
-            }
+            if (_hasChecked) yield break;
 
             _hasChecked = true;
 
-            using (UnityWebRequest request = UnityWebRequest.Get(ApiUrl))
+            using (var request = UnityWebRequest.Get(ApiUrl))
             {
                 request.SetRequestHeader("User-Agent", UserAgent);
 
@@ -66,7 +57,7 @@ namespace CUCoreLib
                     yield break;
                 }
 
-                string latestTag = TryExtractTagName(request.downloadHandler.text);
+                var latestTag = TryExtractTagName(request.downloadHandler.text);
                 if (string.IsNullOrWhiteSpace(latestTag))
                 {
                     yield return Notify("CUCoreLib could not read the latest release version.");
@@ -75,7 +66,7 @@ namespace CUCoreLib
 
                 if (IsNewer(_currentVersion, latestTag))
                 {
-                    yield return Notify($"CUCoreLib update available! {_currentVersion} -> {latestTag}", warning: true);
+                    yield return Notify($"CUCoreLib update available! {_currentVersion} -> {latestTag}", true);
                     yield break;
                 }
 
@@ -85,38 +76,27 @@ namespace CUCoreLib
 
         private static string TryExtractTagName(string json)
         {
-            if (string.IsNullOrEmpty(json))
-            {
-                return null;
-            }
+            if (string.IsNullOrEmpty(json)) return null;
 
             const string tagSearch = "\"tag_name\":\"";
-            int startIndex = json.IndexOf(tagSearch, StringComparison.Ordinal);
-            if (startIndex < 0)
-            {
-                return null;
-            }
+            var startIndex = json.IndexOf(tagSearch, StringComparison.Ordinal);
+            if (startIndex < 0) return null;
 
             startIndex += tagSearch.Length;
-            int endIndex = json.IndexOf('"', startIndex);
-            if (endIndex < 0 || endIndex <= startIndex)
-            {
-                return null;
-            }
+            var endIndex = json.IndexOf('"', startIndex);
+            if (endIndex < 0 || endIndex <= startIndex) return null;
 
             return json.Substring(startIndex, endIndex - startIndex);
         }
 
         private static bool IsNewer(string current, string latest)
         {
-            string normalizedCurrent = NormalizeVersion(current);
-            string normalizedLatest = NormalizeVersion(latest);
+            var normalizedCurrent = NormalizeVersion(current);
+            var normalizedLatest = NormalizeVersion(latest);
 
-            if (Version.TryParse(normalizedCurrent, out Version currentVersion) &&
-                Version.TryParse(normalizedLatest, out Version latestVersion))
-            {
+            if (Version.TryParse(normalizedCurrent, out var currentVersion) &&
+                Version.TryParse(normalizedLatest, out var latestVersion))
                 return latestVersion > currentVersion;
-            }
 
             return false;
         }
@@ -129,16 +109,12 @@ namespace CUCoreLib
         private IEnumerator Notify(string message, bool warning = false)
         {
             if (warning)
-            {
                 _logger?.LogWarning(message);
-            }
             else
-            {
                 _logger?.LogInfo(message);
-            }
 
             ConsoleScript console = null;
-            int attempts = 0;
+            var attempts = 0;
 
             while (console == null && attempts < 50)
             {
@@ -155,10 +131,10 @@ namespace CUCoreLib
 
             if (console != null)
             {
-                string consoleMessage = warning
+                var consoleMessage = warning
                     ? "<color=#FFA500>" + message + "</color>"
                     : message;
-                Helpers.CUCoreUtils.ConsoleLog(console, consoleMessage);
+                CUCoreUtils.ConsoleLog(console, consoleMessage);
             }
         }
     }

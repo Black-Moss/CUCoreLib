@@ -402,17 +402,21 @@ namespace CUCoreLib.Saving
 
         private static int GetProviderVersion(object provider)
         {
-            if (provider is ICustomSaveProvider custom) return Math.Max(0, custom.GetVersion());
-
-            if (provider is IItemSaveProvider item) return Math.Max(0, item.GetVersion());
-
-            if (provider is IBodySaveProvider body) return Math.Max(0, body.GetVersion());
-
-            if (provider is ILimbSaveProvider limb) return Math.Max(0, limb.GetVersion());
-
-            if (provider is IWorldSaveProvider world) return Math.Max(0, world.GetVersion());
-
-            return 0;
+            switch (provider)
+            {
+                case ICustomSaveProvider custom:
+                    return Math.Max(0, custom.GetVersion());
+                case IItemSaveProvider item:
+                    return Math.Max(0, item.GetVersion());
+                case IBodySaveProvider body:
+                    return Math.Max(0, body.GetVersion());
+                case ILimbSaveProvider limb:
+                    return Math.Max(0, limb.GetVersion());
+                case IWorldSaveProvider world:
+                    return Math.Max(0, world.GetVersion());
+                default:
+                    return 0;
+            }
         }
 
         private static List<SaveItemEntry> BuildItemEntries(Body body)

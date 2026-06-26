@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 
@@ -10,6 +11,7 @@ namespace CUCoreLib.ContentReload
     internal static class ContentCompatibilityScanner
     {
         private const string ContentReloadEntryAttributeFullName = "CUCoreLib.Data.ContentReloadEntryAttribute";
+
         private static readonly string[] AllowedBuildingDefinitionMembers =
         {
             "ID",
@@ -57,20 +59,21 @@ namespace CUCoreLib.ContentReload
 
         internal static ContentCompatibilityReport Scan(ContentReloadCandidate candidate)
         {
-            ContentCompatibilityReport report = new ContentCompatibilityReport
+            var report = new ContentCompatibilityReport
             {
-                ModGuid = candidate != null ? candidate.ModGuid : null,
-                ModName = candidate != null ? candidate.ModName : null,
-                LoadedPluginPath = candidate != null ? candidate.LoadedPluginPath : null,
-                OverridePath = candidate != null ? candidate.OverridePath : null,
-                SelectedPath = candidate != null ? candidate.SelectedPath : null,
-                SelectedHash = candidate != null ? candidate.SelectedHash : null,
-                SelectedSourceLabel = candidate != null ? candidate.SelectedSourceLabel : null
+                ModGuid = candidate?.ModGuid,
+                ModName = candidate?.ModName,
+                LoadedPluginPath = candidate?.LoadedPluginPath,
+                OverridePath = candidate?.OverridePath,
+                SelectedPath = candidate?.SelectedPath,
+                SelectedHash = candidate?.SelectedHash,
+                SelectedSourceLabel = candidate?.SelectedSourceLabel
             };
 
             if (candidate == null || string.IsNullOrWhiteSpace(candidate.SelectedPath))
             {
-                report.UnsupportedReason = "No rebuilt DLL source path was found. The loaded plugin path and runtime override path were both unavailable.";
+                report.UnsupportedReason =
+                    "No rebuilt DLL source path was found. The loaded plugin path and runtime override path were both unavailable.";
                 return report;
             }
 
@@ -82,32 +85,32 @@ namespace CUCoreLib.ContentReload
 
             try
             {
-                using (AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(candidate.SelectedPath, CreateReaderParameters(candidate)))
+                using (var assembly =
+                       AssemblyDefinition.ReadAssembly(candidate.SelectedPath, CreateReaderParameters(candidate)))
                 {
-                    TypeDefinition pluginType = FindPluginType(assembly, candidate.ModGuid);
+                    var pluginType = FindPluginType(assembly, candidate.ModGuid);
                     if (pluginType == null)
                     {
-                        report.UnsupportedReason = "No [BepInPlugin] type matching '" + candidate.ModGuid + "' was found in the rebuilt DLL.";
+                        report.UnsupportedReason = "No [BepInPlugin] type matching '" + candidate.ModGuid +
+                                                   "' was found in the rebuilt DLL.";
                         return report;
                     }
 
                     report.PluginTypeFullName = pluginType.FullName;
 
-                    List<SelectedReloadMethod> selectedMethods = SelectSupportedMethods(pluginType, report);
-                    if (!string.IsNullOrWhiteSpace(report.UnsupportedReason))
-                    {
-                        return report;
-                    }
+                    var selectedMethods = SelectSupportedMethods(pluginType, report);
+                    if (!string.IsNullOrWhiteSpace(report.UnsupportedReason)) return report;
 
                     AddIgnoredMethodNotes(pluginType, report);
 
-                    for (int i = 0; i < selectedMethods.Count; i++)
+                    foreach (var selected in selectedMethods)
                     {
-                        SelectedReloadMethod selected = selectedMethods[i];
-                        string forbiddenCall = FindForbiddenCall(selected.Method, new HashSet<string>(StringComparer.Ordinal));
+                        var forbiddenCall =
+                            FindForbiddenCall(selected.Method, new HashSet<string>(StringComparer.Ordinal));
                         if (!string.IsNullOrWhiteSpace(forbiddenCall))
                         {
-                            report.UnsupportedReason = "Method '" + selected.Method.Name + "' is not strict content-only: " + forbiddenCall;
+                            report.UnsupportedReason = "Method '" + selected.Method.Name +
+                                                       "' is not strict content-only: " + forbiddenCall;
                             return report;
                         }
 
@@ -115,11 +118,9 @@ namespace CUCoreLib.ContentReload
                     }
 
                     if (report.RecognizedMethods.Count == 0)
-                    {
                         report.UnsupportedReason =
                             "No supported content reload entry methods were found. " +
                             "Add one or more [ContentReloadEntry(...)] parameterless methods.";
-                    }
                 }
             }
             catch (Exception ex)
@@ -132,17 +133,16 @@ namespace CUCoreLib.ContentReload
 
         private static ReaderParameters CreateReaderParameters(ContentReloadCandidate candidate)
         {
-            DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
-            foreach (string directory in BuildResolverSearchDirectories(candidate))
-            {
+            var resolver = new DefaultAssemblyResolver();
+            foreach (var directory in BuildResolverSearchDirectories(candidate))
                 try
                 {
                     resolver.AddSearchDirectory(directory);
                 }
                 catch
                 {
+                    // ignored
                 }
-            }
 
             return new ReaderParameters
             {
@@ -155,28 +155,25 @@ namespace CUCoreLib.ContentReload
 
         private static IEnumerable<string> BuildResolverSearchDirectories(ContentReloadCandidate candidate)
         {
-            HashSet<string> seenDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             string[] seedPaths =
             {
-                candidate != null ? candidate.SelectedPath : null,
-                candidate != null ? candidate.LoadedPluginPath : null,
-                candidate != null ? candidate.OverridePath : null,
+                candidate?.SelectedPath,
+                candidate?.LoadedPluginPath,
+                candidate?.OverridePath,
                 typeof(CUCoreLibPlugin).Assembly.Location,
-                System.Reflection.Assembly.GetExecutingAssembly().Location
+                Assembly.GetExecutingAssembly().Location
             };
 
-            foreach (string path in seedPaths)
+            foreach (var path in seedPaths)
             {
-                string directory = GetExistingDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory) && seenDirectories.Add(directory))
-                {
-                    yield return directory;
-                }
+                var directory = GetExistingDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && seenDirectories.Add(directory)) yield return directory;
             }
 
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                string directory = null;
+                string directory;
                 try
                 {
                     directory = GetExistingDirectoryName(assembly.Location);
@@ -186,29 +183,20 @@ namespace CUCoreLib.ContentReload
                     directory = null;
                 }
 
-                if (!string.IsNullOrWhiteSpace(directory) && seenDirectories.Add(directory))
-                {
-                    yield return directory;
-                }
+                if (!string.IsNullOrWhiteSpace(directory) && seenDirectories.Add(directory)) yield return directory;
             }
         }
 
         private static string GetExistingDirectoryName(string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                return null;
-            }
+            if (string.IsNullOrWhiteSpace(filePath)) return null;
 
             try
             {
-                string fullPath = Path.GetFullPath(filePath);
-                if (!File.Exists(fullPath))
-                {
-                    return null;
-                }
+                var fullPath = Path.GetFullPath(filePath);
+                if (!File.Exists(fullPath)) return null;
 
-                string directory = Path.GetDirectoryName(fullPath);
+                var directory = Path.GetDirectoryName(fullPath);
                 return Directory.Exists(directory) ? directory : null;
             }
             catch
@@ -217,20 +205,20 @@ namespace CUCoreLib.ContentReload
             }
         }
 
-        private static List<SelectedReloadMethod> SelectSupportedMethods(TypeDefinition pluginType, ContentCompatibilityReport report)
+        private static List<SelectedReloadMethod> SelectSupportedMethods(TypeDefinition pluginType,
+            ContentCompatibilityReport report)
         {
-            List<SelectedReloadMethod> selectedMethods = new List<SelectedReloadMethod>();
-            HashSet<string> seenMethods = new HashSet<string>(StringComparer.Ordinal);
-            int discoveryIndex = 0;
+            var selectedMethods = new List<SelectedReloadMethod>();
+            // not use seenMethods
+            var seenMethods = new HashSet<string>(StringComparer.Ordinal);
+            var discoveryIndex = 0;
 
-            foreach (MethodDefinition method in pluginType.Methods)
+            foreach (var method in pluginType.Methods)
             {
-                CustomAttribute attribute = method.CustomAttributes.FirstOrDefault(entry =>
-                    string.Equals(entry.AttributeType.FullName, ContentReloadEntryAttributeFullName, StringComparison.Ordinal));
-                if (attribute == null)
-                {
-                    continue;
-                }
+                var attribute = method.CustomAttributes.FirstOrDefault(entry =>
+                    string.Equals(entry.AttributeType.FullName, ContentReloadEntryAttributeFullName,
+                        StringComparison.Ordinal));
+                if (attribute == null) continue;
 
                 if (method.HasParameters)
                 {
@@ -240,7 +228,7 @@ namespace CUCoreLib.ContentReload
                     return selectedMethods;
                 }
 
-                if (!TryReadAttributeStage(attribute, out int stageOrder))
+                if (!TryReadAttributeStage(attribute, out var stageOrder))
                 {
                     report.UnsupportedReason =
                         "Method '" + method.Name + "' uses [ContentReloadEntry] with an unsupported stage value.";
@@ -265,16 +253,10 @@ namespace CUCoreLib.ContentReload
         private static bool TryReadAttributeStage(CustomAttribute attribute, out int stageOrder)
         {
             stageOrder = -1;
-            if (attribute == null || attribute.ConstructorArguments.Count < 1)
-            {
-                return false;
-            }
+            if (attribute == null || attribute.ConstructorArguments.Count < 1) return false;
 
-            object rawValue = attribute.ConstructorArguments[0].Value;
-            if (rawValue == null)
-            {
-                return false;
-            }
+            var rawValue = attribute.ConstructorArguments[0].Value;
+            if (rawValue == null) return false;
 
             try
             {
@@ -289,18 +271,11 @@ namespace CUCoreLib.ContentReload
 
         private static int ReadAttributeOrder(CustomAttribute attribute)
         {
-            if (attribute == null)
-            {
-                return 0;
-            }
+            if (attribute == null) return 0;
 
-            for (int i = 0; i < attribute.Properties.Count; i++)
+            foreach (var property in attribute.Properties)
             {
-                CustomAttributeNamedArgument property = attribute.Properties[i];
-                if (!string.Equals(property.Name, "Order", StringComparison.Ordinal))
-                {
-                    continue;
-                }
+                if (!string.Equals(property.Name, "Order", StringComparison.Ordinal)) continue;
 
                 try
                 {
@@ -317,30 +292,21 @@ namespace CUCoreLib.ContentReload
 
         private static TypeDefinition FindPluginType(AssemblyDefinition assembly, string modGuid)
         {
-            if (assembly == null)
-            {
-                return null;
-            }
+            if (assembly == null) return null;
 
-            foreach (TypeDefinition type in EnumerateTypes(assembly.MainModule.Types))
+            foreach (var type in EnumerateTypes(assembly.MainModule.Types))
             {
-                if (!type.HasCustomAttributes)
-                {
-                    continue;
-                }
+                if (!type.HasCustomAttributes) continue;
 
-                foreach (CustomAttribute attribute in type.CustomAttributes)
+                foreach (var attribute in type.CustomAttributes)
                 {
-                    if (!string.Equals(attribute.AttributeType.FullName, "BepInEx.BepInPlugin", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
+                    if (!string.Equals(attribute.AttributeType.FullName, "BepInEx.BepInPlugin",
+                            StringComparison.Ordinal)) continue;
 
                     if (attribute.ConstructorArguments.Count > 0 &&
-                        string.Equals(attribute.ConstructorArguments[0].Value as string, modGuid, StringComparison.Ordinal))
-                    {
+                        string.Equals(attribute.ConstructorArguments[0].Value as string, modGuid,
+                            StringComparison.Ordinal))
                         return type;
-                    }
                 }
             }
 
@@ -349,23 +315,14 @@ namespace CUCoreLib.ContentReload
 
         private static IEnumerable<TypeDefinition> EnumerateTypes(IEnumerable<TypeDefinition> roots)
         {
-            if (roots == null)
-            {
-                yield break;
-            }
+            if (roots == null) yield break;
 
-            foreach (TypeDefinition type in roots)
+            foreach (var type in roots)
             {
-                if (type == null)
-                {
-                    continue;
-                }
+                if (type == null) continue;
 
                 yield return type;
-                foreach (TypeDefinition nested in EnumerateTypes(type.NestedTypes))
-                {
-                    yield return nested;
-                }
+                foreach (var nested in EnumerateTypes(type.NestedTypes)) yield return nested;
             }
         }
 
@@ -384,96 +341,75 @@ namespace CUCoreLib.ContentReload
                 "RegisterSaveProviders"
             };
 
-            for (int i = 0; i < ignoredMethodNames.Length; i++)
-            {
-                if (pluginType.Methods.Any(method => string.Equals(method.Name, ignoredMethodNames[i], StringComparison.Ordinal)))
-                {
-                    report.Notes.Add("Ignored unsupported method '" + ignoredMethodNames[i] + "' during strict content scan.");
-                }
-            }
+            foreach (var ignoredMethodName in ignoredMethodNames)
+                if (pluginType.Methods.Any(method =>
+                        string.Equals(method.Name, ignoredMethodName, StringComparison.Ordinal)))
+                    report.Notes.Add("Ignored unsupported method '" + ignoredMethodName +
+                                     "' during strict content scan.");
         }
 
         private static string FindForbiddenCall(MethodDefinition method, HashSet<string> visitedMethods)
         {
-            if (method == null || !method.HasBody)
-            {
-                return null;
-            }
+            if (method == null || !method.HasBody) return null;
 
-            string methodKey = method.FullName ?? method.Name;
-            if (!visitedMethods.Add(methodKey))
-            {
-                return null;
-            }
+            var methodKey = method.FullName ?? method.Name;
+            if (!visitedMethods.Add(methodKey)) return null;
 
-            foreach (Instruction instruction in method.Body.Instructions)
+            foreach (var instruction in method.Body.Instructions)
             {
-                MethodReference calledMethod = instruction.Operand as MethodReference;
-                if (calledMethod == null)
+                var calledMethod = instruction.Operand as MethodReference;
+                if (calledMethod == null) continue;
+
+                var declaringType = calledMethod.DeclaringType != null
+                    ? calledMethod.DeclaringType.FullName
+                    : string.Empty;
+                var methodName = calledMethod.Name ?? string.Empty;
+
+                if (string.Equals(declaringType, "CUCoreLib.Registries.BuildingEntityRegistry",
+                        StringComparison.Ordinal))
                 {
-                    continue;
-                }
-
-                string declaringType = calledMethod.DeclaringType != null ? calledMethod.DeclaringType.FullName : string.Empty;
-                string methodName = calledMethod.Name ?? string.Empty;
-
-                if (string.Equals(declaringType, "CUCoreLib.Registries.BuildingEntityRegistry", StringComparison.Ordinal))
-                {
-                    if (string.Equals(methodName, "AddDrop", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
+                    if (string.Equals(methodName, "AddDrop", StringComparison.Ordinal)) continue;
 
                     if (!string.Equals(methodName, "Register", StringComparison.Ordinal))
-                    {
-                        return "it calls BuildingEntityRegistry." + methodName + "(). Only basic building registration is supported during strict content reload.";
-                    }
+                        return "it calls BuildingEntityRegistry." + methodName +
+                               "(). Only basic building registration is supported during strict content reload.";
 
-                    string buildingDefinitionIssue = FindUnsupportedBuildingDefinitionUsage(method, calledMethod);
-                    if (!string.IsNullOrWhiteSpace(buildingDefinitionIssue))
-                    {
-                        return buildingDefinitionIssue;
-                    }
+                    var buildingDefinitionIssue = FindUnsupportedBuildingDefinitionUsage(method, calledMethod);
+                    if (!string.IsNullOrWhiteSpace(buildingDefinitionIssue)) return buildingDefinitionIssue;
                 }
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.ModOptionsRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls ModOptionsRegistry." + methodName + "(). Mod options are excluded from strict content reload.";
-                }
+                    return "it calls ModOptionsRegistry." + methodName +
+                           "(). Mod options are excluded from strict content reload.";
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.SaveRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls SaveRegistry." + methodName + "(). Save providers are excluded from strict content reload.";
-                }
+                    return "it calls SaveRegistry." + methodName +
+                           "(). Save providers are excluded from strict content reload.";
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.MoodleRegistry", StringComparison.Ordinal) ||
                     string.Equals(declaringType, "CUCoreLib.Registries.StatusRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls " + calledMethod.DeclaringType.Name + "." + methodName + "(). Status and moodle registration are excluded from strict content reload.";
-                }
+                    return "it calls " + calledMethod.DeclaringType?.Name + "." + methodName +
+                           "(). Status and moodle registration are excluded from strict content reload.";
 
                 if (string.Equals(declaringType, "CUCoreLib.Networking.MultiplayerApi", StringComparison.Ordinal) ||
                     string.Equals(declaringType, "CUCoreLib.Networking.MultiplayerBridge", StringComparison.Ordinal) ||
-                    string.Equals(declaringType, "CUCoreLib.Networking.MultiplayerSyncRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls multiplayer registration/setup code. Multiplayer hooks are excluded from strict content reload.";
-                }
+                    string.Equals(declaringType, "CUCoreLib.Networking.MultiplayerSyncRegistry",
+                        StringComparison.Ordinal))
+                    return
+                        "it calls multiplayer registration/setup code. Multiplayer hooks are excluded from strict content reload.";
 
                 if (string.Equals(declaringType, "CUCoreLib.Registries.TileRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls TileRegistry." + methodName + "(). Tile registration is excluded from strict content reload.";
-                }
+                    return "it calls TileRegistry." + methodName +
+                           "(). Tile registration is excluded from strict content reload.";
 
-                if (string.Equals(declaringType, "CUCoreLib.Registries.ConsoleCommandRegistry", StringComparison.Ordinal))
-                {
-                    return "it calls ConsoleCommandRegistry." + methodName + "(). Console command registration is excluded from strict content reload.";
-                }
+                if (string.Equals(declaringType, "CUCoreLib.Registries.ConsoleCommandRegistry",
+                        StringComparison.Ordinal))
+                    return "it calls ConsoleCommandRegistry." + methodName +
+                           "(). Console command registration is excluded from strict content reload.";
 
                 if (string.Equals(declaringType, "HarmonyLib.Harmony", StringComparison.Ordinal) ||
                     string.Equals(declaringType, "HarmonyLib.HarmonyMethod", StringComparison.Ordinal))
-                {
                     return "it performs Harmony setup. Patch registration is excluded from strict content reload.";
-                }
 
                 MethodDefinition nestedMethod;
                 try
@@ -485,51 +421,36 @@ namespace CUCoreLib.ContentReload
                     nestedMethod = null;
                 }
 
-                if (nestedMethod == null || nestedMethod.Module != method.Module)
-                {
-                    continue;
-                }
+                if (nestedMethod == null || nestedMethod.Module != method.Module) continue;
 
-                string nestedForbiddenCall = FindForbiddenCall(nestedMethod, visitedMethods);
-                if (!string.IsNullOrWhiteSpace(nestedForbiddenCall))
-                {
-                    return nestedForbiddenCall;
-                }
+                var nestedForbiddenCall = FindForbiddenCall(nestedMethod, visitedMethods);
+                if (!string.IsNullOrWhiteSpace(nestedForbiddenCall)) return nestedForbiddenCall;
             }
 
             return null;
         }
 
-        private static string FindUnsupportedBuildingDefinitionUsage(MethodDefinition callingMethod, MethodReference calledMethod)
+        private static string FindUnsupportedBuildingDefinitionUsage(MethodDefinition callingMethod,
+            MethodReference calledMethod)
         {
-            if (callingMethod == null || !callingMethod.HasBody || calledMethod == null)
-            {
-                return null;
-            }
+            if (callingMethod == null || !callingMethod.HasBody || calledMethod == null) return null;
 
             IList<Instruction> instructions = callingMethod.Body.Instructions;
-            for (int i = 0; i < instructions.Count; i++)
+            for (var i = 0; i < instructions.Count; i++)
             {
-                if (!ReferenceEquals(instructions[i].Operand, calledMethod))
-                {
-                    continue;
-                }
+                if (!ReferenceEquals(instructions[i].Operand, calledMethod)) continue;
 
-                for (int scanIndex = i - 1; scanIndex >= 0; scanIndex--)
+                for (var scanIndex = i - 1; scanIndex >= 0; scanIndex--)
                 {
-                    Instruction scan = instructions[scanIndex];
-                    MethodReference ctorReference = scan.Operand as MethodReference;
-                    if (scan.OpCode != OpCodes.Newobj || ctorReference == null)
-                    {
-                        continue;
-                    }
+                    var scan = instructions[scanIndex];
+                    var ctorReference = scan.Operand as MethodReference;
+                    if (scan.OpCode != OpCodes.Newobj || ctorReference == null) continue;
 
-                    TypeReference ctorDeclaringType = ctorReference.DeclaringType;
+                    var ctorDeclaringType = ctorReference.DeclaringType;
                     if (ctorDeclaringType == null ||
-                        !string.Equals(ctorDeclaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition", StringComparison.Ordinal))
-                    {
+                        !string.Equals(ctorDeclaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition",
+                            StringComparison.Ordinal))
                         break;
-                    }
 
                     return ValidateBuildingDefinitionInitialization(instructions, scanIndex, i);
                 }
@@ -540,35 +461,29 @@ namespace CUCoreLib.ContentReload
             return null;
         }
 
-        private static string ValidateBuildingDefinitionInitialization(IList<Instruction> instructions, int startIndex, int endIndex)
+        private static string ValidateBuildingDefinitionInitialization(IList<Instruction> instructions, int startIndex,
+            int endIndex)
         {
-            HashSet<string> allowedMembers = new HashSet<string>(AllowedBuildingDefinitionMembers, StringComparer.Ordinal);
-            for (int i = startIndex + 1; i < endIndex; i++)
+            var allowedMembers = new HashSet<string>(AllowedBuildingDefinitionMembers, StringComparer.Ordinal);
+            for (var i = startIndex + 1; i < endIndex; i++)
             {
-                Instruction instruction = instructions[i];
-                MemberReference member = instruction.Operand as MemberReference;
-                TypeReference declaringType = member != null ? member.DeclaringType : null;
+                var instruction = instructions[i];
+                var member = instruction.Operand as MemberReference;
+                var declaringType = member?.DeclaringType;
                 if (member == null ||
                     declaringType == null ||
-                    !string.Equals(declaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition", StringComparison.Ordinal))
-                {
+                    !string.Equals(declaringType.FullName, "CUCoreLib.Data.CustomBuildingEntityDefinition",
+                        StringComparison.Ordinal))
                     continue;
-                }
 
-                string memberName = member.Name ?? string.Empty;
+                var memberName = member.Name ?? string.Empty;
                 if (string.Equals(memberName, "ConfigurePrefab", StringComparison.Ordinal) ||
                     string.Equals(memberName, "ConfigureInstance", StringComparison.Ordinal) ||
                     string.Equals(memberName, "PlaceCheck", StringComparison.Ordinal) ||
                     string.Equals(memberName, "Components", StringComparison.Ordinal) ||
-                    string.Equals(memberName, "SpawnComponents", StringComparison.Ordinal))
-                {
-                    return "it registers a building definition using unsupported member '" + memberName + "'. Only basic/scriptless building definitions can be hot reloaded.";
-                }
-
-                if (instruction.OpCode == OpCodes.Stfld && !allowedMembers.Contains(memberName))
-                {
-                    return "it registers a building definition using unsupported member '" + memberName + "'. Only basic/scriptless building definitions can be hot reloaded.";
-                }
+                    string.Equals(memberName, "SpawnComponents", StringComparison.Ordinal) || instruction.OpCode == OpCodes.Stfld && !allowedMembers.Contains(memberName))
+                    return "it registers a building definition using unsupported member '" + memberName +
+                           "'. Only basic/scriptless building definitions can be hot reloaded.";
             }
 
             return null;
@@ -576,11 +491,6 @@ namespace CUCoreLib.ContentReload
 
         private sealed class SelectedReloadMethod
         {
-            public MethodDefinition Method { get; }
-            public int StageOrder { get; }
-            public int Order { get; }
-            public int DiscoveryIndex { get; }
-
             public SelectedReloadMethod(MethodDefinition method, int stageOrder, int order, int discoveryIndex)
             {
                 Method = method;
@@ -588,6 +498,11 @@ namespace CUCoreLib.ContentReload
                 Order = order;
                 DiscoveryIndex = discoveryIndex;
             }
+
+            public MethodDefinition Method { get; }
+            public int StageOrder { get; }
+            public int Order { get; }
+            public int DiscoveryIndex { get; }
         }
     }
 }

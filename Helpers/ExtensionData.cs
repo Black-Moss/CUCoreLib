@@ -18,8 +18,7 @@ namespace CUCoreLib.Helpers
             where TKey : class
             where TValue : class
         {
-            if (TableHolder<TKey, TValue>.Table.TryGetValue(target, out var value)) return value;
-            return null;
+            return TableHolder<TKey, TValue>.Table.TryGetValue(target, out var value) ? value : null;
         }
 
         // Generic storage

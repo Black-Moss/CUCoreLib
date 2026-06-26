@@ -1,16 +1,16 @@
-using System;
 using System.IO;
 using System.Linq;
-using UnityEngine;
-using BepInEx.Logging;
 using System.Reflection;
+using BepInEx.Logging;
 using CUCoreLib.ContentReload;
+using UnityEngine;
 
 namespace CUCoreLib.Helpers
 {
     internal static class FileLoader
     {
         private static ManualLogSource Logger;
+
         public static void Initialize(ManualLogSource logger)
         {
             Logger = logger;
@@ -22,9 +22,9 @@ namespace CUCoreLib.Helpers
         }
 
 
-
         public static Sprite LoadSpriteFromFile(string filename)
         {
+            // Introduced optional parameters for method 'Sprite LoadSpriteFromFile(string, float, FilterMode, int, int)'
             return LoadSpriteFromFile(filename, 100, FilterMode.Point, 1, 1);
         }
 
@@ -34,14 +34,14 @@ namespace CUCoreLib.Helpers
         }
 
         // Direct file loads
-        public static Sprite LoadSpriteFromFile(string filename, float ppu, FilterMode filterMode, int widthMultiplier, int heightMultiplier)
+        public static Sprite LoadSpriteFromFile(string filename, float ppu, FilterMode filterMode, int widthMultiplier,
+            int heightMultiplier)
         {
-            string pluginPath = ResolvePluginDirectory();
-            string imagePath = Path.Combine(pluginPath, "Images", filename);
+            var pluginPath = ResolvePluginDirectory();
+            var imagePath = Path.Combine(pluginPath, "Images", filename);
 
             if (!File.Exists(imagePath))
             {
-                
                 imagePath = Path.Combine(pluginPath, filename);
                 if (!File.Exists(imagePath))
                 {
@@ -56,36 +56,28 @@ namespace CUCoreLib.Helpers
             }
 
 
+            var fileData = File.ReadAllBytes(imagePath);
 
-            byte[] fileData = File.ReadAllBytes(imagePath);
+            var originalTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 
-            Texture2D originalTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!originalTexture.LoadImage(fileData)) return null;
+            Texture2D finalTexture;
 
-            if (originalTexture.LoadImage(fileData))
-            {
-                Texture2D finalTexture;
+            if (widthMultiplier > 1 || heightMultiplier > 1)
+                finalTexture = ModifyTextures.ResizeTexture(originalTexture, widthMultiplier, heightMultiplier);
+            else
+                finalTexture = originalTexture;
 
-                if (widthMultiplier > 1 || heightMultiplier > 1)
-                {
-                    finalTexture = ModifyTextures.ResizeTexture(originalTexture, widthMultiplier, heightMultiplier);
-                }
-                else
-                {
-                    finalTexture = originalTexture;
-                }
+            finalTexture.filterMode = filterMode;
+            finalTexture.wrapMode = TextureWrapMode.Clamp;
 
-                finalTexture.filterMode = filterMode;
-                finalTexture.wrapMode = TextureWrapMode.Clamp;
+            return Sprite.Create(
+                finalTexture,
+                new Rect(0, 0, finalTexture.width, finalTexture.height),
+                new Vector2(0.5f, 0.5f),
+                ppu
+            );
 
-                return Sprite.Create(
-                    finalTexture,
-                    new Rect(0, 0, finalTexture.width, finalTexture.height),
-                    new Vector2(0.5f, 0.5f),
-                    ppu
-                );
-            }
-
-            return null;
         }
 
 
@@ -97,6 +89,7 @@ namespace CUCoreLib.Helpers
 
         public static Sprite LoadEmbeddedSprite(string filename)
         {
+            // Introduced optional parameters for method 'Sprite LoadEmbeddedSprite(string, float, FilterMode, int, int)' 
             return LoadEmbeddedSprite(filename, 100, FilterMode.Point, 1, 1);
         }
 
@@ -105,21 +98,24 @@ namespace CUCoreLib.Helpers
             return LoadEmbeddedSprite(filename, ppu, filterMode, 1, 1);
         }
 
-        public static Sprite LoadEmbeddedSprite(string filename, float ppu, FilterMode filterMode, int widthMultiplier, int heightMultiplier)
+        public static Sprite LoadEmbeddedSprite(string filename, float ppu, FilterMode filterMode, int widthMultiplier,
+            int heightMultiplier)
         {
-            Assembly asm = ResolveSourceAssembly();
-            string newFilename = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(filename));
+            var asm = ResolveSourceAssembly();
+            var newFilename = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(filename));
             if (newFilename == null)
             {
-                Logger.LogError($"Image by the name of {filename} does not exist. Check capitalization and file extension");
+                Logger.LogError(
+                    $"Image by the name of {filename} does not exist. Check capitalization and file extension");
                 return null;
             }
+
             // to read file data from manifest resource
-            Stream stream = asm.GetManifestResourceStream(newFilename);
-            byte[] fileData = new byte[stream.Length];
+            var stream = asm.GetManifestResourceStream(newFilename);
+            var fileData = new byte[stream.Length]; // maybe null
             stream.Read(fileData, 0, fileData.Length);
 
-            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBAHalf, false)
+            var texture = new Texture2D(2, 2, TextureFormat.RGBAHalf, false)
             {
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = filterMode,
@@ -130,7 +126,7 @@ namespace CUCoreLib.Helpers
             if (widthMultiplier > 1 || heightMultiplier > 1)
                 texture = ModifyTextures.ResizeTexture(texture, widthMultiplier, heightMultiplier);
 
-            Sprite sprite = Sprite.Create(
+            var sprite = Sprite.Create(
                 texture,
                 new Rect(0, 0, texture.width, texture.height),
                 new Vector2(0.5f, 0.5f),
@@ -148,13 +144,10 @@ namespace CUCoreLib.Helpers
 
         private static string ResolvePluginDirectory()
         {
-            string overrideDirectory = ContentReloadSession.GetPluginDirectoryOverride();
-            if (!string.IsNullOrWhiteSpace(overrideDirectory))
-            {
-                return overrideDirectory;
-            }
-
-            return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var overrideDirectory = ContentReloadSession.GetPluginDirectoryOverride();
+            return !string.IsNullOrWhiteSpace(overrideDirectory)
+                ? overrideDirectory
+                : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         }
     }
 }

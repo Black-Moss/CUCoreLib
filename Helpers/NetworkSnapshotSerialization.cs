@@ -17,8 +17,7 @@ namespace CUCoreLib.Helpers
 
             return new JObject
             {
-                // not null
-                ["name"] = sprite.name ?? string.Empty,
+                ["name"] = sprite.name,
                 ["ppu"] = sprite.pixelsPerUnit,
                 ["data"] = Convert.ToBase64String(png)
             };
@@ -26,8 +25,7 @@ namespace CUCoreLib.Helpers
 
         internal static Sprite ReadSprite(JToken token)
         {
-            var obj = token as JObject;
-            if (obj == null) return null;
+            if (!(token is JObject obj)) return null;
 
             var encoded = obj.Value<string>("data");
             if (string.IsNullOrWhiteSpace(encoded)) return null;
@@ -36,11 +34,9 @@ namespace CUCoreLib.Helpers
 
             var ppu = obj.Value<float?>("ppu") ?? AssetLoader.PPU_WORLD;
             var sprite = AssetLoader.LoadSpriteFromBytes(data, ppu);
-            if (sprite != null)
-            {
-                var name = obj.Value<string>("name");
-                if (!string.IsNullOrWhiteSpace(name)) sprite.name = name;
-            }
+            if (sprite == null) return sprite;
+            var name = obj.Value<string>("name");
+            if (!string.IsNullOrWhiteSpace(name)) sprite.name = name;
 
             return sprite;
         }
@@ -58,8 +54,7 @@ namespace CUCoreLib.Helpers
 
         internal static Color ReadColor(JToken token, Color fallback)
         {
-            var obj = token as JObject;
-            if (obj == null) return fallback;
+            if (!(token is JObject obj)) return fallback;
 
             return new Color(
                 obj.Value<float?>("r") ?? fallback.r,
@@ -93,16 +88,11 @@ namespace CUCoreLib.Helpers
             var stacks = new List<LiquidStack>();
             if (array == null) return stacks;
 
-            foreach (var entry in array)
-            {
-                var obj = entry as JObject;
-                if (obj == null) continue;
-
-                var liquidId = obj.Value<string>("liquidId");
-                if (string.IsNullOrWhiteSpace(liquidId)) continue;
-
-                stacks.Add(new LiquidStack(liquidId, obj.Value<float?>("amount") ?? 0f));
-            }
+            stacks.AddRange(from obj
+                in array.OfType<JObject>()
+                let liquidId = obj.Value<string>("liquidId")
+                where !string.IsNullOrWhiteSpace(liquidId) 
+                select new LiquidStack(liquidId, obj.Value<float?>("amount") ?? 0f));
 
             return stacks;
         }
@@ -132,16 +122,11 @@ namespace CUCoreLib.Helpers
             var qualities = new List<CraftingQuality>();
             if (array == null) return qualities;
 
-            foreach (var entry in array)
-            {
-                var obj = entry as JObject;
-                if (obj == null) continue;
-
-                var id = obj.Value<string>("id");
-                if (string.IsNullOrWhiteSpace(id)) continue;
-
-                qualities.Add(new CraftingQuality(id, obj.Value<float?>("amount") ?? 1f));
-            }
+            qualities.AddRange(from obj
+                in array.OfType<JObject>() 
+                let id = obj.Value<string>("id")
+                where !string.IsNullOrWhiteSpace(id) 
+                select new CraftingQuality(id, obj.Value<float?>("amount") ?? 1f));
 
             return qualities;
         }
@@ -156,6 +141,7 @@ namespace CUCoreLib.Helpers
                 if (type == null) continue;
 
                 // maybe null
+                // 111
                 array.Add(type.AssemblyQualifiedName ?? type.FullName);
             }
 
@@ -166,10 +152,17 @@ namespace CUCoreLib.Helpers
         {
             if (!(token is JArray array)) return null;
 
-            return (from entry in array select entry?
-                .Value<string>() into typeName where !string
-                .IsNullOrWhiteSpace(typeName) select Type
-                .GetType(typeName, false) into resolved where resolved != null select resolved)
+            return (from entry in array
+                    select entry?
+                        .Value<string>()
+                    into typeName
+                    where !string
+                        .IsNullOrWhiteSpace(typeName)
+                    select Type
+                        .GetType(typeName, false)
+                    into resolved
+                    where resolved != null
+                    select resolved)
                 .ToArray();
         }
 
@@ -188,6 +181,7 @@ namespace CUCoreLib.Helpers
             }
             catch
             {
+                // ignored
             }
 
             RenderTexture renderTexture = null;

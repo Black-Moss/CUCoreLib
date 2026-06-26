@@ -42,13 +42,11 @@ namespace CUCoreLib.Patches
                 var instruction = codes[i];
                 yield return instruction;
 
-                if (instruction.opcode == OpCodes.Ldc_I4_1 && i + 1 < codes.Count &&
-                    codes[i + 1].opcode == OpCodes.Stfld && codes[i + 1].operand is FieldInfo field &&
-                    field.Name == "sideMoodles")
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return CodeInstruction.Call(typeof(MoodleManagerPatches), nameof(AddSideCustomMoodles));
-                }
+                if (instruction.opcode != OpCodes.Ldc_I4_1 || i + 1 >= codes.Count ||
+                    codes[i + 1].opcode != OpCodes.Stfld || !(codes[i + 1].operand is FieldInfo field) ||
+                    field.Name != "sideMoodles") continue;
+                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return CodeInstruction.Call(typeof(MoodleManagerPatches), nameof(AddSideCustomMoodles));
             }
         }
 

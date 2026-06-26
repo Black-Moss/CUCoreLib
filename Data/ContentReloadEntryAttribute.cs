@@ -13,15 +13,15 @@ namespace CUCoreLib.Data
         RegisterRecipes = 500
     }
 
-    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Method, Inherited = false)]
     public sealed class ContentReloadEntryAttribute : Attribute
     {
-        public ContentReloadEntryStage Stage { get; }
-        public int Order { get; set; }
-
         public ContentReloadEntryAttribute(ContentReloadEntryStage stage)
         {
             Stage = stage;
         }
+
+        public ContentReloadEntryStage Stage { get; }
+        public int Order { get; set; }
     }
 }

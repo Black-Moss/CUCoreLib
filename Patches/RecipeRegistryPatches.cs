@@ -12,21 +12,13 @@ namespace CUCoreLib.Patches
     {
         internal static void RefreshCraftingUi()
         {
-            PlayerCamera camera = PlayerCamera.main;
-            if (camera == null || Recipes.recipes == null)
-            {
-                return;
-            }
+            var camera = PlayerCamera.main;
+            if (camera == null || Recipes.recipes == null) return;
 
-            int recipeCount = Recipes.recipes.Count;
-            if (recipeCount <= 0)
-            {
-                camera.selectedRecipe = 0;
-            }
-            else
-            {
-                camera.selectedRecipe = Mathf.Clamp(camera.selectedRecipe, 0, recipeCount - 1);
-            }
+            var recipeCount = Recipes.recipes.Count;
+            camera.selectedRecipe = recipeCount <= 0
+                ? 0
+                : Mathf.Clamp(camera.selectedRecipe, 0, recipeCount - 1);
 
             camera.RefreshRecipeList();
             camera.RefreshCurrentlySelectedRecipe();
@@ -45,7 +37,7 @@ namespace CUCoreLib.Patches
         [HarmonyPrefix]
         private static bool FixRecipeIcon(Recipe __instance, ref (Sprite, Color) __result)
         {
-            if (__instance == null || __instance.result == null || string.IsNullOrWhiteSpace(__instance.result.id))
+            if (__instance?.result == null || string.IsNullOrWhiteSpace(__instance.result.id))
             {
                 __result = (null, Color.white);
                 return false;
@@ -81,11 +73,10 @@ namespace CUCoreLib.Patches
                 var recipeBox = __instance.recipeListContent.GetChild(i);
                 if (recipeBox.childCount < 3) continue;
 
-                var recipeIndex = i;
-                if (recipeIndex < 0 || recipeIndex >= Recipes.recipes.Count) continue;
+                if (i < 0 || i >= Recipes.recipes.Count) continue;
 
-                var recipe = Recipes.recipes[recipeIndex];
-                var animationId = recipe?.result != null ? recipe.result.id : null;
+                var recipe = Recipes.recipes[i];
+                var animationId = recipe?.result?.id;
                 if (string.IsNullOrWhiteSpace(animationId)) continue;
 
                 var image = recipeBox.GetChild(2).GetComponent<Image>();
@@ -131,15 +122,13 @@ namespace CUCoreLib.Patches
                 if (resultObj != null)
                 {
                     var component = resultObj.GetComponent<Item>();
-                    if (component != null)
-                    {
-                        component.condition = __instance.resultCondition * conditionMult;
-                        PlayerCamera.main.body.AutoPickUpItem(component);
+                    if (component == null) continue;
+                    component.condition = __instance.resultCondition * conditionMult;
+                    PlayerCamera.main.body.AutoPickUpItem(component);
 
-                        if (!__instance.dontDrainResultLiquid &&
-                            component.TryGetComponent<WaterContainerItem>(out var wat))
-                            wat.stack = new List<LiquidStack>();
-                    }
+                    if (!__instance.dontDrainResultLiquid &&
+                        component.TryGetComponent<WaterContainerItem>(out var wat))
+                        wat.stack = new List<LiquidStack>();
                 }
                 else
                 {

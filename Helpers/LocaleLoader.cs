@@ -50,9 +50,9 @@ namespace CUCoreLib.Helpers
             var value = TryReadValue(Locale.currentLang, normalizedCategory, normalizedKey);
             if (!string.IsNullOrWhiteSpace(value)) return value;
 
-            if (!string.IsNullOrWhiteSpace(fallback)) return fallback;
-
-            return normalizedKey;
+            return !string.IsNullOrWhiteSpace(fallback)
+                ? fallback
+                : normalizedKey;
         }
 
         private static List<string> FindOverlayFiles(string localeName)
@@ -64,7 +64,11 @@ namespace CUCoreLib.Helpers
             if (File.Exists(configPath)) results.Add(configPath);
 
             var pluginRoot = Path.Combine(Path.GetDirectoryName(Paths.ConfigPath) ?? string.Empty, "plugins");
-            if (Directory.Exists(pluginRoot))
+            if (!Directory.Exists(pluginRoot))
+                return results
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             {
                 var pluginMatches = Directory.EnumerateFiles(pluginRoot, fileName, SearchOption.AllDirectories)
                     .Where(path =>
@@ -107,6 +111,7 @@ namespace CUCoreLib.Helpers
             foreach (var property in section.Properties())
             {
                 // property.Value == null is always false
+                // dude here no change
                 if (string.IsNullOrWhiteSpace(property.Name) || property.Value == null) continue;
 
                 var value = property.Value.Type == JTokenType.String

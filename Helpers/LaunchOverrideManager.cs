@@ -18,12 +18,9 @@ namespace CUCoreLib.Helpers
 
         internal static void Initialize()
         {
-            if (_configFile != null)
-            {
-                return;
-            }
+            if (_configFile != null) return;
 
-            string configPath = Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg");
+            var configPath = Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg");
             _configFile = new ConfigFile(configPath, true);
             _launchInSandbox = _configFile.Bind(
                 SectionName,
@@ -39,10 +36,7 @@ namespace CUCoreLib.Helpers
 
         internal static bool TryConsumeMenuLaunchOverride(PreRunScript menu)
         {
-            if (_launchOverrideConsumed || menu == null)
-            {
-                return false;
-            }
+            if (_launchOverrideConsumed || menu == null) return false;
 
             _launchOverrideConsumed = true;
 
@@ -58,36 +52,27 @@ namespace CUCoreLib.Helpers
                 return true;
             }
 
-            if (_launchInDebugWorld != null && _launchInDebugWorld.Value)
+            if (_launchInDebugWorld == null || !_launchInDebugWorld.Value) return false;
+            var runSettings = new Dictionary<string, object>(RunSettings.GetPreset("normal").presetValues)
             {
-                var runSettings = new Dictionary<string, object>(RunSettings.GetPreset("normal").presetValues)
-                {
-                    ["debugworld"] = true
-                };
+                ["debugworld"] = true
+            };
 
-                SaveSystem.loadedRun = false;
-                WorldGeneration.runSettings = runSettings;
-                menu.StartCoroutine(menu.WaitLoad());
-                CUCoreLibPlugin.Log?.LogInfo("CUCoreLib launch override: starting normal debug world.");
-                return true;
-            }
+            SaveSystem.loadedRun = false;
+            WorldGeneration.runSettings = runSettings;
+            menu.StartCoroutine(menu.WaitLoad());
+            CUCoreLibPlugin.Log?.LogInfo("CUCoreLib launch override: starting normal debug world.");
+            return true;
 
-            return false;
         }
 
         internal static bool TryConsumePendingSandboxCourse(TutorialHandler tutorialHandler)
         {
-            if (!_pendingSandboxCourse || tutorialHandler == null)
-            {
-                return false;
-            }
+            if (!_pendingSandboxCourse || tutorialHandler == null) return false;
 
             _pendingSandboxCourse = false;
             tutorialHandler.StartCourse(typeof(SandboxCourse));
-            if (tutorialHandler.courseSelectScreen != null)
-            {
-                tutorialHandler.courseSelectScreen.SetActive(false);
-            }
+            if (tutorialHandler.courseSelectScreen != null) tutorialHandler.courseSelectScreen.SetActive(false);
 
             CUCoreLibPlugin.Log?.LogInfo("CUCoreLib launch override: entered sandbox course.");
             return true;
