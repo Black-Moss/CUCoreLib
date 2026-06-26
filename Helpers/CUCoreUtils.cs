@@ -325,6 +325,34 @@ namespace CUCoreLib.Helpers
         {
             GiveItem(id, count);
         }
+        
+        public static void GiveItemSlot(string id, int slot, int count)
+        {
+            if (!IsInWorld() || string.IsNullOrWhiteSpace(id) || count <= 0) return;
+
+            var body = PlayerCamera.main.body;
+            if (body == null) return;
+
+            var normalizedId = id.Trim();
+            for (var i = 0; i < count; i++)
+            {
+                var spawned = Utils.Create(normalizedId, body.transform.position, 0f);
+                var spawnedItem = spawned != null ? spawned.GetComponent<Item>() : null;
+                if (spawnedItem == null)
+                {
+                    if (spawned != null) Object.Destroy(spawned);
+
+                    return;
+                }
+
+                body.PickUpItem(spawnedItem, slot);
+            }
+        }
+
+        public static void giveItemSlot(string id, int slot, int count)
+        {
+            GiveItemSlot(id, slot, count);
+        }
 
         public static bool TryGetCustomItemInfo(string id, out CustomItemInfo info)
         {
@@ -405,6 +433,23 @@ namespace CUCoreLib.Helpers
         {
             InvokeMethod(instance, "LogToConsole", message);
         }
+        
+        // try this?
+        // _consoleScript are ConsoleScript Instance
+        // public static void LogToConsole(string text)
+        // {
+        //     if (_consoleScript == null)
+        //         return;
+        //
+        //     _consoleScript.logs.Add(
+        //         $"[<alpha=#55>{TimeSpan.FromSeconds(Time.realtimeSinceStartup):mm\\:ss}<alpha=#FF>] {text}");
+        //     if (_consoleScript.logs.Count > MaxLogCount)
+        //         _consoleScript.logs.RemoveAt(0);
+        //     if (!_consoleScript.active)
+        //         return;
+        //     if (_consoleScript.logText == null) return;
+        //     _consoleScript.logText.text = string.Join("\n", _consoleScript.logs);
+        // }
 
         public static void ConsoleRunCommand(ConsoleScript instance, string commandString)
         {
