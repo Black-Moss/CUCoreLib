@@ -5,6 +5,35 @@ using HarmonyLib;
 
 namespace CUCoreLib.Patches
 {
+    /// <summary>
+    ///     The game's SettingsMenu hardcodes "gameset" prefix when looking up
+    ///     setting locale strings (e.g. Locale.GetOther("gameset" + setting.name)).
+    ///     This patch intercepts Locale.GetOther so that keys starting with
+    ///     "gameset" first try the clean (unprefixed) key in Language.other.
+    ///     If found there, it returns immediately; otherwise the original
+    ///     method runs, preserving built-in game settings.
+    /// </summary>
+    [HarmonyPatch(typeof(Locale), nameof(Locale.GetOther), typeof(string))]
+    internal static class LocalePatch
+    {
+        [HarmonyPrefix]
+        private static bool HateGameset(string __0, ref string __result)
+        {
+            if (string.IsNullOrEmpty(__0) || !__0.StartsWith("gameset"))
+                return true;
+
+            var language = Locale.currentLang;
+            if (language?.other == null)
+                return true;
+
+            var cleanKey = __0.Substring("gameset".Length);
+            if (!language.other.TryGetValue(cleanKey, out var value)
+                || string.IsNullOrWhiteSpace(value)) return true;
+            __result = value;
+            return false;
+        }
+    }
+
     [HarmonyPatch(typeof(Settings), nameof(Settings.DefaultSettings))]
     internal static class ModOptionsPatches
     {

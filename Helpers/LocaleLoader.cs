@@ -114,9 +114,7 @@ namespace CUCoreLib.Helpers
 
             foreach (var property in section.Properties())
             {
-                // property.Value == null is always false
-                // dude here no change
-                if (string.IsNullOrWhiteSpace(property.Name) || property.Value == null) continue;
+                if (string.IsNullOrWhiteSpace(property.Name)) continue;
 
                 var value = property.Value.Type == JTokenType.String
                     ? property.Value.Value<string>()
