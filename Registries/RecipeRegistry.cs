@@ -27,7 +27,7 @@ namespace CUCoreLib.Registries
 
         public static void Register(Recipe recipe)
         {
-            if (recipe == null || recipe.result == null || string.IsNullOrWhiteSpace(recipe.result.id))
+            if (recipe?.result == null || string.IsNullOrWhiteSpace(recipe.result.id))
             {
                 CUCoreLibPlugin.Log.LogError("Recipe registration failed: Result ID is missing.");
                 return;
@@ -59,7 +59,7 @@ namespace CUCoreLib.Registries
 
         internal static string BuildRecipeKey(Recipe recipe)
         {
-            if (recipe == null || recipe.result == null) return string.Empty;
+            if (recipe?.result == null) return string.Empty;
 
             var ingredientKey = BuildIngredientKey(recipe.items);
             return
@@ -68,18 +68,18 @@ namespace CUCoreLib.Registries
 
         internal static bool InjectSingleRecipe(Recipe recipe)
         {
-            if (Recipes.recipes == null || recipe == null || recipe.result == null) return false;
+            if (Recipes.recipes == null || recipe?.result == null) return false;
             EnsureCurrentRecipeList();
 
             var recipeKey = BuildRecipeKey(recipe);
             if (InjectedRecipeKeys.Contains(recipeKey)) return false;
 
-            foreach (var existing in Recipes.recipes)
-                if (BuildRecipeKey(existing).Equals(recipeKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    InjectedRecipeKeys.Add(recipeKey);
-                    return false;
-                }
+            if (Recipes.recipes.Any(existing =>
+                    BuildRecipeKey(existing).Equals(recipeKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                InjectedRecipeKeys.Add(recipeKey);
+                return false;
+            }
 
             if (recipe.items != null)
                 foreach (var item in recipe.items)
@@ -105,10 +105,7 @@ namespace CUCoreLib.Registries
 
             EnsureCurrentRecipeList();
 
-            var added = 0;
-            foreach (var recipe in RegisteredRecipes)
-                if (InjectSingleRecipe(recipe))
-                    added++;
+            var added = RegisteredRecipes.Count(InjectSingleRecipe);
 
             if (added > 0) CUCoreLibPlugin.Log.LogInfo($"Recipes: Added {added} recipes.");
 
@@ -156,14 +153,14 @@ namespace CUCoreLib.Registries
                        string.Equals(owner, normalizedOwnerId, StringComparison.OrdinalIgnoreCase);
             });
 
-            for (var i = 0; i < ownedKeys.Length; i++)
+            foreach (var key in ownedKeys)
             {
-                var key = ownedKeys[i];
                 RegisteredRecipeKeys.Remove(key);
                 RecipeOwners.Remove(key);
                 InjectedRecipeKeys.Remove(key);
+                var key1 = key;
                 Recipes.recipes?.RemoveAll(recipe =>
-                    string.Equals(BuildRecipeKey(recipe), key, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(BuildRecipeKey(recipe), key1, StringComparison.OrdinalIgnoreCase));
             }
 
             result?.AddInfo("Cleared " + ownedKeys.Length + " recipes owned by '" + normalizedOwnerId + "'.");
@@ -178,11 +175,9 @@ namespace CUCoreLib.Registries
 
         private static void EnsureCurrentRecipeList()
         {
-            if (!ReferenceEquals(LastRecipeList, Recipes.recipes))
-            {
-                LastRecipeList = Recipes.recipes;
-                InjectedRecipeKeys.Clear();
-            }
+            if (ReferenceEquals(LastRecipeList, Recipes.recipes)) return;
+            LastRecipeList = Recipes.recipes;
+            InjectedRecipeKeys.Clear();
         }
 
         private static void ValidateRecipeReferences(Recipe recipe)
@@ -198,20 +193,18 @@ namespace CUCoreLib.Registries
                     continue;
                 }
 
-                if (item.specific)
+                if (!item.specific) continue;
+                if (string.IsNullOrWhiteSpace(item.specificId))
                 {
-                    if (string.IsNullOrWhiteSpace(item.specificId))
-                    {
-                        CUCoreLibPlugin.Log?.LogWarning(
-                            $"Recipe '{recipe.result.id}' has a specific ingredient without a specificId at index {i}.");
-                        continue;
-                    }
-
-                    var normalizedId = item.specificId.Trim();
-                    if (!TryResolveRecipeItemId(normalizedId, item.isLiquid))
-                        CUCoreLibPlugin.Log?.LogWarning(
-                            $"Recipe '{recipe.result.id}' references unknown {(item.isLiquid ? "liquid" : "item")} '{normalizedId}' at ingredient index {i}.");
+                    CUCoreLibPlugin.Log?.LogWarning(
+                        $"Recipe '{recipe.result.id}' has a specific ingredient without a specificId at index {i}.");
+                    continue;
                 }
+
+                var normalizedId = item.specificId.Trim();
+                if (!TryResolveRecipeItemId(normalizedId, item.isLiquid))
+                    CUCoreLibPlugin.Log?.LogWarning(
+                        $"Recipe '{recipe.result.id}' references unknown {(item.isLiquid ? "liquid" : "item")} '{normalizedId}' at ingredient index {i}.");
             }
         }
 

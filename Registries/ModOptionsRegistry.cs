@@ -75,9 +75,9 @@ namespace CUCoreLib.Registries
 
         private static void RegisterLocale(ModOptionDefinition option)
         {
-            LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Other, "gameset" + option.Id, option.Label);
+            LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Option, option.Id, option.Label);
             if (!string.IsNullOrWhiteSpace(option.Description))
-                LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Other, "gameset" + option.Id + "dsc",
+                LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Option, option.Id + "dsc",
                     option.Description);
             // todo I really need to figure this out
             // man this is kinda ass ngl
@@ -85,7 +85,7 @@ namespace CUCoreLib.Registries
 
             foreach (var choice in option.Choices)
             {
-                LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Other, "gameset" + option.Id + choice.Key,
+                LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Option, option.Id + choice.Key,
                     choice.Label);
             }
         }

@@ -20,7 +20,9 @@ namespace CUCoreLib.Registries
             Other = 3,
             Log = 4,
             Command = 5,
-            Option = 6
+            Option = 6,
+            Liquid = 7,
+            Title = 8
         }
 
         internal static Dictionary<int, Dictionary<string, string>> CustomLocales =
@@ -255,6 +257,8 @@ namespace CUCoreLib.Registries
                 normalizedCategory == "log" ? LocaleCategory.Log :
                 normalizedCategory == "command" ? LocaleCategory.Command :
                 normalizedCategory == "option" ? LocaleCategory.Option :
+                normalizedCategory == "liquid" ? LocaleCategory.Liquid :
+                normalizedCategory == "title" ? LocaleCategory.Title :
                 LocaleCategory.Other);
         }
 
@@ -274,6 +278,10 @@ namespace CUCoreLib.Registries
                     return "command";
                 case LocaleCategory.Option:
                     return "option";
+                case LocaleCategory.Liquid:
+                    return "liquid";
+                case LocaleCategory.Title:
+                    return "title";
                 case LocaleCategory.Other:
                 default:
                     return "other";

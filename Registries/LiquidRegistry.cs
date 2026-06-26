@@ -48,10 +48,7 @@ namespace CUCoreLib.Registries
 
         internal static int InjectRegisteredLiquids(bool logSummary = false)
         {
-            var injected = 0;
-            foreach (var kvp in RegisteredLiquids)
-                if (InjectSingleLiquid(kvp.Key, kvp.Value))
-                    injected++;
+            var injected = RegisteredLiquids.Count(kvp => InjectSingleLiquid(kvp.Key, kvp.Value));
 
             if (logSummary) LogInitialInjectionSummary();
 
@@ -96,9 +93,9 @@ namespace CUCoreLib.Registries
                 qualities = info.qualities ?? new List<CraftingQuality>()
             };
 
-            if (!string.IsNullOrEmpty(info.name)) LocaleRegistry.Register("other", id, info.name);
+            if (!string.IsNullOrEmpty(info.name)) LocaleRegistry.Register("liquid", id, info.name);
 
-            if (!string.IsNullOrEmpty(info.description)) LocaleRegistry.Register("other", id + "dsc", info.description);
+            if (!string.IsNullOrEmpty(info.description)) LocaleRegistry.Register("liquid", id + "dsc", info.description);
 
             return !wasPresent;
         }
@@ -138,17 +135,15 @@ namespace CUCoreLib.Registries
                 .Select(entry => entry.Key)
                 .ToArray();
 
-            for (var i = 0; i < ids.Length; i++)
+            foreach (var id in ids)
             {
-                var id = ids[i];
                 RegisteredLiquids.Remove(id);
                 LiquidOwners.Remove(id);
                 Liquids.Registry?.Remove(id);
             }
 
             if (ids.Length > 0)
-                result?.AddInfo("Cleared " + ids.Length + " liquid registrations owned by '" + normalizedOwnerId +
-                                "'.");
+                result?.AddInfo("Cleared " + ids.Length + " liquid registrations owned by '" + normalizedOwnerId + "'.");
         }
 
         internal static JObject CaptureNetworkSnapshot()
@@ -182,8 +177,7 @@ namespace CUCoreLib.Registries
 
             foreach (var property in snapshot.Properties())
             {
-                var obj = property.Value as JObject;
-                if (obj == null) continue;
+                if (!(property.Value is JObject obj)) continue;
 
                 Register(property.Name, new CustomLiquidInfo
                 {
@@ -203,9 +197,7 @@ namespace CUCoreLib.Registries
         public static bool TryGetCustomInfo(string id, out CustomLiquidInfo info)
         {
             info = null;
-            if (string.IsNullOrWhiteSpace(id)) return false;
-
-            return RegisteredLiquids.TryGetValue(id.Trim(), out info);
+            return !string.IsNullOrWhiteSpace(id) && RegisteredLiquids.TryGetValue(id.Trim(), out info);
         }
 
         private sealed class OwnerScope : IDisposable
