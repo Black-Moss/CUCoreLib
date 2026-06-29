@@ -670,6 +670,7 @@ private void RegisterGlassBuildings()
         Placement = BuildingPlacementType.Floor,
         SpawnMinPerChunk = 0.07f,
         SpawnMaxPerChunk = 0.07f,
+        SpawnLayers = BuildingEntityRegistry.LayersToMask(3, 4, 5),
         SurfaceOffset = 0.5f,
         Components = new[] { typeof(CentrifugeScript) },
         ItemsDropOnDestroy = new[]
@@ -726,6 +727,7 @@ private void RegisterAdvancedBuildings()
         GenerationStyle = BuildingGenerationStyle.DropPod, // Removes tiles around it when spawning
         SpawnMinPerChunk = 0.01f,
         SpawnMaxPerChunk = 0.015f,
+        SpawnLayers = BuildingEntityRegistry.AllLayersExcept(1, 2),
         SurfaceOffset = 0.4f,
         Components = new[] { typeof(ModdedLootCrateScript) }
     });

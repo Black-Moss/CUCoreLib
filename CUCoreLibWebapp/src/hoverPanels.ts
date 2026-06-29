@@ -125,6 +125,10 @@ export const hoverPanels: Record<string, HoverPanel> = {
     title: "SpawnMaxPerChunk",
     body: "Upper end of the random worldgen density range. CUCoreLib picks a value between SpawnMinPerChunk and SpawnMaxPerChunk each placement pass."
   },
+  SpawnLayers: {
+    title: "SpawnLayers",
+    body: "Bitmask for allowed in-game layers during worldgen. Use BuildingEntityRegistry.LayersToMask(...) or BuildingEntityRegistry.AllLayersExcept(...) with 1-based layer numbers."
+  },
   Placement: {
     title: "Placement",
     body: "Which surface type CUCoreLib searches for during placement. Floor casts downward, Ceiling casts upward, and Wall casts sideways with automatic horizontal flipping."

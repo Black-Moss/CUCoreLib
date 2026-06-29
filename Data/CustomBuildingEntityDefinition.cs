@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CUCoreLib.Registries;
 using UnityEngine;
 
 namespace CUCoreLib.Data
@@ -65,6 +66,7 @@ namespace CUCoreLib.Data
         public int SortingOrder = 5;
         public List<string> SpawnComponents = new List<string>();
         public bool SpawnInGround;
+        public int SpawnLayers = BuildingEntityRegistry.AllSpawnLayersMask;
         public float SpawnMaxPerChunk;
         public float SpawnMinPerChunk;
 

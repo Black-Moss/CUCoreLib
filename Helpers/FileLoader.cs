@@ -105,8 +105,7 @@ namespace CUCoreLib.Helpers
             var newFilename = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(filename));
             if (newFilename == null)
             {
-                Logger.LogError(
-                    $"Image by the name of {filename} does not exist. Check capitalization and file extension");
+                Logger?.LogWarning($"Image by the name of {filename} does not exist. Check capitalization and file extension");
                 return null;
             }
 

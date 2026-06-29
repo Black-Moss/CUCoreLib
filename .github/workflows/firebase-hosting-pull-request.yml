@@ -13,10 +13,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cd CUCoreLibWebapp && npm ci && npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/setup-node@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CUCORELIB }}
-          entryPoint: CUCoreLibWebapp
-          projectId: cucorelib
+          node-version: 24
+          cache: npm
+          cache-dependency-path: CUCoreLibWebapp/package-lock.json
+      - run: npm ci
+        working-directory: CUCoreLibWebapp
+      - run: npm run build
+        working-directory: CUCoreLibWebapp
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CUCORELIB }}
+      - id: deploy_preview
+        shell: bash
+        working-directory: CUCoreLibWebapp
+        run: |
+          set -euo pipefail
+          output="$(npx firebase-tools@latest hosting:channel:deploy "pr-${{ github.event.pull_request.number }}" --project cucorelib --expires 7d --json --non-interactive)"
+          printf '%s\n' "$output"
+          preview_url="$(printf '%s' "$output" | node -e "let input=''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => { const json = JSON.parse(input); const result = json.result ?? {}; const candidates = []; if (result.url) candidates.push(result.url); for (const value of Object.values(result)) { if (value && typeof value === 'object' && value.url) candidates.push(value.url); } const url = candidates.find(Boolean); if (!url) { process.exit(1); } process.stdout.write(url); });")"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = '${{ steps.deploy_preview.outputs.preview_url }}';
+            const body = `Firebase Hosting preview is ready: ${previewUrl}`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

@@ -144,6 +144,7 @@ namespace CUCoreLib.Patches
         {
             var spawnCommand = ConsoleScript.SearchExact("spawn");
             if (spawnCommand == null) return;
+            if (!HasRegisteredSpawnEntities(ConsoleScript.instance)) return;
 
             if (spawnCommand.argAutofill == null) spawnCommand.argAutofill = new Dictionary<int, List<string>>();
 
@@ -155,6 +156,15 @@ namespace CUCoreLib.Patches
 
             foreach (var id in BuildSpawnAutofill()[0].Where(id => !spawnIds.Contains(id, StringComparer.OrdinalIgnoreCase)))
                 spawnIds.Add(id);
+        }
+
+        private static bool HasRegisteredSpawnEntities(ConsoleScript console)
+        {
+            if (console == null) return false;
+
+            var registeredSpawnEntitiesField = AccessTools.Field(typeof(ConsoleScript), "registeredSpawnEntities");
+            return registeredSpawnEntitiesField != null && registeredSpawnEntitiesField.GetValue(console) is bool registered &&
+                   registered;
         }
 
         private static void RefreshCustomSpawnAutofill()

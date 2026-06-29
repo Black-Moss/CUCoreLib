@@ -130,7 +130,7 @@ namespace CUCoreLib.Registries
         {
             var root = existing != null ? (JObject)existing.DeepClone() : new JObject();
 
-            for (var type = 0; type <= 6; type++)
+            for (var type = 0; type <= 8; type++)
             {
                 var category = TypeToCategory(type);
                 if (!(root[category] is JObject categoryObject))

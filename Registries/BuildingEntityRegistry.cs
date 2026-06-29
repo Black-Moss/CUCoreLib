@@ -16,6 +16,7 @@ namespace CUCoreLib.Registries
     public static class BuildingEntityRegistry
     {
         private const string DefaultHitSoundReferenceId = "glowplant";
+        public const int AllSpawnLayersMask = -1;
 
         private static readonly Dictionary<string, CustomBuildingEntityDefinition> RegisteredDefinitions =
             new Dictionary<string, CustomBuildingEntityDefinition>(StringComparer.OrdinalIgnoreCase);
@@ -106,6 +107,29 @@ namespace CUCoreLib.Registries
         public static IEnumerable<KeyValuePair<string, CustomBuildingEntityDefinition>> GetRegisteredDefinitions()
         {
             return RegisteredDefinitions.ToArray();
+        }
+
+        public static int LayerToMask(int layerNumber)
+        {
+            if (layerNumber <= 0 || layerNumber > 31) return 0;
+
+            return 1 << (layerNumber - 1);
+        }
+
+        public static int LayersToMask(params int[] layerNumbers)
+        {
+            if (layerNumbers == null || layerNumbers.Length == 0) return 0;
+
+            return layerNumbers.Aggregate(0, (current, layerNumber) => current | LayerToMask(layerNumber));
+        }
+
+        public static int AllLayersExcept(params int[] excludedLayerNumbers)
+        {
+            var mask = AllSpawnLayersMask;
+            if (excludedLayerNumbers == null || excludedLayerNumbers.Length == 0) return mask;
+
+            return excludedLayerNumbers.Select(LayerToMask).Where(layerMask => layerMask != 0)
+                .Aggregate(mask, (current, layerMask) => current & ~layerMask);
         }
 
         internal static void RegisterRuntime(CustomBuildingRuntime runtime)
@@ -222,6 +246,7 @@ namespace CUCoreLib.Registries
                     ["generationStyle"] = (int)definition.GenerationStyle,
                     ["spawnMinPerChunk"] = definition.SpawnMinPerChunk,
                     ["spawnMaxPerChunk"] = definition.SpawnMaxPerChunk,
+                    ["spawnLayers"] = definition.SpawnLayers,
                     ["surfaceOffset"] = definition.SurfaceOffset,
                     ["randomFlip"] = definition.RandomFlip,
                     ["spawnInGround"] = definition.SpawnInGround,
@@ -301,6 +326,7 @@ namespace CUCoreLib.Registries
                     GenerationStyle = (BuildingGenerationStyle)(obj.Value<int?>("generationStyle") ?? 0),
                     SpawnMinPerChunk = obj.Value<float?>("spawnMinPerChunk") ?? 0f,
                     SpawnMaxPerChunk = obj.Value<float?>("spawnMaxPerChunk") ?? 0f,
+                    SpawnLayers = obj.Value<int?>("spawnLayers") ?? AllSpawnLayersMask,
                     SurfaceOffset = obj.Value<float?>("surfaceOffset") ?? 0.5f,
                     RandomFlip = obj.Value<bool?>("randomFlip") ?? true,
                     SpawnInGround = obj.Value<bool?>("spawnInGround") ?? false,
@@ -382,6 +408,7 @@ namespace CUCoreLib.Registries
         {
             if (world == null || !TryGetDefinition(id, out var definition)) return;
             if (definition.GenerationStyle == BuildingGenerationStyle.None) return;
+            if (!CanSpawnInLayer(definition, world.biomeDepth)) return;
 
             var prefab = GetOrCreatePrefab(id);
             if (prefab == null) return;
@@ -674,6 +701,20 @@ namespace CUCoreLib.Registries
         {
             var reference = Resources.Load<GameObject>(resourceId);
             return reference != null ? reference.layer : fallback;
+        }
+
+        private static bool CanSpawnInLayer(CustomBuildingEntityDefinition definition, int biomeDepth)
+        {
+            if (definition == null) return false;
+
+            var spawnLayers = definition.SpawnLayers;
+            if (spawnLayers == 0) return false;
+
+            if (spawnLayers == AllSpawnLayersMask) return true;
+
+            var layerNumber = biomeDepth + 1;
+            var layerMask = LayerToMask(layerNumber);
+            return layerMask != 0 && (spawnLayers & layerMask) != 0;
         }
 
         private static void DistributeStandard(WorldGeneration world, string id,

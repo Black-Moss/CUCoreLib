@@ -322,6 +322,7 @@ function buildingEntitiesPage(): string {
     Placement = BuildingPlacementType.Floor,
     SpawnMinPerChunk = 0.07f,
     SpawnMaxPerChunk = 0.07f,
+    SpawnLayers = BuildingEntityRegistry.LayersToMask(3, 4, 5),
     SurfaceOffset = 0.5f,
     HeatRadius = 3f,
     HeatPerSecond = 1.2f,
@@ -348,6 +349,7 @@ function buildingEntitiesPage(): string {
     Placement = BuildingPlacementType.Wall,
     SpawnMinPerChunk = 0.02f,
     SpawnMaxPerChunk = 0.03f,
+    SpawnLayers = BuildingEntityRegistry.AllLayersExcept(1, 2),
     SurfaceOffset = 0.35f,
     RandomFlip = false,
     ItemsDropOnDestroy = new[]
@@ -393,6 +395,7 @@ function buildingEntitiesPage(): string {
             <tr><td><span class="inline-code">GenerationStyle</span></td><td><span class="inline-code">BuildingGenerationStyle</span></td><td>Worldgen mode. Defaults to <span class="inline-code">None</span>, so buildings only appear when spawned or placed directly.</td></tr>
             <tr><td><span class="inline-code">SpawnMinPerChunk</span></td><td><span class="inline-code">float</span></td><td>Lower bound for worldgen spawn density.</td></tr>
             <tr><td><span class="inline-code">SpawnMaxPerChunk</span></td><td><span class="inline-code">float</span></td><td>Upper bound for worldgen spawn density.</td></tr>
+            <tr><td><span class="inline-code">SpawnLayers</span></td><td><span class="inline-code">int</span></td><td>Bitmask for allowed in-game layers during building worldgen. Defaults to all layers. Use <span class="inline-code">BuildingEntityRegistry.LayersToMask(2, 4, 5)</span> or <span class="inline-code">BuildingEntityRegistry.AllLayersExcept(1, 3)</span>.</td></tr>
             <tr><td><span class="inline-code">SurfaceOffset</span></td><td><span class="inline-code">float</span></td><td>Offset from the hit surface used when placing or generating the object. Defaults to <span class="inline-code">0.5f</span>.</td></tr>
             <tr><td><span class="inline-code">RandomFlip</span></td><td><span class="inline-code">bool</span></td><td>Randomly mirrors the prefab on spawn. Defaults to <span class="inline-code">true</span>.</td></tr>
             <tr><td><span class="inline-code">SpawnInGround</span></td><td><span class="inline-code">bool</span></td><td>Allows standard worldgen placement even when the target is inside ground.</td></tr>
@@ -405,6 +408,7 @@ function buildingEntitiesPage(): string {
           </tbody>
         </table>
       </div>
+      <p><span class="inline-code">SpawnLayers</span> uses the same 1-based layer numbering as the tile registry helpers. Layer <span class="inline-code">1</span> means the first playable depth, layer <span class="inline-code">4</span> means biome depth <span class="inline-code">3</span>, and leaving the field alone keeps the building eligible everywhere.</p>
     </section>
   `;
 }
@@ -1797,7 +1801,7 @@ function localePage(): string {
 
     <section class="lesson-card">
       <h2>Manual keys and ad hoc lookups</h2>
-      <p>... ad hoc means "as needed"...<p>
+      <p>... ad hoc means "as needed"...</p>
 
       <p>For UI text, alerts, or other strings that do not come from registered items or liquids, (e.g. ui code, console command autofill) use <span class="inline-code">LocaleRegistry.Get</span>.</p>
       <pre><code>
@@ -1816,9 +1820,32 @@ createLocale C:/Temp/EN.json</code></pre>
     </section>
 
     <section class="lesson-card">
+      <h2>How to ship the locale file</h2>
+      <p>CUCoreLib now supports two mod-owned distribution patterns for files like <span class="inline-code">zh-CN.json</span>, <span class="inline-code">fr-FR.json</span>, or <span class="inline-code">CAT.json</span>. In both cases, the file name must match the in-game locale name exactly.</p>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead><tr><th>Approach</th><th>How to ship it</th><th>When to use it</th></tr></thead>
+          <tbody>
+            <tr><td><span class="inline-code">Embedded Resource</span></td><td>Add <span class="inline-code">zh-CN.json</span> to your mod project and set its Build Action to <span class="inline-code">Embedded Resource</span>. CUCoreLib scans loaded mod assemblies for embedded <span class="inline-code">XX-xx.json</span> resources automatically, so users do not need to place the file anywhere manually.</td><td>Use this when the translation should always ship inside the DLL.</td></tr>
+            <tr><td><span class="inline-code">Loose file beside the DLL</span></td><td>Ship or tell users to place the locale file directly beside your mod DLL, for example <span class="inline-code">BepInEx/plugins/MyMod/zh-CN.json</span>.</td><td>Use this when you want translators or players to swap locale files without rebuilding the mod.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The older shared overlay folder still works too: <span class="inline-code">BepInEx/config/CUCoreLib/Locales/zh-CN.json</span>. Load order is English fallback first, then embedded mod locale files, then loose plugin/config overlays, so external files can still override shipped defaults.</p>
+      <pre><code>&lt;ItemGroup&gt;
+  &lt;EmbeddedResource Include="Locales\\zh-CN.json" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+      <pre><code>BepInEx/
+  plugins/
+    MyMod/
+      MyMod.dll
+      zh-CN.json</code></pre>
+    </section>
+
+    <section class="lesson-card">
       <h2>Generated shape</h2>
       <p>The JSON is grouped by the same categories used by vanilla locale lookup: <span class="inline-code">item</span>, <span class="inline-code">building</span>, <span class="inline-code">moodle</span>, and <span class="inline-code">other</span>. A translator can rename <span class="inline-code">EN.json</span> to something like <span class="inline-code">zh-CN.json</span> and replace the values without changing the keys.</p>
-      <p>Check the right side code for for a example LOLCAT translation ^w^<p>
+      <p>Check the right side code for an example LOLCAT translation.</p>
       <pre><code>{
   "item": {
     "clothpatch": "Ruined yarn ball",
@@ -2706,7 +2733,7 @@ AudioClip cachedLoop = AssetLoader.GetCachedAudioClip("modname.centrifuge.loop")
 
     <section class="lesson-card">
       <h2>Using audio in gameplay</h2>
-      <p>Loaded clips are standard Unity <span class="inline-code">AudioClip</span> objects. You can assign them to an <span class="inline-code">AudioSource</span>, play them manually, or pass them into CUCoreLib definitions that accept clips.</p>
+      <p>Loaded clips are standard Unity <span class="inline-code">AudioClip</span> objects. You can pass them into CUCoreLib definitions that accept clips or play them directly with <span class="inline-code">CUCoreUtils.PlaySoundAt()</span>.</p>
       <pre><code>AudioClip centrifugeHit = AssetLoader.LoadEmbeddedAudio("Audio.centrifuge-hit.wav");
 
 BuildingEntityRegistry.Register("centrifuge", new CustomBuildingEntityDefinition
@@ -2715,9 +2742,15 @@ BuildingEntityRegistry.Register("centrifuge", new CustomBuildingEntityDefinition
     Sprite = AssetLoader.LoadEmbeddedSprite("Images.centrifuge.png", 8f),
     HitSound = centrifugeHit // Plays the audio clip on claw hit
 });</code></pre>
-      <pre><code>AudioSource source = gameObject.GetComponent&lt;AudioSource&gt;() ?? gameObject.AddComponent&lt;AudioSource&gt;();
-source.clip = AssetLoader.GetCachedAudioClip("yourmod.verycoolsound.effect");
-source.Play();</code></pre>
+      <pre><code>CUCoreUtils.PlaySoundAt(
+    AssetLoader.GetCachedAudioClip("yourmod.verycoolsound.effect"),
+    volume: 0.7f,
+    delay: 0.1f,
+    position: (Vector2)transform.position,
+    pitch: 1.1f
+);</code></pre>
+      <pre><code>CUCoreUtils.Talk("Hello there.");
+CUCoreUtils.TalkElectronic("Beep boop.", item);</code></pre>
     </section>
 
     <details open>

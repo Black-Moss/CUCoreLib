@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Collections.Generic;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
@@ -67,13 +68,20 @@ namespace CUCoreLib.Patches
             if (!_newLoaderPatched)
             {
                 var newObjectSystemType = ResolveLoadedType(NewObjectSystemTypeName);
-                var loadObjectResource = AccessTools.Method(newObjectSystemType, "LoadObjectResource");
-                if (loadObjectResource != null)
+                var loadObjectResources = AccessTools.GetDeclaredMethods(newObjectSystemType)
+                    ?.Where(method => string.Equals(method.Name, "LoadObjectResource", StringComparison.Ordinal))
+                    ?.ToArray();
+                if (loadObjectResources != null)
                 {
-                    harmony.Patch(loadObjectResource,
-                        new HarmonyMethod(typeof(KrokMpCompatibilityPatches), nameof(LoadObjectResource_Prefix)));
-                    _newLoaderPatched = true;
-                    patchedAnything = true;
+                    foreach (var loadObjectResource in loadObjectResources)
+                    {
+                        harmony.Patch(loadObjectResource,
+                            prefix: new HarmonyMethod(typeof(KrokMpCompatibilityPatches),
+                                nameof(LoadObjectResource_Prefix)));
+                        patchedAnything = true;
+                    }
+
+                    _newLoaderPatched = loadObjectResources.Any();
                 }
             }
 
@@ -304,8 +312,14 @@ namespace CUCoreLib.Patches
             return prefab != null;
         }
 
-        private static bool LoadObjectResource_Prefix(string resourceid, Vector2 pos, ref GameObject __result)
+        private static bool LoadObjectResource_Prefix(string resourceid, object[] __args, ref GameObject __result)
         {
+            var pos = default(Vector2);
+            if (__args != null && __args.Length > 1 && __args[1] is Vector2 vector)
+            {
+                pos = vector;
+            }
+
             if (!TryResolveResourcePrefab(resourceid, out var prefab, out var parentToWorldGrid) ||
                 prefab == null) return true;
 

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -35,6 +37,21 @@ namespace CUCoreLib.Helpers
 
         private static void ApplyLocaleFile(string localeName)
         {
+            var embeddedResources = FindEmbeddedOverlayResources(localeName);
+            foreach (var resource in embeddedResources)
+                try
+                {
+                    var localeJson = LoadEmbeddedLocaleJson(resource);
+                    if (localeJson == null) continue;
+
+                    MergeLocaleJson(Locale.currentLang, localeJson);
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogWarning(
+                        $"Failed to load embedded locale overlay '{resource.DisplayName}': {ex.Message}");
+                }
+
             var overlayFiles = FindOverlayFiles(localeName);
             if (overlayFiles.Count == 0) return;
 
@@ -73,27 +90,84 @@ namespace CUCoreLib.Helpers
             var configPath = Path.Combine(Paths.ConfigPath, "CUCoreLib", "Locales", fileName);
             if (File.Exists(configPath)) results.Add(configPath);
 
-            var pluginRoot = Path.Combine(Path.GetDirectoryName(Paths.ConfigPath) ?? string.Empty, "plugins");
-            if (!Directory.Exists(pluginRoot))
-                return results
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            {
-                var pluginMatches = Directory.EnumerateFiles(pluginRoot, fileName, SearchOption.AllDirectories)
-                    .Where(path =>
-                        path.IndexOf(Path.DirectorySeparatorChar + "Locales" + Path.DirectorySeparatorChar,
-                            StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        path.IndexOf(Path.AltDirectorySeparatorChar + "Locales" + Path.AltDirectorySeparatorChar,
-                            StringComparison.OrdinalIgnoreCase) >= 0);
-
-                results.AddRange(pluginMatches);
-            }
+            results.AddRange(FindPluginOverlayFiles(fileName));
 
             return results
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static List<string> FindPluginOverlayFiles(string fileName)
+        {
+            var results = new List<string>();
+            var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pluginInfo in Chainloader.PluginInfos.Values
+                         .Where(info => info != null)
+                         .OrderBy(GetPluginSortKey, StringComparer.OrdinalIgnoreCase))
+            {
+                var pluginLocation = NormalizeExistingPath(pluginInfo.Location);
+                if (string.IsNullOrWhiteSpace(pluginLocation)) continue;
+
+                var pluginDirectory = Path.GetDirectoryName(pluginLocation);
+                if (string.IsNullOrWhiteSpace(pluginDirectory)) continue;
+
+                AddIfExists(results, visitedPaths, Path.Combine(pluginDirectory, fileName));
+                AddIfExists(results, visitedPaths, Path.Combine(pluginDirectory, "Locales", fileName));
+            }
+
+            var pluginRoot = Path.Combine(Path.GetDirectoryName(Paths.ConfigPath) ?? string.Empty, "plugins");
+            if (!Directory.Exists(pluginRoot)) return results;
+
+            var pluginMatches = Directory.EnumerateFiles(pluginRoot, fileName, SearchOption.AllDirectories)
+                .Where(path =>
+                    path.IndexOf(Path.DirectorySeparatorChar + "Locales" + Path.DirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    path.IndexOf(Path.AltDirectorySeparatorChar + "Locales" + Path.AltDirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase) >= 0);
+
+            foreach (var match in pluginMatches)
+                AddIfExists(results, visitedPaths, match);
+
+            return results;
+        }
+
+        private static List<EmbeddedLocaleResource> FindEmbeddedOverlayResources(string localeName)
+        {
+            var fileName = localeName + ".json";
+            var normalizedFileName = NormalizeResourceName(fileName);
+            var results = new List<EmbeddedLocaleResource>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pluginInfo in Chainloader.PluginInfos.Values
+                         .Where(info => info != null)
+                         .OrderBy(GetPluginSortKey, StringComparer.OrdinalIgnoreCase))
+            {
+                var assembly = ResolvePluginAssembly(pluginInfo);
+                if (assembly == null) continue;
+
+                foreach (var resourceName in assembly.GetManifestResourceNames()
+                             .Where(name => ResourceNameMatchesLocale(name, normalizedFileName))
+                             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+                {
+                    var uniqueKey = (assembly.FullName ?? assembly.GetName().Name ?? string.Empty) + "|" + resourceName;
+                    if (!visited.Add(uniqueKey)) continue;
+
+                    results.Add(new EmbeddedLocaleResource(assembly, resourceName));
+                }
+            }
+
+            return results;
+        }
+
+        private static JObject LoadEmbeddedLocaleJson(EmbeddedLocaleResource resource)
+        {
+            if (resource == null || resource.Assembly == null || string.IsNullOrWhiteSpace(resource.ResourceName))
+                return null;
+
+            var json = AssetLoader.LoadEmbeddedText(resource.ResourceName, resource.Assembly);
+            return string.IsNullOrWhiteSpace(json) ? null : JObject.Parse(json);
         }
 
         private static void MergeLocaleJson(Language target, JObject source)
@@ -114,6 +188,8 @@ namespace CUCoreLib.Helpers
             MergeSection(target.other, source["log"]);
             MergeSection(target.other, source["command"]);
             MergeSection(target.other, source["option"]);
+            MergeSection(target.other, source["liquid"]);
+            MergeSection(target.other, source["title"]);
         }
 
         private static void MergeSection(Dictionary<string, string> target, JToken sectionToken)
@@ -149,6 +225,92 @@ namespace CUCoreLib.Helpers
             if (section.TryGetValue(key, out var value)) return value ?? string.Empty;
 
             return string.Empty;
+        }
+
+        private static string GetPluginSortKey(PluginInfo pluginInfo)
+        {
+            if (pluginInfo?.Metadata != null && !string.IsNullOrWhiteSpace(pluginInfo.Metadata.GUID))
+                return pluginInfo.Metadata.GUID.Trim();
+
+            if (!string.IsNullOrWhiteSpace(pluginInfo?.Location))
+                return pluginInfo.Location;
+
+            return string.Empty;
+        }
+
+        private static Assembly ResolvePluginAssembly(PluginInfo pluginInfo)
+        {
+            var instanceAssembly = pluginInfo?.Instance != null ? pluginInfo.Instance.GetType().Assembly : null;
+            if (instanceAssembly != null) return instanceAssembly;
+
+            var normalizedLocation = NormalizeExistingPath(pluginInfo?.Location);
+            if (string.IsNullOrWhiteSpace(normalizedLocation)) return null;
+
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(assembly =>
+                {
+                    try
+                    {
+                        return string.Equals(NormalizeExistingPath(assembly.Location), normalizedLocation,
+                            StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+        }
+
+        private static string NormalizeExistingPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+
+            try
+            {
+                var fullPath = Path.GetFullPath(path);
+                return File.Exists(fullPath) ? fullPath : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string NormalizeResourceName(string resourceName)
+        {
+            return string.IsNullOrWhiteSpace(resourceName)
+                ? string.Empty
+                : resourceName.Trim().Replace('/', '.').Replace('\\', '.');
+        }
+
+        private static bool ResourceNameMatchesLocale(string resourceName, string normalizedFileName)
+        {
+            if (string.IsNullOrWhiteSpace(resourceName) || string.IsNullOrWhiteSpace(normalizedFileName)) return false;
+
+            var normalizedResourceName = NormalizeResourceName(resourceName);
+            return string.Equals(normalizedResourceName, normalizedFileName, StringComparison.OrdinalIgnoreCase) ||
+                   normalizedResourceName.EndsWith("." + normalizedFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AddIfExists(ICollection<string> results, ISet<string> visitedPaths, string path)
+        {
+            var normalizedPath = NormalizeExistingPath(path);
+            if (string.IsNullOrWhiteSpace(normalizedPath) || !visitedPaths.Add(normalizedPath)) return;
+
+            results.Add(normalizedPath);
+        }
+
+        private sealed class EmbeddedLocaleResource
+        {
+            public EmbeddedLocaleResource(Assembly assembly, string resourceName)
+            {
+                Assembly = assembly;
+                ResourceName = resourceName;
+            }
+
+            public Assembly Assembly { get; }
+            public string ResourceName { get; }
+            public string DisplayName => $"{Assembly.GetName().Name}:{ResourceName}";
         }
     }
 }

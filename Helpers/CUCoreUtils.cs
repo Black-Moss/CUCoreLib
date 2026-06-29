@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using CUCoreLib.Data;
 using CUCoreLib.Registries;
+using TMPro;
 using UnityEngine;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using Object = UnityEngine.Object;
@@ -17,6 +18,7 @@ namespace CUCoreLib.Helpers
     {
         private static readonly Dictionary<string, MethodInfo> MethodCache = new Dictionary<string, MethodInfo>();
         private static readonly Dictionary<KeyCode, Sprite> KeySpriteCache = new Dictionary<KeyCode, Sprite>();
+        private static Talker ElectronicTalkerProxy;
 
         // TODO allow for keybind support with FriendyKeyNames as a relay
         private static readonly Dictionary<KeyCode, string> FriendlyKeyNames = new Dictionary<KeyCode, string>
@@ -398,20 +400,75 @@ namespace CUCoreLib.Helpers
             DoAmputate(item, limb);
         }
 
+        public static void Talk(string dialogue)
+        {
+            if (string.IsNullOrWhiteSpace(dialogue)) return;
+            if (PlayerCamera.main == null || PlayerCamera.main.body == null || PlayerCamera.main.body.talker == null) return;
+
+            PlayerCamera.main.body.talker.Talk(dialogue);
+        }
+
+        public static void talk(string dialogue)
+        {
+            Talk(dialogue);
+        }
+
+        public static void TalkElectronic(string dialogue, Item item = null)
+        {
+            if (string.IsNullOrWhiteSpace(dialogue)) return;
+
+            bool createdProxy;
+            Talker talker = GetElectronicTalker(item, out createdProxy);
+            if (talker == null) return;
+
+            if (createdProxy)
+            {
+                DelayCall(0f, () => talker.Talk(dialogue));
+                return;
+            }
+
+            talker.Talk(dialogue);
+        }
+
+        public static void talkElectronic(string dialogue, Item item = null)
+        {
+            TalkElectronic(dialogue, item);
+        }
+
         public static AudioSource PlaySoundAt(AudioClip clip, Vector2? pos = null)
+        {
+            return PlaySoundAt(clip, null, null, pos, null);
+        }
+
+        public static AudioSource PlaySoundAt(AudioClip clip, float? volume = null, float? delay = null, Vector2? position = null, float? pitch = null)
         {
             if (clip == null) return null;
 
-            var playPos = pos ?? (PlayerCamera.main != null && PlayerCamera.main.body != null
+            var playPos = position ?? (PlayerCamera.main != null && PlayerCamera.main.body != null
                 ? (Vector2)PlayerCamera.main.body.transform.position
                 : Vector2.zero);
 
-            return Sound.Play(clip, playPos);
+            float resolvedVolume = volume ?? 1f;
+            float resolvedPitch = pitch ?? 1f;
+            bool usePitchShift = !pitch.HasValue;
+
+            if (delay.HasValue && delay.Value > 0f)
+            {
+                DelayCall(delay.Value, () => Sound.Play(clip, playPos, volume: resolvedVolume, pitch: resolvedPitch, pitchShift: usePitchShift));
+                return null;
+            }
+
+            return Sound.Play(clip, playPos, volume: resolvedVolume, pitch: resolvedPitch, pitchShift: usePitchShift);
         }
 
         public static AudioSource playSoundAt(AudioClip clip, Vector2? pos = null)
         {
             return PlaySoundAt(clip, pos);
+        }
+
+        public static AudioSource playSoundAt(AudioClip clip, float? volume = null, float? delay = null, Vector2? position = null, float? pitch = null)
+        {
+            return PlaySoundAt(clip, volume, delay, position, pitch);
         }
 
         public static bool IsModdedItem(string itemId)
@@ -428,6 +485,89 @@ namespace CUCoreLib.Helpers
         public static bool isModdedItem(string itemId)
         {
             return IsModdedItem(itemId);
+        }
+
+        private static Talker GetElectronicTalker(Item item, out bool createdProxy)
+        {
+            createdProxy = false;
+
+            if (item != null)
+            {
+                Talker attachedTalker = item.GetComponent<Talker>();
+                if (attachedTalker != null)
+                {
+                    return attachedTalker;
+                }
+            }
+
+            Vector3 fallbackPosition = PlayerCamera.main != null && PlayerCamera.main.body != null
+                ? PlayerCamera.main.body.transform.position
+                : Vector3.zero;
+
+            Talker templateTalker = GetWatchTalkerTemplate();
+            if (templateTalker == null)
+            {
+                return null;
+            }
+
+            if (ElectronicTalkerProxy == null)
+            {
+                GameObject target = new GameObject("CUCoreUtils_ElectronicTalker");
+                Object.DontDestroyOnLoad(target);
+                ElectronicTalkerProxy = target.AddComponent<Talker>();
+                InitializeElectronicTalker(ElectronicTalkerProxy, templateTalker);
+                createdProxy = true;
+            }
+            else if (!ElectronicTalkerProxy)
+            {
+                ElectronicTalkerProxy = null;
+                return GetElectronicTalker(item, out createdProxy);
+            }
+
+            Transform proxyTransform = ElectronicTalkerProxy.transform;
+            if (item != null)
+            {
+                proxyTransform.SetParent(item.transform, false);
+                proxyTransform.position = item.transform.position;
+            }
+            else
+            {
+                proxyTransform.SetParent(null);
+                proxyTransform.position = fallbackPosition;
+            }
+
+            return ElectronicTalkerProxy;
+        }
+
+        private static Talker GetWatchTalkerTemplate()
+        {
+            GameObject watchPrefab = Resources.Load<GameObject>("watch");
+            if (watchPrefab == null)
+            {
+                return null;
+            }
+
+            return watchPrefab.GetComponent<Talker>();
+        }
+
+        private static void InitializeElectronicTalker(Talker talker, Talker templateTalker)
+        {
+            if (talker == null || templateTalker == null)
+            {
+                return;
+            }
+
+            talker.textPrefab = templateTalker.textPrefab;
+            talker.talkSoundCustom = templateTalker.talkSoundCustom;
+            talker.talkTimeMult = templateTalker.talkTimeMult;
+            talker.trader = templateTalker.trader;
+            talker.body = null;
+
+            if (talker.text == null && talker.textPrefab != null)
+            {
+                GameObject textObject = Object.Instantiate(talker.textPrefab, talker.transform.position, Quaternion.identity);
+                talker.text = textObject.GetComponent<TextMeshPro>();
+            }
         }
 
         public static MethodInfo GetMethod(object target, string methodName)

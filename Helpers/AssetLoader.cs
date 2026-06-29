@@ -512,7 +512,7 @@ namespace CUCoreLib.Helpers
             var key = "embedded:" + resourceType + ":" + sourceAssembly.FullName + ":" + normalizedPath;
             if (!LoggedMissingResources.Add(key)) return;
 
-            Logger?.LogError(
+            Logger?.LogWarning(
                 $"Could not load embedded {resourceType} '{resourcePath}' (normalized '{normalizedPath}') from assembly '{sourceAssembly.GetName().Name}'.");
         }
 
@@ -524,7 +524,7 @@ namespace CUCoreLib.Helpers
             var key = "file:" + resourceType + ":" + fullPath;
             if (!LoggedMissingResources.Add(key)) return;
 
-            Logger?.LogError($"Could not load {resourceType} file '{fullPath}'.");
+            Logger?.LogWarning($"Could not load {resourceType} file '{fullPath}'.");
         }
 
         private static AudioClip LoadAudioFromStream(Stream stream, string resourceName)

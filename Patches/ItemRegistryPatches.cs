@@ -127,11 +127,13 @@ namespace CUCoreLib.Patches
         {
             if (item == null || def == null) return 1f;
 
-            if (TryResolveSpriteScaleFromDimensions(item, def, out var scaledByDimensions)) return scaledByDimensions;
-
-            return def.SpriteScale > 0f
+            var baseScale = def.SpriteScale > 0f
                 ? def.SpriteScale
                 : 1f;
+
+            if (!TryResolveSpriteScaleFromDimensions(item, def, out var scaledByDimensions)) return baseScale;
+
+            return scaledByDimensions * baseScale;
         }
 
         private static bool TryResolveSpriteScaleFromDimensions(Item item, CustomItemInfo def, out float scale)
@@ -314,6 +316,24 @@ namespace CUCoreLib.Patches
             }
         }
 
+        private static string ResolveConfiguredBatteryType(BatteryProperties battery)
+        {
+            if (battery == null) return null;
+
+            var configuredBatteryType = string.IsNullOrWhiteSpace(battery.BatteryType)
+                ? PresetToBatteryId(battery.Preset)
+                : battery.BatteryType.Trim();
+
+            if (string.Equals(configuredBatteryType, "smallbattery", StringComparison.OrdinalIgnoreCase))
+                return "smallbattery";
+            if (string.Equals(configuredBatteryType, "mediumbattery", StringComparison.OrdinalIgnoreCase))
+                return "mediumbattery";
+            if (string.Equals(configuredBatteryType, "largebattery", StringComparison.OrdinalIgnoreCase))
+                return "largebattery";
+
+            return configuredBatteryType;
+        }
+
         internal static void MarkPendingBatteryInitialization(GameObject obj)
         {
             if (obj == null || obj.GetComponent<PendingBatteryInitializationMarker>() != null) return;
@@ -342,13 +362,10 @@ namespace CUCoreLib.Patches
             bat.maxAllowedCharge = def.Battery.MaxCharge;
             if (NotSpawnWithBatteryField != null) NotSpawnWithBatteryField.SetValue(bat, !def.Battery.SpawnWithBattery);
 
-            if (def.Battery.SpawnWithBattery)
-            {
-                var configuredBatteryType = string.IsNullOrWhiteSpace(def.Battery.BatteryType)
-                    ? PresetToBatteryId(def.Battery.Preset)
-                    : def.Battery.BatteryType;
-                if (forceBatteryType || string.IsNullOrEmpty(bat.batteryType)) bat.batteryType = configuredBatteryType;
-            }
+            var configuredBatteryType = ResolveConfiguredBatteryType(def.Battery);
+            if ((forceBatteryType || string.IsNullOrEmpty(bat.batteryType)) &&
+                !string.IsNullOrWhiteSpace(configuredBatteryType))
+                bat.batteryType = configuredBatteryType;
 
             if (!initializeState) return;
 
