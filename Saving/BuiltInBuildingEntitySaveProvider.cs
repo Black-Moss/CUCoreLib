@@ -35,8 +35,7 @@ namespace CUCoreLib.Saving
 
         public void Restore(WorldSaveContext context, JToken payload, int version, SaveRestoreContext contextForRestore)
         {
-            var buildings = payload as JArray;
-            if (buildings == null) return;
+            if (!(payload is JArray buildings)) return;
 
             contextForRestore.Defer(() =>
             {
@@ -60,12 +59,10 @@ namespace CUCoreLib.Saving
                     if (instance == null) continue;
 
                     instance.transform.localScale = ReadVector3(token["scale"], instance.transform.localScale);
-                    if (instance.TryGetComponent(out BuildingEntity building))
-                    {
-                        building.health = (float?)token["health"] ?? building.health;
-                        BuildingEntityRegistry.RestoreSeating(instance, context.World,
-                            ReadVector2Int(token["blockPlacedOn"]));
-                    }
+                    if (!instance.TryGetComponent(out BuildingEntity building)) continue;
+                    building.health = (float?)token["health"] ?? building.health;
+                    BuildingEntityRegistry.RestoreSeating(instance, context.World,
+                        ReadVector2Int(token["blockPlacedOn"]));
                 }
             });
         }

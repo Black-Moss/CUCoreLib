@@ -12,9 +12,11 @@ namespace CUCoreLib.Registries
     public static class LiquidRegistry
     {
         internal static Dictionary<string, CustomLiquidInfo> RegisteredLiquids =
-            new Dictionary<string, CustomLiquidInfo>(System.StringComparer.OrdinalIgnoreCase);
+            new Dictionary<string, CustomLiquidInfo>(StringComparer.OrdinalIgnoreCase);
+
         private static readonly Dictionary<string, string> LiquidOwners =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         private static bool LoggedInitialInjection;
         private static string ActiveOwnerId;
 
@@ -26,20 +28,14 @@ namespace CUCoreLib.Registries
                 return;
             }
 
-            if (info == null)
-            {
-                info = new CustomLiquidInfo();
-            }
+            if (info == null) info = new CustomLiquidInfo();
 
             id = id.Trim();
             RegisteredLiquids[id] = info;
-            string ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
+            var ownerId = !string.IsNullOrWhiteSpace(ActiveOwnerId)
                 ? ActiveOwnerId
                 : ContentReloadSession.ResolveAmbientOwnerId();
-            if (!string.IsNullOrWhiteSpace(ownerId))
-            {
-                LiquidOwners[id] = ownerId;
-            }
+            if (!string.IsNullOrWhiteSpace(ownerId)) LiquidOwners[id] = ownerId;
 
             InjectSingleLiquid(id, info);
             LogInitialInjectionSummary();
@@ -52,14 +48,7 @@ namespace CUCoreLib.Registries
 
         internal static int InjectRegisteredLiquids(bool logSummary = false)
         {
-            int injected = 0;
-            foreach (var kvp in RegisteredLiquids)
-            {
-                if (InjectSingleLiquid(kvp.Key, kvp.Value))
-                {
-                    injected++;
-                }
-            }
+            var injected = RegisteredLiquids.Count(kvp => InjectSingleLiquid(kvp.Key, kvp.Value));
 
             if (logSummary) LogInitialInjectionSummary();
 
@@ -85,17 +74,11 @@ namespace CUCoreLib.Registries
         {
             if (string.IsNullOrWhiteSpace(id) || info == null) return false;
 
-            if (info.onDrink == null)
-            {
-                info.onDrink = (amount, body) => { };
-            }
+            if (info.onDrink == null) info.onDrink = (amount, body) => { };
 
-            if (info.onHealthUse == null)
-            {
-                info.onHealthUse = (amount, limb) => { };
-            }
+            if (info.onHealthUse == null) info.onHealthUse = (amount, limb) => { };
 
-            bool wasPresent = Liquids.Registry.ContainsKey(id);
+            var wasPresent = Liquids.Registry.ContainsKey(id);
             Liquids.Registry[id] = new LiquidType
             {
                 localeName = id,
@@ -110,15 +93,9 @@ namespace CUCoreLib.Registries
                 qualities = info.qualities ?? new List<CraftingQuality>()
             };
 
-            if (!string.IsNullOrEmpty(info.name))
-            {
-                LocaleRegistry.Register("other", id, info.name);
-            }
+            if (!string.IsNullOrEmpty(info.name)) LocaleRegistry.Register("liquid", id, info.name);
 
-            if (!string.IsNullOrEmpty(info.description))
-            {
-                LocaleRegistry.Register("other", id + "dsc", info.description);
-            }
+            if (!string.IsNullOrEmpty(info.description)) LocaleRegistry.Register("liquid", id + "dsc", info.description);
 
             return !wasPresent;
         }
@@ -131,11 +108,9 @@ namespace CUCoreLib.Registries
         internal static Dictionary<string, CustomLiquidInfo> CaptureOwnerEntries(string ownerId)
         {
             if (string.IsNullOrWhiteSpace(ownerId))
-            {
                 return new Dictionary<string, CustomLiquidInfo>(StringComparer.OrdinalIgnoreCase);
-            }
 
-            string normalizedOwnerId = ownerId.Trim();
+            var normalizedOwnerId = ownerId.Trim();
             return LiquidOwners
                 .Where(entry => string.Equals(entry.Value, normalizedOwnerId, StringComparison.OrdinalIgnoreCase))
                 .Select(entry => entry.Key)
@@ -145,54 +120,39 @@ namespace CUCoreLib.Registries
 
         internal static void RestoreOwnerEntries(string ownerId, IDictionary<string, CustomLiquidInfo> entries)
         {
-            if (entries == null || entries.Count == 0)
-            {
-                return;
-            }
+            if (entries == null || entries.Count == 0) return;
 
-            foreach (KeyValuePair<string, CustomLiquidInfo> entry in entries)
-            {
-                Register(entry.Key, entry.Value);
-            }
+            foreach (var entry in entries) Register(entry.Key, entry.Value);
         }
 
         internal static void ClearOwnerEntries(string ownerId, ContentReloadResult result)
         {
-            if (string.IsNullOrWhiteSpace(ownerId))
-            {
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(ownerId)) return;
 
-            string normalizedOwnerId = ownerId.Trim();
-            string[] ids = LiquidOwners
+            var normalizedOwnerId = ownerId.Trim();
+            var ids = LiquidOwners
                 .Where(entry => string.Equals(entry.Value, normalizedOwnerId, StringComparison.OrdinalIgnoreCase))
                 .Select(entry => entry.Key)
                 .ToArray();
 
-            for (int i = 0; i < ids.Length; i++)
+            foreach (var id in ids)
             {
-                string id = ids[i];
                 RegisteredLiquids.Remove(id);
                 LiquidOwners.Remove(id);
                 Liquids.Registry?.Remove(id);
             }
 
             if (ids.Length > 0)
-            {
                 result?.AddInfo("Cleared " + ids.Length + " liquid registrations owned by '" + normalizedOwnerId + "'.");
-            }
         }
 
         internal static JObject CaptureNetworkSnapshot()
         {
-            JObject root = new JObject();
+            var root = new JObject();
             foreach (var entry in RegisteredLiquids)
             {
-                CustomLiquidInfo info = entry.Value;
-                if (info == null)
-                {
-                    continue;
-                }
+                var info = entry.Value;
+                if (info == null) continue;
 
                 root[entry.Key] = new JObject
                 {
@@ -213,18 +173,11 @@ namespace CUCoreLib.Registries
 
         internal static void ApplyNetworkSnapshot(JObject snapshot)
         {
-            if (snapshot == null)
-            {
-                return;
-            }
+            if (snapshot == null) return;
 
-            foreach (JProperty property in snapshot.Properties())
+            foreach (var property in snapshot.Properties())
             {
-                JObject obj = property.Value as JObject;
-                if (obj == null)
-                {
-                    continue;
-                }
+                if (!(property.Value is JObject obj)) continue;
 
                 Register(property.Name, new CustomLiquidInfo
                 {
@@ -244,9 +197,7 @@ namespace CUCoreLib.Registries
         public static bool TryGetCustomInfo(string id, out CustomLiquidInfo info)
         {
             info = null;
-            if (string.IsNullOrWhiteSpace(id)) return false;
-
-            return RegisteredLiquids.TryGetValue(id.Trim(), out info);
+            return !string.IsNullOrWhiteSpace(id) && RegisteredLiquids.TryGetValue(id.Trim(), out info);
         }
 
         private sealed class OwnerScope : IDisposable

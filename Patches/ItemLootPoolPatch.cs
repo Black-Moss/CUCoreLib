@@ -27,10 +27,7 @@ namespace CUCoreLib.Patches
 
             if (injectedCount <= 0) return;
 
-            if (!hasLoggedInjection)
-            {
-                hasLoggedInjection = true;
-            }
+            if (!hasLoggedInjection) hasLoggedInjection = true;
 
             CUCoreLibPlugin.Log.LogInfo($"LootPool injected {injectedCount} custom items.");
         }

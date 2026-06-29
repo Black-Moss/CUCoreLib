@@ -75,10 +75,11 @@ namespace CUCoreLib.Registries
         private static void RegisterProvider<T>(Dictionary<string, T> map, string scope, string key, T provider)
             where T : class
         {
-            string scopeLabel = string.IsNullOrWhiteSpace(scope)
+            var scopeLabel = string.IsNullOrWhiteSpace(scope)
                 ? "Provider"
                 : char.ToUpperInvariant(scope[0]) + scope.Substring(1) + "Provider";
-            ContentReloadSession.AssertNotActive("SaveRegistry.Register" + scopeLabel + "()", "Save providers are excluded from strict content reload.");
+            ContentReloadSession.AssertNotActive("SaveRegistry.Register" + scopeLabel + "()",
+                "Save providers are excluded from strict content reload.");
 
             if (string.IsNullOrWhiteSpace(key))
             {

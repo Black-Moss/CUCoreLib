@@ -58,7 +58,8 @@ namespace CUCoreLib.Registries
 
         public static bool Register(ushort tileIndex, CustomTileDefinition definition)
         {
-            ContentReloadSession.AssertNotActive("TileRegistry.Register()", "Tile registration is excluded from strict content reload.");
+            ContentReloadSession.AssertNotActive("TileRegistry.Register()",
+                "Tile registration is excluded from strict content reload.");
 
             if (tileIndex < FirstCustomTileIndex)
             {
@@ -95,10 +96,10 @@ namespace CUCoreLib.Registries
             RegisteredTiles.Add(tileIndex, CreateTile(definition));
 
             if (!string.IsNullOrEmpty(definition.Name))
-                LocaleRegistry.Register("other", definition.ID, definition.Name);
+                LocaleRegistry.Register("title", definition.ID, definition.Name);
 
             if (!string.IsNullOrEmpty(definition.Description))
-                LocaleRegistry.Register("other", definition.ID + "dsc", definition.Description);
+                LocaleRegistry.Register("title", definition.ID + "dsc", definition.Description);
 
             InjectRegisteredTiles(WorldGeneration.world);
             return true;
@@ -130,10 +131,7 @@ namespace CUCoreLib.Registries
         {
             if (layerNumbers == null || layerNumbers.Length == 0) return 0;
 
-            var mask = 0;
-            foreach (var layerNumber in layerNumbers) mask |= LayerToMask(layerNumber);
-
-            return mask;
+            return layerNumbers.Aggregate(0, (current, layerNumber) => current | LayerToMask(layerNumber));
         }
 
         public static int AllLayersExcept(params int[] excludedLayerNumbers)
@@ -141,13 +139,8 @@ namespace CUCoreLib.Registries
             var mask = AllSpawnLayersMask;
             if (excludedLayerNumbers == null || excludedLayerNumbers.Length == 0) return mask;
 
-            foreach (var layerNumber in excludedLayerNumbers)
-            {
-                var layerMask = LayerToMask(layerNumber);
-                if (layerMask != 0) mask &= ~layerMask;
-            }
-
-            return mask;
+            return excludedLayerNumbers.Select(LayerToMask).Where(layerMask => layerMask != 0)
+                .Aggregate(mask, (current, layerMask) => current & ~layerMask);
         }
 
         internal static JObject CaptureNetworkSnapshot()
@@ -287,12 +280,10 @@ namespace CUCoreLib.Registries
             var worldBlocks = WorldBlocksField?.GetValue(world) as ushort[,];
             if (worldBlocks == null) return;
 
-            foreach (var entry in RegisteredDefinitions)
+            foreach (var entry in RegisteredDefinitions
+                         .Where(entry => entry.Value != null && !(entry.Value.SpawnAmount <= 0))
+                         .Where(entry => CanSpawnInLayer(entry.Value, world.biomeDepth)))
             {
-                if (entry.Value == null || entry.Value.SpawnAmount <= 0) continue;
-
-                if (!CanSpawnInLayer(entry.Value, world.biomeDepth)) continue;
-
                 GenerateWorldTile(entry.Value, world, worldBlocks, entry.Key);
             }
         }
@@ -462,15 +453,11 @@ namespace CUCoreLib.Registries
             }
 
             var buildingReference = Resources.Load<GameObject>(normalized);
-            if (buildingReference != null && buildingReference.TryGetComponent(out BuildingEntity building) &&
-                building.hitSound != null)
-            {
-                resolved = building.hitSound;
-                if (!string.IsNullOrWhiteSpace(resolved.name)) AssetLoader.CacheAudioClip(resolved.name, resolved);
-                return true;
-            }
-
-            return false;
+            if (buildingReference == null || !buildingReference.TryGetComponent(out BuildingEntity building) ||
+                building.hitSound == null) return false;
+            resolved = building.hitSound;
+            if (!string.IsNullOrWhiteSpace(resolved.name)) AssetLoader.CacheAudioClip(resolved.name, resolved);
+            return true;
         }
 
         private static TileBase GetReservedTile(ushort index)
@@ -526,12 +513,7 @@ namespace CUCoreLib.Registries
 
         private static int CountGenerationStyles(TileGenerationStyle styleMask)
         {
-            var count = 0;
-            foreach (var style in AllGenerationStyles)
-                if ((styleMask & style) != 0)
-                    count++;
-
-            return count;
+            return AllGenerationStyles.Count(style => (styleMask & style) != 0);
         }
 
         private static void GenerateWorldTileStyle(
@@ -559,6 +541,7 @@ namespace CUCoreLib.Registries
                     GenerateClusteredCircles(world, tileIndex, spawnAmount, false);
                     break;
                 case TileGenerationStyle.Vein:
+                case TileGenerationStyle.None:
                 default:
                     GenerateOreVeins(world, worldBlocks, tileIndex, spawnAmount, 1f, 1, 25);
                     break;

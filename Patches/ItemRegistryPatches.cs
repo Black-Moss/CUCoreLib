@@ -1,23 +1,20 @@
-﻿using HarmonyLib;
-using CUCoreLib.Registries;
-using CUCoreLib.Helpers;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using CUCoreLib.Data;
+using CUCoreLib.Helpers;
+using CUCoreLib.Registries;
+using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Linq;
-using System;
+using Object = UnityEngine.Object;
 
 namespace CUCoreLib.Patches
 {
     [HarmonyPatch(typeof(Item))]
     internal static class ItemRegistryPatches
     {
-        private sealed class PendingBatteryInitializationMarker : MonoBehaviour
-        {
-        }
-
         private static readonly FieldInfo NotSpawnWithBatteryField =
             AccessTools.Field(typeof(BatteryItem), "notSpawnWithBattery");
 
@@ -34,10 +31,7 @@ namespace CUCoreLib.Patches
         {
             if (Item.GlobalItems == null) return;
 
-            foreach (var kvp in ItemRegistry.RegisteredItems)
-            {
-                ItemRegistry.InjectSingleItem(kvp.Key, kvp.Value);
-            }
+            foreach (var kvp in ItemRegistry.RegisteredItems) ItemRegistry.InjectSingleItem(kvp.Key, kvp.Value);
 
             ItemLootPool.InitializePool();
             CUCoreLibPlugin.Log.LogInfo($"Bulk injected {ItemRegistry.RegisteredItems.Count} items.");
@@ -56,16 +50,10 @@ namespace CUCoreLib.Patches
         [HarmonyPrefix]
         private static void ApplyCustomLiquidMaskBeforeWaterContainerStart(WaterContainerItem __instance)
         {
-            if (__instance == null)
-            {
-                return;
-            }
+            if (__instance == null) return;
 
-            Item item = __instance.GetComponent<Item>();
-            if (!ItemRegistry.TryGetCustomInfo(item, out var def))
-            {
-                return;
-            }
+            var item = __instance.GetComponent<Item>();
+            if (!ItemRegistry.TryGetCustomInfo(item, out var def)) return;
 
             __instance.fillSprite = def.LiquidMask;
         }
@@ -88,39 +76,31 @@ namespace CUCoreLib.Patches
         {
             if (def != null && !string.IsNullOrWhiteSpace(def.IconAnimationId))
             {
-                RegisteredSpriteAnimation animation = AssetLoader.GetCachedSpriteAnimation(def.IconAnimationId);
+                var animation = AssetLoader.GetCachedSpriteAnimation(def.IconAnimationId);
                 if (animation != null && animation.Frames != null && animation.Frames.Length > 0)
-                {
                     return animation.Frames[0];
-                }
             }
 
-            if (def != null && def.Icon != null)
-            {
-                return def.Icon;
-            }
+            if (def != null && def.Icon != null) return def.Icon;
 
-            SpriteRenderer sr = item != null ? item.GetComponent<SpriteRenderer>() : null;
+            var sr = item != null ? item.GetComponent<SpriteRenderer>() : null;
             return sr != null ? sr.sprite : null;
         }
 
         private static void ApplyCustomItemVisuals(Item item, CustomItemInfo def, bool preferWornSprite)
         {
-            Sprite sprite = preferWornSprite && def.WornSprite != null ? def.WornSprite : def.Icon;
-            SpriteRenderer sr = item.GetComponent<SpriteRenderer>();
+            var sprite = preferWornSprite && def.WornSprite != null ? def.WornSprite : def.Icon;
+            var sr = item.GetComponent<SpriteRenderer>();
             if (sr != null && sprite != null)
             {
                 sr.sprite = sprite;
                 CustomInstantiate.ApplySpriteCollision(item.gameObject, sprite);
             }
 
-            string animationId = preferWornSprite && !string.IsNullOrWhiteSpace(def.WornSpriteAnimationId)
+            var animationId = preferWornSprite && !string.IsNullOrWhiteSpace(def.WornSpriteAnimationId)
                 ? def.WornSpriteAnimationId
                 : def.IconAnimationId;
-            if (sr != null && !string.IsNullOrWhiteSpace(animationId))
-            {
-                AssetLoader.TryApplyAnimation(sr, animationId);
-            }
+            if (sr != null && !string.IsNullOrWhiteSpace(animationId)) AssetLoader.TryApplyAnimation(sr, animationId);
 
             ApplyCustomScale(item, def);
         }
@@ -130,12 +110,13 @@ namespace CUCoreLib.Patches
         {
             if (item == null || def == null) return;
 
-            float resolvedScale = ResolveSpriteScale(item, def);
+            var resolvedScale = ResolveSpriteScale(item, def);
 
-            InventorySlot slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
+            var slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
             if (slot != null && slot.limb != null)
             {
-                item.transform.localScale = new Vector3(resolvedScale / slot.limb.transform.localScale.x, resolvedScale, resolvedScale);
+                item.transform.localScale = new Vector3(resolvedScale / slot.limb.transform.localScale.x, resolvedScale,
+                    resolvedScale);
                 return;
             }
 
@@ -144,55 +125,34 @@ namespace CUCoreLib.Patches
 
         internal static float ResolveSpriteScale(Item item, CustomItemInfo def)
         {
-            if (item == null || def == null)
-            {
-                return 1f;
-            }
+            if (item == null || def == null) return 1f;
 
-            if (TryResolveSpriteScaleFromDimensions(item, def, out float scaledByDimensions))
-            {
-                return scaledByDimensions;
-            }
+            if (TryResolveSpriteScaleFromDimensions(item, def, out var scaledByDimensions)) return scaledByDimensions;
 
-            if (def.SpriteScale > 0f)
-            {
-                return def.SpriteScale;
-            }
-
-            return 1f;
+            return def.SpriteScale > 0f
+                ? def.SpriteScale
+                : 1f;
         }
 
         private static bool TryResolveSpriteScaleFromDimensions(Item item, CustomItemInfo def, out float scale)
         {
             scale = 1f;
-            if (item == null || def == null || !def.SpriteScaleDimensions.IsConfigured)
-            {
-                return false;
-            }
+            if (item == null || def == null || !def.SpriteScaleDimensions.IsConfigured) return false;
 
-            SpriteRenderer renderer = item.GetComponent<SpriteRenderer>();
-            Sprite sprite = renderer != null ? renderer.sprite : GetInventorySprite(item, def);
-            if (sprite == null)
-            {
-                return false;
-            }
+            var renderer = item.GetComponent<SpriteRenderer>();
+            var sprite = renderer != null ? renderer.sprite : GetInventorySprite(item, def);
+            if (sprite == null) return false;
 
-            Vector2 spritePixelSize = sprite.rect.size;
-            if (spritePixelSize.x <= 0f || spritePixelSize.y <= 0f)
-            {
-                return false;
-            }
+            var spritePixelSize = sprite.rect.size;
+            if (spritePixelSize.x <= 0f || spritePixelSize.y <= 0f) return false;
 
-            float widthScale = def.SpriteScaleDimensions.Width / spritePixelSize.x;
-            float heightScale = def.SpriteScaleDimensions.Height / spritePixelSize.y;
-            float chosenScale = def.SpriteScaleDimensions.ExpandToFirstMetCondition
+            var widthScale = def.SpriteScaleDimensions.Width / spritePixelSize.x;
+            var heightScale = def.SpriteScaleDimensions.Height / spritePixelSize.y;
+            var chosenScale = def.SpriteScaleDimensions.ExpandToFirstMetCondition
                 ? Mathf.Min(widthScale, heightScale)
                 : Mathf.Max(widthScale, heightScale);
 
-            if (chosenScale <= 0f || float.IsNaN(chosenScale) || float.IsInfinity(chosenScale))
-            {
-                return false;
-            }
+            if (chosenScale <= 0f || float.IsNaN(chosenScale) || float.IsInfinity(chosenScale)) return false;
 
             scale = chosenScale;
             return true;
@@ -200,32 +160,21 @@ namespace CUCoreLib.Patches
 
         internal static void ApplyCustomHeldOffset(Item item, CustomItemInfo def)
         {
-            if (item == null || def == null)
-            {
-                return;
-            }
+            if (item == null || def == null) return;
 
-            InventorySlot slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
-            if (slot == null || !slot.isHand)
-            {
-                return;
-            }
+            var slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
+            if (slot == null || !slot.isHand) return;
 
-            item.transform.localPosition = new Vector3(def.HeldSpriteOffset.x, def.HeldSpriteOffset.y, item.transform.localPosition.z);
+            item.transform.localPosition = new Vector3(def.HeldSpriteOffset.x, def.HeldSpriteOffset.y,
+                item.transform.localPosition.z);
         }
 
         internal static void ResetCustomHeldOffset(Item item)
         {
-            if (item == null)
-            {
-                return;
-            }
+            if (item == null) return;
 
-            InventorySlot slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
-            if (slot == null || !slot.isHand)
-            {
-                return;
-            }
+            var slot = item.transform.parent != null ? item.transform.parent.GetComponent<InventorySlot>() : null;
+            if (slot == null || !slot.isHand) return;
 
             item.transform.localPosition = new Vector3(0f, 0f, item.transform.localPosition.z);
         }
@@ -238,7 +187,7 @@ namespace CUCoreLib.Patches
             // Containers
             if (def.Container != null)
             {
-                Container cont = item.GetComponent<Container>();
+                var cont = item.GetComponent<Container>();
                 if (cont == null) cont = item.gameObject.AddComponent<Container>();
                 cont.maxWeight = def.Container.Capacity;
                 cont.maxWeightPerItem = def.Container.MaxWeightPerItem;
@@ -248,68 +197,51 @@ namespace CUCoreLib.Patches
             // Batteries
             if (def.Battery != null)
             {
-                BatteryItem bat = item.GetComponent<BatteryItem>();
-                bool createdBattery = bat == null;
+                var bat = item.GetComponent<BatteryItem>();
+                var createdBattery = bat == null;
                 if (bat == null) bat = item.gameObject.AddComponent<BatteryItem>();
 
-                bool initializeBatteryState = createdBattery || ConsumePendingBatteryInitialization(item.gameObject);
-                ApplyBatteryProperties(item, bat, def, initializeState: initializeBatteryState, forceBatteryType: createdBattery || initializeBatteryState);
+                var initializeBatteryState = createdBattery || ConsumePendingBatteryInitialization(item.gameObject);
+                ApplyBatteryProperties(item, bat, def, initializeBatteryState,
+                    createdBattery || initializeBatteryState);
 
-                if (def.decayInfo == 0)
-                {
-                    def.decayInfo = (byte)ItemInfo.DecayType.BatteryDecay;
-                }
+                if (def.decayInfo == 0) def.decayInfo = (byte)ItemInfo.DecayType.BatteryDecay;
             }
 
-            if (def.Light != null)
-            {
-                ApplyLight(item, def.Light);
-            }
+            if (def.Light != null) ApplyLight(item, def.Light);
 
             if (IsLiquidContainer(def))
             {
-                WaterContainerItem wat = item.GetComponent<WaterContainerItem>();
-                bool createdWaterContainer = wat == null;
+                var wat = item.GetComponent<WaterContainerItem>();
+                var createdWaterContainer = wat == null;
                 if (wat == null) wat = item.gameObject.AddComponent<WaterContainerItem>();
 
                 wat.fillSprite = def.LiquidMask;
 
                 if (createdWaterContainer && (wat.stack == null || wat.stack.Count == 0))
-                {
                     wat.stack = CopyLiquidStacks(def.defaultContents);
-                }
 
                 if (def.capacity > 0f)
-                {
                     item.condition = Mathf.Clamp01(wat.stack.Sum(liquid => liquid.amount) / def.capacity);
-                }
             }
 
             // Injectables (Syringes)
-            if (def.Syringe != null)
+            if (def.Syringe == null) return;
             {
-                WaterContainerItem wat = item.GetComponent<WaterContainerItem>();
-                bool createdWaterContainer = wat == null;
+                var wat = item.GetComponent<WaterContainerItem>();
+                var createdWaterContainer = wat == null;
                 if (wat == null) wat = item.gameObject.AddComponent<WaterContainerItem>();
 
                 wat.fillSprite = def.LiquidMask;
 
-                if (createdWaterContainer && (wat.stack == null || wat.stack.Count == 0))
-                {
-                    wat.stack = new List<LiquidStack>();
-                    if (def.Syringe.DefaultContents != null)
-                    {
-                        foreach (LiquidStack liquid in def.Syringe.DefaultContents)
-                        {
-                            wat.stack.Add(new LiquidStack(liquid.liquidId, liquid.amount));
-                        }
-                    }
+                if (!createdWaterContainer || (wat.stack != null && wat.stack.Count != 0)) return;
+                wat.stack = new List<LiquidStack>();
+                if (def.Syringe.DefaultContents != null)
+                    foreach (var liquid in def.Syringe.DefaultContents)
+                        wat.stack.Add(new LiquidStack(liquid.liquidId, liquid.amount));
 
-                    if (def.Syringe.Capacity > 0f)
-                    {
-                        item.condition = Mathf.Clamp01(wat.stack.Sum(liquid => liquid.amount) / def.Syringe.Capacity);
-                    }
-                }
+                if (def.Syringe.Capacity > 0f)
+                    item.condition = Mathf.Clamp01(wat.stack.Sum(liquid => liquid.amount) / def.Syringe.Capacity);
             }
         }
 
@@ -320,14 +252,12 @@ namespace CUCoreLib.Patches
 
         private static List<LiquidStack> CopyLiquidStacks(List<LiquidStack> source)
         {
-            List<LiquidStack> copy = new List<LiquidStack>();
+            var copy = new List<LiquidStack>();
             if (source == null) return copy;
 
-            foreach (LiquidStack liquid in source)
-            {
-                if (liquid == null) continue;
-                copy.Add(new LiquidStack(liquid.liquidId, liquid.amount));
-            }
+            copy.AddRange(from liquid in source
+                where liquid != null
+                select new LiquidStack(liquid.liquidId, liquid.amount));
 
             return copy;
         }
@@ -340,16 +270,13 @@ namespace CUCoreLib.Patches
             if (properties.AddLightItem)
             {
                 lightItem = item.GetComponent<LightItem>();
-                if (lightItem == null)
-                {
-                    lightItem = item.gameObject.AddComponent<LightItem>();
-                }
+                if (lightItem == null) lightItem = item.gameObject.AddComponent<LightItem>();
             }
 
-            Light2D light = item.GetComponentInChildren<Light2D>();
+            var light = item.GetComponentInChildren<Light2D>();
             if (light == null)
             {
-                GameObject lightObject = new GameObject("CustomLight", typeof(Light2D));
+                var lightObject = new GameObject("CustomLight", typeof(Light2D));
                 lightObject.transform.SetParent(item.transform);
                 lightObject.transform.localRotation = Quaternion.identity;
                 lightObject.transform.localScale = Vector3.one;
@@ -363,11 +290,9 @@ namespace CUCoreLib.Patches
             light.pointLightOuterRadius = properties.PointLightOuterRadius;
             light.pointLightInnerRadius = properties.PointLightInnerRadius;
 
-            if (lightItem != null)
-            {
-                lightItem.light = light;
-                lightItem.shouldEnable = true;
-            }
+            if (lightItem == null) return;
+            lightItem.light = light;
+            lightItem.shouldEnable = true;
         }
 
         private static Light2D.LightType ToLight2DType(CustomLightType type)
@@ -383,6 +308,7 @@ namespace CUCoreLib.Patches
                     return "smallbattery";
                 case BatteryItem.BatteryPreset.Large:
                     return "largebattery";
+                case BatteryItem.BatteryPreset.Medium:
                 default:
                     return "mediumbattery";
             }
@@ -390,61 +316,41 @@ namespace CUCoreLib.Patches
 
         internal static void MarkPendingBatteryInitialization(GameObject obj)
         {
-            if (obj == null || obj.GetComponent<PendingBatteryInitializationMarker>() != null)
-            {
-                return;
-            }
+            if (obj == null || obj.GetComponent<PendingBatteryInitializationMarker>() != null) return;
 
             obj.AddComponent<PendingBatteryInitializationMarker>();
         }
 
         private static bool ConsumePendingBatteryInitialization(GameObject obj)
         {
-            if (obj == null)
-            {
-                return false;
-            }
+            if (obj == null) return false;
 
-            PendingBatteryInitializationMarker marker = obj.GetComponent<PendingBatteryInitializationMarker>();
-            if (marker == null)
-            {
-                return false;
-            }
+            var marker = obj.GetComponent<PendingBatteryInitializationMarker>();
+            if (marker == null) return false;
 
-            UnityEngine.Object.Destroy(marker);
+            Object.Destroy(marker);
             return true;
         }
 
-        internal static void ApplyBatteryProperties(Item item, BatteryItem bat, CustomItemInfo def, bool initializeState, bool forceBatteryType)
+        internal static void ApplyBatteryProperties(Item item, BatteryItem bat, CustomItemInfo def,
+            bool initializeState, bool forceBatteryType)
         {
-            if (item == null || bat == null || def?.Battery == null)
-            {
-                return;
-            }
+            if (item == null || bat == null || def?.Battery == null) return;
 
             bat.preset = def.Battery.Preset;
             bat.maxCharge = def.Battery.MaxCharge;
             bat.maxAllowedCharge = def.Battery.MaxCharge;
-            if (NotSpawnWithBatteryField != null)
-            {
-                NotSpawnWithBatteryField.SetValue(bat, !def.Battery.SpawnWithBattery);
-            }
+            if (NotSpawnWithBatteryField != null) NotSpawnWithBatteryField.SetValue(bat, !def.Battery.SpawnWithBattery);
 
             if (def.Battery.SpawnWithBattery)
             {
-                string configuredBatteryType = string.IsNullOrWhiteSpace(def.Battery.BatteryType)
+                var configuredBatteryType = string.IsNullOrWhiteSpace(def.Battery.BatteryType)
                     ? PresetToBatteryId(def.Battery.Preset)
                     : def.Battery.BatteryType;
-                if (forceBatteryType || string.IsNullOrEmpty(bat.batteryType))
-                {
-                    bat.batteryType = configuredBatteryType;
-                }
+                if (forceBatteryType || string.IsNullOrEmpty(bat.batteryType)) bat.batteryType = configuredBatteryType;
             }
 
-            if (!initializeState)
-            {
-                return;
-            }
+            if (!initializeState) return;
 
             if (!def.Battery.SpawnWithBattery)
             {
@@ -453,9 +359,7 @@ namespace CUCoreLib.Patches
             }
 
             if (def.Battery.StartCharge > 0f)
-            {
                 item.condition = Mathf.Clamp01(def.Battery.StartCharge / Mathf.Max(1f, def.Battery.MaxCharge));
-            }
         }
 
         [HarmonyPatch(typeof(Body), "PickUpItem")]
@@ -465,14 +369,14 @@ namespace CUCoreLib.Patches
             ApplyCustomItemRuntime(item);
         }
 
-        [HarmonyPatch(typeof(Body), "DropItem", new[] { typeof(Item) })]
+        [HarmonyPatch(typeof(Body), "DropItem", typeof(Item))]
         [HarmonyPrefix]
         private static void ResetCustomHeldOffsetBeforeDrop(Item item)
         {
             ResetCustomHeldOffset(item);
         }
 
-        [HarmonyPatch(typeof(Body), "DropItem", new[] { typeof(Item) })]
+        [HarmonyPatch(typeof(Body), "DropItem", typeof(Item))]
         [HarmonyPostfix]
         private static void ApplyCustomScaleAfterDrop(Item item)
         {
@@ -485,16 +389,14 @@ namespace CUCoreLib.Patches
         {
             if (__instance == null || __instance.slots == null) return;
 
-            foreach (InventorySlot slot in __instance.slots)
+            foreach (var slot in __instance.slots)
             {
                 if (slot == null || slot.transform.childCount == 0) continue;
 
-                Item item = slot.transform.GetChild(0).GetComponent<Item>();
-                if (ItemRegistry.TryGetCustomInfo(item, out var def))
-                {
-                    ApplyCustomScale(item, def);
-                    ApplyCustomHeldOffset(item, def);
-                }
+                var item = slot.transform.GetChild(0).GetComponent<Item>();
+                if (!ItemRegistry.TryGetCustomInfo(item, out var def)) continue;
+                ApplyCustomScale(item, def);
+                ApplyCustomHeldOffset(item, def);
             }
         }
 
@@ -504,14 +406,16 @@ namespace CUCoreLib.Patches
         {
             if (__instance == null || __instance.itemImg == null) return;
 
-            Item item = __instance.GetItem();
+            var item = __instance.GetItem();
             if (!ItemRegistry.TryGetCustomInfo(item, out var def)) return;
 
-            Sprite sprite = GetInventorySprite(item, def);
+            var sprite = GetInventorySprite(item, def);
             if (sprite == null) return;
 
             __instance.itemImg.sprite = sprite;
-            __instance.itemImg.rectTransform.sizeDelta = PlayerCamera.ImageSizeDelta(sprite.texture, 3f, __instance.maxImageSize) * Mathf.Max(0.01f, ResolveSpriteScale(item, def));
+            __instance.itemImg.rectTransform.sizeDelta =
+                PlayerCamera.ImageSizeDelta(sprite.texture, 3f, __instance.maxImageSize) *
+                Mathf.Max(0.01f, ResolveSpriteScale(item, def));
         }
 
         [HarmonyPatch(typeof(LightItem), "Start")]
@@ -521,41 +425,23 @@ namespace CUCoreLib.Patches
             if (__instance == null || __instance.light != null) return;
 
             __instance.light = __instance.GetComponentInChildren<Light2D>();
-            if (__instance.light != null)
-            {
-                NextLightLookupFrameByInstance.Remove(__instance.GetInstanceID());
-            }
+            if (__instance.light != null) NextLightLookupFrameByInstance.Remove(__instance.GetInstanceID());
         }
 
         private static void ApplyCustomSpawnComponents(Item item, CustomItemInfo def)
         {
-            if (item == null || def == null || def.SpawnComponents == null || def.SpawnComponents.Count == 0)
+            if (item == null || def?.SpawnComponents == null || def.SpawnComponents.Count == 0) return;
+
+            foreach (var componentType in from componentName in def.SpawnComponents
+                     where !string.IsNullOrWhiteSpace(componentName)
+                     select Type.GetType(componentName, false)
+                     into componentType
+                     where componentType != null
+                     where typeof(MonoBehaviour).IsAssignableFrom(componentType)
+                     where item.GetComponent(componentType) == null
+                     select componentType)
             {
-                return;
-            }
-
-            foreach (string componentName in def.SpawnComponents)
-            {
-                if (string.IsNullOrWhiteSpace(componentName))
-                {
-                    continue;
-                }
-
-                Type componentType = Type.GetType(componentName, false);
-                if (componentType == null)
-                {
-                    continue;
-                }
-
-                if (!typeof(MonoBehaviour).IsAssignableFrom(componentType))
-                {
-                    continue;
-                }
-
-                if (item.GetComponent(componentType) == null)
-                {
-                    item.gameObject.AddComponent(componentType);
-                }
+                item.gameObject.AddComponent(componentType);
             }
         }
 
@@ -564,21 +450,14 @@ namespace CUCoreLib.Patches
         private static bool SkipNullCustomLightUpdate(LightItem __instance)
         {
             if (__instance == null) return false;
-            if (__instance.light == null)
-            {
-                int instanceId = __instance.GetInstanceID();
-                if (NextLightLookupFrameByInstance.TryGetValue(instanceId, out int nextFrame) && Time.frameCount < nextFrame)
-                {
-                    return false;
-                }
+            if (__instance.light != null) return __instance.light != null;
+            var instanceId = __instance.GetInstanceID();
+            if (NextLightLookupFrameByInstance.TryGetValue(instanceId, out var nextFrame) &&
+                Time.frameCount < nextFrame) return false;
 
-                NextLightLookupFrameByInstance[instanceId] = Time.frameCount + 30;
-                __instance.light = __instance.GetComponentInChildren<Light2D>();
-                if (__instance.light != null)
-                {
-                    NextLightLookupFrameByInstance.Remove(instanceId);
-                }
-            }
+            NextLightLookupFrameByInstance[instanceId] = Time.frameCount + 30;
+            __instance.light = __instance.GetComponentInChildren<Light2D>();
+            if (__instance.light != null) NextLightLookupFrameByInstance.Remove(instanceId);
 
             return __instance.light != null;
         }
@@ -587,42 +466,34 @@ namespace CUCoreLib.Patches
         [HarmonyPrefix]
         private static bool GuardInvalidDecayConfiguration(Item __instance)
         {
-            if (__instance == null)
-            {
-                return false;
-            }
+            if (__instance == null) return false;
 
-            ItemInfo stats = __instance.Stats;
-            if (stats == null)
-            {
-                return false;
-            }
+            var stats = __instance.Stats;
+            if (stats == null) return false;
 
             if ((stats.decayInfo & 1) != 0 && __instance.container == null)
             {
-                WarnInvalidDecayConfiguration(__instance, "uses NoDecayWithoutContainerItem but has no Container component; skipping decay update");
+                WarnInvalidDecayConfiguration(__instance,
+                    "uses NoDecayWithoutContainerItem but has no Container component; skipping decay update");
                 return false;
             }
 
-            if ((stats.decayInfo & 0x10) != 0 && __instance.battery == null)
-            {
-                WarnInvalidDecayConfiguration(__instance, "uses BatteryDecay but has no BatteryItem component; skipping decay update");
-                return false;
-            }
+            if ((stats.decayInfo & 0x10) == 0 || __instance.battery != null) return true;
+            WarnInvalidDecayConfiguration(__instance,
+                "uses BatteryDecay but has no BatteryItem component; skipping decay update");
+            return false;
 
-            return true;
         }
 
         private static void WarnInvalidDecayConfiguration(Item item, string issue)
         {
-            string itemId = string.IsNullOrWhiteSpace(item != null ? item.id : null) ? "<unknown>" : item.id;
-            string warningKey = itemId + "|" + issue;
-            if (!WarnedInvalidDecayConfigurations.Add(warningKey))
-            {
-                return;
-            }
+            var itemId = string.IsNullOrWhiteSpace(item != null ? item.id : null) ? "<unknown>" : item.id;
+            var warningKey = itemId + "|" + issue;
+            if (!WarnedInvalidDecayConfigurations.Add(warningKey)) return;
 
-            CUCoreLibPlugin.Log?.LogWarning("Item '" + itemId + "' has an invalid decay configuration and would have thrown in Item.HandleDecay(): " + issue + ".");
+            CUCoreLibPlugin.Log?.LogWarning("Item '" + itemId +
+                                            "' has an invalid decay configuration and would have thrown in Item.HandleDecay(): " +
+                                            issue + ".");
         }
 
         [HarmonyPatch(typeof(WaterContainerItem), nameof(WaterContainerItem.Capacity), MethodType.Getter)]
@@ -631,11 +502,9 @@ namespace CUCoreLib.Patches
         {
             if (__result > 0f || __instance == null) return;
 
-            Item item = __instance.GetComponent<Item>();
+            var item = __instance.GetComponent<Item>();
             if (ItemRegistry.TryGetCustomInfo(item, out var info) && info.Syringe != null)
-            {
                 __result = info.Syringe.Capacity;
-            }
         }
 
         [HarmonyPatch(typeof(WaterContainerItem), nameof(WaterContainerItem.AutoFill), MethodType.Getter)]
@@ -644,11 +513,9 @@ namespace CUCoreLib.Patches
         {
             if (__result || __instance == null) return;
 
-            Item item = __instance.GetComponent<Item>();
+            var item = __instance.GetComponent<Item>();
             if (ItemRegistry.TryGetCustomInfo(item, out var info) && info.Syringe != null)
-            {
                 __result = info.Syringe.AutoFill;
-            }
         }
 
         // GetItem Patch
@@ -660,17 +527,16 @@ namespace CUCoreLib.Patches
             if (Item.GlobalItems == null || string.IsNullOrWhiteSpace(id)) return true;
             if (Item.GlobalItems.ContainsKey(id)) return true;
 
-            if (ItemRegistry.RegisteredItems.TryGetValue(id, out var def))
-            {
-                ItemRegistry.InjectSingleItem(id, def);
-                if (Item.GlobalItems.TryGetValue(id, out var info))
-                {
-                    __result = info;
-                    return false;
-                }
-            }
+            if (!ItemRegistry.RegisteredItems.TryGetValue(id, out var def)) return true;
+            ItemRegistry.InjectSingleItem(id, def);
+            if (!Item.GlobalItems.TryGetValue(id, out var info)) return true;
+            __result = info;
+            return false;
 
-            return true;
+        }
+
+        private sealed class PendingBatteryInitializationMarker : MonoBehaviour
+        {
         }
 
         [HarmonyPatch]
@@ -683,20 +549,16 @@ namespace CUCoreLib.Patches
 
             public static bool Prefix(Item __instance, ref ItemInfo __result)
             {
-                if (__instance == null || Item.GlobalItems == null || string.IsNullOrWhiteSpace(__instance.id)) return true;
+                if (__instance == null || Item.GlobalItems == null || string.IsNullOrWhiteSpace(__instance.id))
+                    return true;
                 if (Item.GlobalItems.ContainsKey(__instance.id)) return true;
 
-                if (ItemRegistry.RegisteredItems.TryGetValue(__instance.id, out var def))
-                {
-                    ItemRegistry.InjectSingleItem(__instance.id, def);
-                    if (Item.GlobalItems.TryGetValue(__instance.id, out var info))
-                    {
-                        __result = info;
-                        return false;
-                    }
-                }
+                if (!ItemRegistry.RegisteredItems.TryGetValue(__instance.id, out var def)) return true;
+                ItemRegistry.InjectSingleItem(__instance.id, def);
+                if (!Item.GlobalItems.TryGetValue(__instance.id, out var info)) return true;
+                __result = info;
+                return false;
 
-                return true;
             }
         }
     }

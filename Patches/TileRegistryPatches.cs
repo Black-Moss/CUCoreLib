@@ -1,5 +1,5 @@
-using CUCoreLib.Registries;
 using CUCoreLib.Networking;
+using CUCoreLib.Registries;
 using HarmonyLib;
 using UnityEngine;
 
@@ -62,16 +62,10 @@ namespace CUCoreLib.Patches
         [HarmonyPostfix]
         private static void SpawnCustomTileDrops(WorldGeneration __instance, Vector2Int pos, BreakDropState __state)
         {
-            if (__state == null || !__state.ShouldSpawn || __instance == null || __instance.GetBlock(pos) != 0)
-            {
-                return;
-            }
+            if (__state == null || !__state.ShouldSpawn || __instance == null || __instance.GetBlock(pos) != 0) return;
 
             // Multiplayer clients replay block damage from the server for visuals only.
-            if (MultiplayerBridge.IsAvailable && MultiplayerBridge.IsClient)
-            {
-                return;
-            }
+            if (MultiplayerBridge.IsAvailable && MultiplayerBridge.IsClient) return;
 
             TileRegistry.SpawnDrops(__instance, pos, __state.TileIndex);
         }

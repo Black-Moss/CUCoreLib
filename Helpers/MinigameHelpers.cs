@@ -69,7 +69,7 @@ namespace CUCoreLib.Helpers
 
         internal CUCoreMinigameSession(MinigameBase game)
         {
-            this.Game = game;
+            Game = game;
         }
 
         public MinigameBase Game { get; }

@@ -41,23 +41,23 @@ namespace CUCoreLib.Helpers
 
         public static Coroutine StartCoroutine(IEnumerator routine)
         {
-            if (routine == null) return null;
-
-            return CoroutineRunner.Instance.StartCoroutine(routine);
+            return routine == null 
+                ? null 
+                : CoroutineRunner.Instance.StartCoroutine(routine);
         }
 
         public static Coroutine StartCoroutine(Func<IEnumerator> routineFactory)
         {
-            if (routineFactory == null) return null;
-
-            return StartCoroutine(routineFactory());
+            return routineFactory == null
+                ? null
+                : StartCoroutine(routineFactory());
         }
 
         public static Coroutine DelayCall(float delaySeconds, Action action)
         {
-            if (action == null) return null;
-
-            return StartCoroutine(DelayCallRoutine(delaySeconds, action));
+            return action == null
+                ? null
+                : StartCoroutine(DelayCallRoutine(delaySeconds, action));
         }
 
         public static Coroutine CallWhen(Func<bool> condition, Action action, float checkRepeatTimeSeconds = 0f)
@@ -237,10 +237,9 @@ namespace CUCoreLib.Helpers
             item = null;
             if (!TryGetBody(out var body)) return false;
 
-            foreach (var uiCast in UIUtil.GetEventSystemRaycastResults())
+            foreach (var uiCast in UIUtil.GetEventSystemRaycastResults()
+                         .Where(uiCast => uiCast.gameObject != null))
             {
-                if (uiCast.gameObject == null) continue;
-
                 if (!uiCast.gameObject.TryGetComponent(out ItemLabel label) || label == null ||
                     label.refItem == null) continue;
                 item = label.refItem;
@@ -249,7 +248,7 @@ namespace CUCoreLib.Helpers
 
             // maybe System.NullReferenceException
             var collider = Physics2D.OverlapPoint(
-                Camera.main.ScreenToWorldPoint(Input.mousePosition),
+                Camera.main.ScreenToWorldPoint(Input.mousePosition),    // maybe null
                 LayerMask.GetMask("Item"));
 
             if (collider == null) return false;
@@ -299,6 +298,28 @@ namespace CUCoreLib.Helpers
             ShowAlert(text, important);
         }
 
+        public static void Alert(string text, bool important, float delay = 0f)
+        {
+            if (string.IsNullOrWhiteSpace(text) || PlayerCamera.main == null) return;
+
+            if (delay <= 0f)
+                PlayerCamera.main.DoAlert(text, important);
+            else
+                StartCoroutine(AlertDelayedRoutine(text, important, delay));
+        }
+
+        public static void alert(string text, bool important, float delay = 0f)
+        {
+            Alert(text, important, delay);
+        }
+
+        private static IEnumerator AlertDelayedRoutine(string text, bool important, float delay)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            if (PlayerCamera.main != null)
+                PlayerCamera.main.DoAlert(text, important);
+        }
+
         public static void GiveItem(string id, int count)
         {
             if (!IsInWorld() || string.IsNullOrWhiteSpace(id) || count <= 0) return;
@@ -325,6 +346,34 @@ namespace CUCoreLib.Helpers
         public static void giveItem(string id, int count)
         {
             GiveItem(id, count);
+        }
+        
+        public static void GiveItemSlot(string id, int slot, int count)
+        {
+            if (!IsInWorld() || string.IsNullOrWhiteSpace(id) || count <= 0) return;
+
+            var body = PlayerCamera.main.body;
+            if (body == null) return;
+
+            var normalizedId = id.Trim();
+            for (var i = 0; i < count; i++)
+            {
+                var spawned = Utils.Create(normalizedId, body.transform.position, 0f);
+                var spawnedItem = spawned != null ? spawned.GetComponent<Item>() : null;
+                if (spawnedItem == null)
+                {
+                    if (spawned != null) Object.Destroy(spawned);
+
+                    return;
+                }
+
+                body.PickUpItem(spawnedItem, slot);
+            }
+        }
+
+        public static void giveItemSlot(string id, int slot, int count)
+        {
+            GiveItemSlot(id, slot, count);
         }
 
         public static bool TryGetCustomItemInfo(string id, out CustomItemInfo info)
@@ -406,6 +455,23 @@ namespace CUCoreLib.Helpers
         {
             InvokeMethod(instance, "LogToConsole", message);
         }
+        
+        // try this?
+        // _consoleScript are ConsoleScript Instance
+        // public static void LogToConsole(string text)
+        // {
+        //     if (_consoleScript == null)
+        //         return;
+        //
+        //     _consoleScript.logs.Add(
+        //         $"[<alpha=#55>{TimeSpan.FromSeconds(Time.realtimeSinceStartup):mm\\:ss}<alpha=#FF>] {text}");
+        //     if (_consoleScript.logs.Count > MaxLogCount)
+        //         _consoleScript.logs.RemoveAt(0);
+        //     if (!_consoleScript.active)
+        //         return;
+        //     if (_consoleScript.logText == null) return;
+        //     _consoleScript.logText.text = string.Join("\n", _consoleScript.logs);
+        // }
 
         public static void ConsoleRunCommand(ConsoleScript instance, string commandString)
         {
@@ -542,13 +608,11 @@ namespace CUCoreLib.Helpers
             {
                 get
                 {
-                    if (_instance == null)
-                    {
-                        var obj = new GameObject("CUCoreUtils_CoroutineRunner");
-                        DontDestroyOnLoad(obj);
-                        obj.hideFlags = HideFlags.HideAndDontSave;
-                        _instance = obj.AddComponent<CoroutineRunner>();
-                    }
+                    if (_instance != null) return _instance;
+                    var obj = new GameObject("CUCoreUtils_CoroutineRunner");
+                    DontDestroyOnLoad(obj);
+                    obj.hideFlags = HideFlags.HideAndDontSave;
+                    _instance = obj.AddComponent<CoroutineRunner>();
 
                     return _instance;
                 }

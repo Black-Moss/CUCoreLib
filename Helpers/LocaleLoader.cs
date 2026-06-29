@@ -25,7 +25,17 @@ namespace CUCoreLib.Helpers
             if (string.IsNullOrWhiteSpace(localeName)) return;
 
             var normalizedLocaleName = localeName.Trim();
-            var overlayFiles = FindOverlayFiles(normalizedLocaleName);
+            
+            var isEnglish = string.Equals(normalizedLocaleName, "EN", StringComparison.OrdinalIgnoreCase);
+            if (!isEnglish)
+                ApplyLocaleFile("EN");
+
+            ApplyLocaleFile(normalizedLocaleName);
+        }
+
+        private static void ApplyLocaleFile(string localeName)
+        {
+            var overlayFiles = FindOverlayFiles(localeName);
             if (overlayFiles.Count == 0) return;
 
             foreach (var path in overlayFiles)
@@ -50,9 +60,9 @@ namespace CUCoreLib.Helpers
             var value = TryReadValue(Locale.currentLang, normalizedCategory, normalizedKey);
             if (!string.IsNullOrWhiteSpace(value)) return value;
 
-            if (!string.IsNullOrWhiteSpace(fallback)) return fallback;
-
-            return normalizedKey;
+            return !string.IsNullOrWhiteSpace(fallback)
+                ? fallback
+                : normalizedKey;
         }
 
         private static List<string> FindOverlayFiles(string localeName)
@@ -64,7 +74,11 @@ namespace CUCoreLib.Helpers
             if (File.Exists(configPath)) results.Add(configPath);
 
             var pluginRoot = Path.Combine(Path.GetDirectoryName(Paths.ConfigPath) ?? string.Empty, "plugins");
-            if (Directory.Exists(pluginRoot))
+            if (!Directory.Exists(pluginRoot))
+                return results
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             {
                 var pluginMatches = Directory.EnumerateFiles(pluginRoot, fileName, SearchOption.AllDirectories)
                     .Where(path =>
@@ -96,6 +110,10 @@ namespace CUCoreLib.Helpers
             MergeSection(target.moodles, source["moodles"]);
 
             MergeSection(target.other, source["other"]);
+
+            MergeSection(target.other, source["log"]);
+            MergeSection(target.other, source["command"]);
+            MergeSection(target.other, source["option"]);
         }
 
         private static void MergeSection(Dictionary<string, string> target, JToken sectionToken)
@@ -106,8 +124,7 @@ namespace CUCoreLib.Helpers
 
             foreach (var property in section.Properties())
             {
-                // property.Value == null is always false
-                if (string.IsNullOrWhiteSpace(property.Name) || property.Value == null) continue;
+                if (string.IsNullOrWhiteSpace(property.Name)) continue;
 
                 var value = property.Value.Type == JTokenType.String
                     ? property.Value.Value<string>()

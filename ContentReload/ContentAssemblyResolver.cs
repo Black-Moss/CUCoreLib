@@ -9,10 +9,11 @@ namespace CUCoreLib.ContentReload
 {
     internal static class ContentAssemblyResolver
     {
-        internal static ContentReloadCandidate ResolveCandidate(string modGuid, ContentReloadConfig config, ContentReloadState state)
+        internal static ContentReloadCandidate ResolveCandidate(string modGuid, ContentReloadConfig config,
+            ContentReloadState state)
         {
-            string normalizedModGuid = (modGuid ?? string.Empty).Trim();
-            ContentReloadCandidate candidate = new ContentReloadCandidate
+            var normalizedModGuid = (modGuid ?? string.Empty).Trim();
+            var candidate = new ContentReloadCandidate
             {
                 ModGuid = normalizedModGuid,
                 ModName = normalizedModGuid
@@ -26,18 +27,22 @@ namespace CUCoreLib.ContentReload
                 candidate.LoadedPluginPath = NormalizeExistingPath(pluginInfo.Location);
             }
 
-            ContentReloadModConfig modConfig = GetModConfig(config, normalizedModGuid);
-            candidate.OverridePath = NormalizeExistingPath(ResolveConfiguredPath(modConfig != null ? modConfig.OverrideDllPath : null));
+            var modConfig = GetModConfig(config, normalizedModGuid);
+            candidate.OverridePath =
+                NormalizeExistingPath(ResolveConfiguredPath(modConfig?.OverrideDllPath));
 
-            string loadedHash = GetFileHash(candidate.LoadedPluginPath, state);
-            string overrideHash = GetFileHash(candidate.OverridePath, state);
+            var loadedHash = GetFileHash(candidate.LoadedPluginPath, state);
+            var overrideHash = GetFileHash(candidate.OverridePath, state);
 
-            bool loadedChanged = !string.IsNullOrWhiteSpace(loadedHash) &&
-                !string.Equals(loadedHash, state != null ? state.LastSuccessfulHash : null, StringComparison.OrdinalIgnoreCase);
-            bool overrideChanged = !string.IsNullOrWhiteSpace(overrideHash) &&
-                !string.Equals(overrideHash, state != null ? state.LastSuccessfulHash : null, StringComparison.OrdinalIgnoreCase);
+            var loadedChanged = !string.IsNullOrWhiteSpace(loadedHash) &&
+                                !string.Equals(loadedHash, state?.LastSuccessfulHash,
+                                    StringComparison.OrdinalIgnoreCase);
+            var overrideChanged = !string.IsNullOrWhiteSpace(overrideHash) &&
+                                  !string.Equals(overrideHash, state?.LastSuccessfulHash,
+                                      StringComparison.OrdinalIgnoreCase);
 
-            if (!string.IsNullOrWhiteSpace(candidate.LoadedPluginPath) && (loadedChanged || string.IsNullOrWhiteSpace(candidate.OverridePath)))
+            if (!string.IsNullOrWhiteSpace(candidate.LoadedPluginPath) &&
+                (loadedChanged || string.IsNullOrWhiteSpace(candidate.OverridePath)))
             {
                 candidate.SelectedPath = candidate.LoadedPluginPath;
                 candidate.SelectedHash = loadedHash;
@@ -73,31 +78,23 @@ namespace CUCoreLib.ContentReload
 
         internal static string GetFileHash(string path, ContentReloadState state)
         {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            {
-                return null;
-            }
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
 
-            if (state == null)
-            {
-                return ComputeHash(path);
-            }
+            if (state == null) return ComputeHash(path);
 
-            if (!state.ObservedFiles.TryGetValue(path, out ContentObservedFileState observed))
+            if (!state.ObservedFiles.TryGetValue(path, out var observed))
             {
                 observed = new ContentObservedFileState();
                 state.ObservedFiles[path] = observed;
             }
 
-            FileInfo info = new FileInfo(path);
-            long length = info.Length;
-            long writeTicks = info.LastWriteTimeUtc.Ticks;
+            var info = new FileInfo(path);
+            var length = info.Length;
+            var writeTicks = info.LastWriteTimeUtc.Ticks;
             if (observed.Length == length &&
                 observed.LastWriteUtcTicks == writeTicks &&
                 !string.IsNullOrWhiteSpace(observed.Hash))
-            {
                 return observed.Hash;
-            }
 
             observed.Length = length;
             observed.LastWriteUtcTicks = writeTicks;
@@ -107,7 +104,7 @@ namespace CUCoreLib.ContentReload
 
         internal static bool IsWatchEnabled(ContentReloadConfig config, string modGuid)
         {
-            ContentReloadModConfig modConfig = GetModConfig(config, modGuid);
+            var modConfig = GetModConfig(config, modGuid);
             return modConfig != null && modConfig.WatchEnabled;
         }
 
@@ -121,40 +118,24 @@ namespace CUCoreLib.ContentReload
 
         private static ContentReloadModConfig GetModConfig(ContentReloadConfig config, string modGuid)
         {
-            if (config == null || config.Mods == null || string.IsNullOrWhiteSpace(modGuid))
-            {
-                return null;
-            }
+            if (config?.Mods == null || string.IsNullOrWhiteSpace(modGuid)) return null;
 
-            config.Mods.TryGetValue(modGuid.Trim(), out ContentReloadModConfig modConfig);
+            config.Mods.TryGetValue(modGuid.Trim(), out var modConfig);
             return modConfig;
         }
 
         private static string ResolveConfiguredPath(string path)
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
-
-            if (Path.IsPathRooted(path))
-            {
-                return path;
-            }
-
-            return path;
+            return string.IsNullOrWhiteSpace(path) ? null : path;
         }
 
         private static string NormalizeExistingPath(string path)
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
+            if (string.IsNullOrWhiteSpace(path)) return null;
 
             try
             {
-                string fullPath = Path.GetFullPath(path);
+                var fullPath = Path.GetFullPath(path);
                 return File.Exists(fullPath) ? fullPath : null;
             }
             catch
@@ -165,15 +146,13 @@ namespace CUCoreLib.ContentReload
 
         private static string ComputeHash(string path)
         {
-            using (SHA256 sha = SHA256.Create())
-            using (FileStream stream = File.OpenRead(path))
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(path))
             {
-                byte[] hash = sha.ComputeHash(stream);
-                StringBuilder builder = new StringBuilder(hash.Length * 2);
-                for (int i = 0; i < hash.Length; i++)
-                {
-                    builder.Append(hash[i].ToString("x2"));
-                }
+                var hash = sha.ComputeHash(stream);
+                var builder = new StringBuilder(hash.Length * 2);
+                foreach (var t in hash)
+                    builder.Append(t.ToString("x2"));
 
                 return builder.ToString();
             }
