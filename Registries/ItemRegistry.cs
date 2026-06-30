@@ -38,6 +38,9 @@ namespace CUCoreLib.Registries
                 "sandvinerope"
             };
 
+        private static readonly HashSet<string> WarnedMissingIconIds =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         public static void Register(string id, ItemInfo info, Sprite icon, int spawnFrequency = 1)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -72,6 +75,7 @@ namespace CUCoreLib.Registries
 
             id = id.Trim();
             info.ID = id;
+            WarnedMissingIconIds.Remove(SpawnIdHelpers.NormalizeSpawnId(id));
 
             if (string.IsNullOrWhiteSpace(info.category)) info.category = "nospawn";
 
@@ -472,10 +476,12 @@ namespace CUCoreLib.Registries
             {
                 sprite = renderer.sprite;
                 AssetLoader.CacheSprite(normalizedId, sprite);
+                WarnedMissingIconIds.Remove(normalizedId);
                 return true;
             }
 
-            CUCoreLibPlugin.Log?.LogWarning("No item icon was found for '" + normalizedId + "'.");
+            if (WarnedMissingIconIds.Add(normalizedId))
+                CUCoreLibPlugin.Log?.LogWarning("No item icon was found for '" + normalizedId + "'.");
             return false;
         }
 

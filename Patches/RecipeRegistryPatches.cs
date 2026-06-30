@@ -80,6 +80,7 @@ namespace CUCoreLib.Patches
                 if (string.IsNullOrWhiteSpace(animationId)) continue;
 
                 var image = recipeBox.GetChild(2).GetComponent<Image>();
+                TryApplyRecipeIcon(image, recipe);
                 AssetLoader.TryApplyAnimation(image, animationId);
             }
         }
@@ -97,7 +98,22 @@ namespace CUCoreLib.Patches
             if (recipe?.result == null || string.IsNullOrWhiteSpace(recipe.result.id)) return;
 
             var image = __instance.craftingPanel.transform.GetChild(6).GetComponent<Image>();
+            TryApplyRecipeIcon(image, recipe);
             AssetLoader.TryApplyAnimation(image, recipe.result.id);
+        }
+
+        private static void TryApplyRecipeIcon(Image image, Recipe recipe)
+        {
+            if (image == null || recipe?.result == null || recipe.result.isLiquid ||
+                string.IsNullOrWhiteSpace(recipe.result.id))
+                return;
+
+            if (!ItemRegistry.TryGetIcon(recipe.result.id, out var sprite) || sprite == null) return;
+
+            image.sprite = sprite;
+            if (sprite.texture != null)
+                image.rectTransform.sizeDelta = PlayerCamera.ImageSizeDelta(sprite.texture, 8f, 64f);
+            image.color = Color.white;
         }
 
         [HarmonyPatch(typeof(RecipeResult), "SpawnResult")]
