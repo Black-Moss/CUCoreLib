@@ -262,6 +262,31 @@ namespace AcidShroomTutorial
 }`;
 }
 
+function multiBlockStructureCode(): string {
+  return `using System.IO;
+using BepInEx;
+using CUCoreLib.Registries;
+
+[BepInPlugin("com.example.structuremod", "Structure Mod", "1.0.0")]
+[BepInDependency("net.cucorelib", BepInDependency.DependencyFlags.HardDependency)]
+public class Plugin : BaseUnityPlugin
+{
+    private void Awake()
+    {
+        StructureRegistry.RegisterFromEmbeddedJson(
+            "fieldlab",
+            "Structures.field_lab.json");
+
+        StructureRegistry.RegisterFromFile(
+            "crashsite",
+            Path.Combine(Paths.PluginPath, "MyMod", "Structures", "crashsite.json"));
+
+        // Optional density override after import.
+        StructureRegistry.TrySetSpawnCounts("fieldlab", 0, 1, 2, 2, 3);
+    }
+}`;
+}
+
 function itemCode(): string {
   const id = itemState.id.trim() || "myitem";
   const spriteVariable = `${csharpIdentifier(id, "item")}Sprite`;
@@ -571,6 +596,7 @@ export function currentCode(nextPage: PageId, nextItemState: ItemState, nextReci
   if (currentPage === "advanced-building-entities") return advancedBuildingEntityCode();
   if (currentPage === "minigames") return minigameCode();
   if (currentPage === "tiles") return tileCode();
+  if (currentPage === "multi-block-structures") return multiBlockStructureCode();
   if (currentPage === "traps") return trapsCode();
   if (currentPage === "settings") return settingsCode();
   if (currentPage === "locale") return localeCode();
@@ -603,6 +629,7 @@ export function codeTitle(currentPage: PageId): string {
   if (currentPage === "advanced-building-entities") return "RegisterAdvancedBuildings.cs";
   if (currentPage === "minigames") return "CustomMinigame.cs";
   if (currentPage === "tiles") return "RegisterTiles.cs";
+  if (currentPage === "multi-block-structures") return "RegisterStructures.cs";
   if (currentPage === "traps") return "RegisterTraps.cs";
   if (currentPage === "settings") return "RegisterSettings.cs";
   if (currentPage === "locale") return "CAT.json";

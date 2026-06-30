@@ -41,6 +41,13 @@ namespace CUCoreLib.Registries
 
         public static event Action<string, CustomBuildingEntityDefinition, bool> Registered;
 
+        public static void Register(string id, CustomBuildingEntityDefinition definition, Sprite icon = null)
+        {
+            if (definition != null && icon != null) definition.Sprite = icon;
+
+            Register(id, definition);
+        }
+
         public static void Register(string id, CustomBuildingEntityDefinition definition)
         {
             ContentReloadSession.AssertAllowed(

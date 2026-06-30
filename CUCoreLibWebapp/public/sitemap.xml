@@ -19,6 +19,7 @@
   <url><loc>https://cucorelib.jimmyking.dev/docs/advanced-building-entities/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/minigames/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/tiles/</loc></url>
+  <url><loc>https://cucorelib.jimmyking.dev/docs/multi-block-structures/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/traps/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/debug-testing/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/utils/</loc></url>
@@ -46,6 +47,7 @@
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/advanced-building-entities.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/minigames.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/tiles.json</loc></url>
+  <url><loc>https://cucorelib.jimmyking.dev/api/topics/multi-block-structures.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/traps.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/debug-testing.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/utils.json</loc></url>

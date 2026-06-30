@@ -97,7 +97,7 @@ export const pages: Page[] = [
     label: "Statuses",
     crumb: "Player",
     title: "Statuses",
-    lead: "Planned documentation for status effects and their gameplay hooks."
+    lead: "Reference for status effects, common status state, and the gameplay hooks mods usually read or modify."
   },
   {
     id: "limb-statuses",
@@ -111,7 +111,7 @@ export const pages: Page[] = [
     label: "Moodles",
     crumb: "Player",
     title: "Moodles",
-    lead: "Planned documentation for moodle display and player condition indicators."
+    lead: "Reference for moodle display, intensity tiers, and the player condition indicators mods commonly surface."
   },
   {
     id: "building-entities",
@@ -277,6 +277,7 @@ export function pageBody(page: PageId, nextItemState: ItemState, nextRecipeState
   else if (page === "advanced-building-entities") content = advancedBuildingEntitiesPage();
   else if (page === "minigames") content = minigamesPage();
   else if (page === "tiles") content = tilesPage();
+  else if (page === "multi-block-structures") content = multiBlockStructuresPage();
   else if (page === "traps") content = trapsPage();
   else if (page === "locale") content = localePage();
   else if (page === "multi-mod-compatibility") content = multiplayerPage();
@@ -527,13 +528,84 @@ function advancedBuildingEntitiesPage(): string {
   `;
 }
 
+function multiBlockStructuresPage(): string {
+  return `
+    <section class="lesson-card">
+      <h2>What this API is for</h2>
+      <p><span class="inline-code">StructureRegistry</span> is for authored multi-block structures exported from the CU Structure Editor / More Structures webapp as v2 JSON. This is not a replacement for <span class="inline-code">BuildingEntityRegistry</span>; it is the bigger worldgen-oriented sibling for whole prefabs made of many blocks, liquids, items, and placed world objects.</p>
+      <p>CUCoreLib v1 optimizes for deterministic world generation. It parses the JSON once, compiles the structure once, caches the result, and reuses that compiled payload during world generation instead of reparsing the file every placement.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Structure editor</h2>
+      <p>Author the layout in the hosted <a href="https://cu-custom-structures.jimmyking.dev/index.html" target="_blank">CU Custom Structures editor</a>, export the compact v2 JSON, then register that exported payload through <span class="inline-code">StructureRegistry</span>.</p>
+      <img src="images/custom-structure-editor.png" alt="CU Custom Structures editor showing a multi-block structure authoring layout." class="screenshot">
+    </section>
+
+    <section class="lesson-card">
+      <h2>Register structure JSON</h2>
+      <p>Author the structure in the webapp, export the compact v2 JSON, and register that exact payload. You can load the text from an embedded resource or a loose file path.</p>
+      <pre><code>string campJson = AssetLoader.LoadEmbeddedText("Structures.camp_heater_room.json");
+StructureRegistry.RegisterFromJson("campheaterroom", campJson);
+
+StructureRegistry.RegisterFromEmbeddedJson(
+    "fieldlab",
+    "Structures.field_lab.json");
+
+StructureRegistry.RegisterFromFile(
+    "crashsite",
+    Path.Combine(Paths.PluginPath, "MyMod", "Structures", "crashsite.json"));</code></pre>
+      <p>The structure ID is the stable runtime key. The exported JSON keeps ownership of the actual block/object/item layout and the default five-depth <span class="inline-code">spawnCounts</span> values.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Imported fields</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Payload field</th><th>Status in v1</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">layers</span></td><td>Supported</td><td>Visible foreground and background layers are composed once during import.</td></tr>
+            <tr><td><span class="inline-code">objectsByCell</span></td><td>Supported</td><td>Object markers are flattened onto the visible foreground layer and spawned during placement.</td></tr>
+            <tr><td><span class="inline-code">itemsByCell</span></td><td>Supported</td><td>Only deterministic single-entry item assignments are accepted in v1.</td></tr>
+            <tr><td><span class="inline-code">customPropertiesByCell</span></td><td>Supported</td><td>Imported for item/object placements and simple runtime overrides like condition or health.</td></tr>
+            <tr><td><span class="inline-code">precisePlacements</span></td><td>Supported</td><td>Rotation, scale, flip, and per-cell offsets are compiled into the cached placement data.</td></tr>
+            <tr><td><span class="inline-code">metadata.spawnCounts</span></td><td>Supported</td><td>Used as the default per-depth worldgen counts.</td></tr>
+            <tr><td><span class="inline-code">terrainGenAreas</span></td><td>Imported, not executed</td><td>CUCoreLib keeps compatibility with the webapp payload shape, but terrain sub-generation is deferred past v1.</td></tr>
+            <tr><td><span class="inline-code">lootRules</span> / <span class="inline-code">lootPools</span></td><td>Supported</td><td>Compiled into a second-pass seeded loot-marker roll path so the static structure still stays precompiled.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Spawn counts and overrides</h2>
+      <p>The importer reuses the same five-depth <span class="inline-code">spawnCounts</span> array the structure editor already exports. If your mod wants to tweak density after import, override the counts in code without rewriting the JSON.</p>
+      <pre><code>StructureRegistry.RegisterFromEmbeddedJson(
+    "fieldlab",
+    "Structures.field_lab.json");
+
+StructureRegistry.TrySetSpawnCounts("fieldlab", 0, 1, 2, 2, 3);</code></pre>
+      <p>During world generation, CUCoreLib reads the current biome depth, picks the matching count, and places the already-compiled structure payload for each spawn.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Loot marker pass</h2>
+      <p><span class="inline-code">lootRules</span> and <span class="inline-code">lootPools</span> now run as a separate seeded pass over precompiled marker positions. CUCoreLib still compiles the static blocks, liquids, backgrounds, and non-loot entity placements once at import time, then only rolls the cached loot markers during structure placement.</p>
+      <p>That keeps the runtime cost proportional to the number of loot markers instead of forcing a full structure reparse or recompilation for every spawn.</p>
+    </section>
+
+  `;
+}
+
 function minigamesPage(): string {
   return `
     <section class="lesson-card">
       <h2>What this wraps</h2>
       <p>CUCoreLib does not replace the game's minigame system. It now mirrors the game's real split more closely: the vanilla <span class="inline-code">Minigame</span> contract still does the actual work, while CUCoreLib adds a runner facade, a live session object, and a definition layer so mods can target stable seams instead of poking globals directly.</p>
       <p>The important vanilla hooks are <span class="inline-code">Start()</span>, <span class="inline-code">Update()</span>, <span class="inline-code">PhysicsUpdate()</span>, <span class="inline-code">HandType()</span>, <span class="inline-code">GuideLocaleString()</span>, <span class="inline-code">NeedsItem()</span>, and <span class="inline-code">CanExit()</span>.</p>
-      <p>For quick visual wiring, the session layer exposes the live hand sprite, hand state, spawned minigame root, and the shared screen factory so custom minigames can swap art or grab child GameObjects without repeating reflection code everywhere.</p>
+      <p>For quick visual wiring, the session layer exposes the live hand sprite, hand state, spawned minigame root, session-scoped state storage, and the shared screen factory so custom minigames can swap art or grab child GameObjects without repeating reflection code everywhere.</p>
     </section>
 
     <section class="lesson-card">
@@ -545,13 +617,16 @@ function minigamesPage(): string {
           </thead>
           <tbody>
             <tr><td><span class="inline-code">CUCoreMinigames</span></td><td>Static runner facade that starts or ends minigames and exposes the current live session.</td></tr>
-            <tr><td><span class="inline-code">CUCoreMinigameSession</span></td><td>Live wrapper around the shared runner with access to body, current item, hand state, spawned UI, and screen/hand helpers.</td></tr>
-            <tr><td><span class="inline-code">CUCoreMinigameDefinition</span></td><td>Composable definition layer for new minigames. Override only the hooks you need and work against the session object.</td></tr>
+            <tr><td><span class="inline-code">CUCoreMinigameSession</span></td><td>Live wrapper around the shared runner with access to body, current item, hand state, spawned UI, session-scoped state, and screen/hand helpers.</td></tr>
+            <tr><td><span class="inline-code">CUCoreMinigameConfig</span></td><td>Cached policy object returned from <span class="inline-code">Configure(...)</span> for hand type, guide key, item requirement, rotation offset, and exit behavior.</td></tr>
+            <tr><td><span class="inline-code">CUCoreMinigameDefinition</span></td><td>Composable definition layer for new minigames. Override <span class="inline-code">Configure</span>, <span class="inline-code">Start</span>, <span class="inline-code">Update</span>, and optional <span class="inline-code">End</span> hooks.</td></tr>
             <tr><td><span class="inline-code">CUCoreMinigames.TryStart(...)</span> / <span class="inline-code">TryStartDefinition(...)</span></td><td>Starts either a vanilla <span class="inline-code">Minigame</span> or a definition-based CUCoreLib minigame only when the shared runner is idle.</td></tr>
             <tr><td><span class="inline-code">session.TryCreateScreen(...)</span></td><td>Loads a minigame screen prefab through the game's existing UI system.</td></tr>
-            <tr><td><span class="inline-code">session.End()</span></td><td>Ends the active minigame through the shared runner.</td></tr>
+            <tr><td><span class="inline-code">session.Complete()</span> / <span class="inline-code">Fail()</span> / <span class="inline-code">Cancel()</span></td><td>Ends the active minigame through the shared runner and reports an explicit end reason into the definition lifecycle.</td></tr>
             <tr><td><span class="inline-code">session.TrySetHandSprite(...)</span></td><td>Swaps the current hand sprite immediately, either from a sprite asset or one of the game's existing hand slots.</td></tr>
-            <tr><td><span class="inline-code">session.TryGetSpawnedMiniGameObject(...)</span></td><td>Gets a child GameObject from the spawned minigame root by index.</td></tr>
+            <tr><td><span class="inline-code">session.GetOrCreateState&lt;T&gt;(...)</span></td><td>Stores modular per-run state without inventing extra globals or singleton managers.</td></tr>
+            <tr><td><span class="inline-code">session.TryGetSpawnedMiniGameObject(...)</span></td><td>Gets a child GameObject from the spawned minigame root by index or by name.</td></tr>
+            <tr><td><span class="inline-code">CUCoreMinigameTimer</span> / <span class="inline-code">CUCoreMinigameProgress</span></td><td>Optional small helper objects for countdowns and progress-based minigame state.</td></tr>
             <tr><td><span class="inline-code">CUCoreMinigame</span></td><td>Legacy-compatible abstract wrapper for mods that still prefer direct inheritance from a <span class="inline-code">Minigame</span>-style base.</td></tr>
           </tbody>
         </table>
@@ -560,7 +635,7 @@ function minigamesPage(): string {
 
     <section class="lesson-card">
       <h2>Minimal custom minigame</h2>
-      <p>For new work, subclass <span class="inline-code">CUCoreMinigameDefinition</span> and start it through <span class="inline-code">CUCoreMinigames.TryStartDefinition(...)</span>. That keeps your minigame logic focused on one live session object instead of scattered global calls.</p>
+      <p>For new work, subclass <span class="inline-code">CUCoreMinigameDefinition</span> and start it through <span class="inline-code">CUCoreMinigames.TryStartDefinition(...)</span>. That keeps your minigame logic focused on one live session object instead of scattered global calls. Put static policy in <span class="inline-code">Configure(...)</span>, then keep runtime state inside the session.</p>
       <pre><code>using System.Collections.Generic;
 using CUCoreLib.Helpers;
 using UnityEngine;
@@ -568,32 +643,53 @@ using UnityEngine.EventSystems;
 
 public sealed class WireSpliceMinigame : CUCoreMinigameDefinition
 {
-    public override Minigame.HandSpriteType HandType(CUCoreMinigameSession session)
+    private sealed class WireSpliceState
     {
-        return Minigame.HandSpriteType.Tweezers;
+        public CUCoreMinigameTimer Timer = new CUCoreMinigameTimer(6f);
+        public CUCoreMinigameProgress Progress = new CUCoreMinigameProgress(3f);
     }
 
-    public override bool NeedsItem(CUCoreMinigameSession session)
+    public override CUCoreMinigameConfig Configure(CUCoreMinigameSession session)
     {
-        return false;
-    }
-
-    public override string GuideLocaleKey(CUCoreMinigameSession session)
-    {
-        return "wireSpliceGuide";
+        return new CUCoreMinigameConfig
+        {
+            HandType = _ =&gt; Minigame.HandSpriteType.Tweezers,
+            NeedsItem = _ =&gt; false,
+            GuideLocaleKey = _ =&gt; "wireSpliceGuide"
+        };
     }
 
     public override void Start(CUCoreMinigameSession session)
     {
         session.TryCreateScreen("Special/WireSpliceMinigame");
+        session.GetOrCreateState(() =&gt; new WireSpliceState());
     }
 
     public override void Update(CUCoreMinigameSession session, List&lt;RaycastResult&gt; uiCasts)
     {
-        if (Input.GetKeyDown(KeyCode.Escape) && CanExit(session))
+        WireSpliceState state = session.GetOrCreateState(() =&gt; new WireSpliceState());
+
+        if (state.Timer.Tick(Time.deltaTime))
         {
-            session.End();
+            session.Fail();
+            return;
         }
+
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            state.Progress.Add(1f);
+            if (state.Progress.IsComplete) session.Complete();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            session.Cancel();
+        }
+    }
+
+    public override void End(CUCoreMinigameSession session, CUCoreMinigameEndReason reason)
+    {
+        Debug.Log("WireSplice ended with reason: " + reason);
     }
 }</code></pre>
     </section>

@@ -2,7 +2,7 @@
   "version": "1.0",
   "library": "CUCoreLib",
   "description": "Machine-readable CUCoreLib web docs generated from the interactive docs sources.",
-  "generatedAt": "2026-06-29T17:01:10.678Z",
+  "generatedAt": "2026-06-30T16:13:22.265Z",
   "baseUrl": "/",
   "topics": [
     {
@@ -118,7 +118,7 @@
       "label": "Statuses",
       "crumb": "Player",
       "title": "Statuses",
-      "lead": "Planned documentation for status effects and their gameplay hooks.",
+      "lead": "Reference for status effects, common status state, and the gameplay hooks mods usually read or modify.",
       "appUrl": "/docs/statuses/",
       "machineUrl": "/api/topics/statuses.json"
     },
@@ -127,7 +127,7 @@
       "label": "Moodles",
       "crumb": "Player",
       "title": "Moodles",
-      "lead": "Planned documentation for moodle display and player condition indicators.",
+      "lead": "Reference for moodle display, intensity tiers, and the player condition indicators mods commonly surface.",
       "appUrl": "/docs/moodles/",
       "machineUrl": "/api/topics/moodles.json"
     },
@@ -166,6 +166,15 @@
       "lead": "Register terrain tiles with stable block indices, vanilla block behavior, and normal world or Tilemap placement.",
       "appUrl": "/docs/tiles/",
       "machineUrl": "/api/topics/tiles.json"
+    },
+    {
+      "id": "multi-block-structures",
+      "label": "Multi-Block Structures",
+      "crumb": "World",
+      "title": "Multi-block structures",
+      "lead": "Planned documentation for structures made from multiple world blocks.",
+      "appUrl": "/docs/multi-block-structures/",
+      "machineUrl": "/api/topics/multi-block-structures.json"
     },
     {
       "id": "traps",

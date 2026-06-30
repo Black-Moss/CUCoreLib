@@ -259,6 +259,7 @@
         <Compile Include="Patches\TileRegistryPatches.cs"/>
         <Compile Include="Patches\UtilsCreatePatches.cs"/>
         <Compile Include="Patches\WorldGenerationBuildingPatches.cs"/>
+        <Compile Include="Patches\WorldGenerationStructurePatches.cs"/>
         <Compile Include="Registries\BuildingEntityRegistry.cs"/>
         <Compile Include="Registries\ItemRegistry.cs"/>
         <Compile Include="Registries\LiquidRegistry.cs"/>
@@ -268,6 +269,7 @@
         <Compile Include="Registries\RecipeRegistry.cs"/>
         <Compile Include="Registries\SaveRegistry.cs"/>
         <Compile Include="Registries\StatusRegistry.cs"/>
+        <Compile Include="Registries\StructureRegistry.cs"/>
         <Compile Include="Registries\TileRegistry.cs"/>
         <Compile Include="Registries\ConsoleCommandRegistry.cs"/>
         <Compile Include="Helpers\CustomInstantiate.cs"/>

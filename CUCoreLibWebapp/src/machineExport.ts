@@ -19,6 +19,7 @@ export const machineExportEnabledPageIds = [
   "advanced-building-entities",
   "minigames",
   "tiles",
+  "multi-block-structures",
   "traps",
   "debug-testing",
   "utils",
