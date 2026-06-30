@@ -30,8 +30,6 @@ namespace CUCoreLib.Registries
         private static readonly Dictionary<string, RegisteredStructureDefinition> RegisteredDefinitions =
             new Dictionary<string, RegisteredStructureDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly Dictionary<int, char> GlobalBlockReverseMap = BuildGlobalBlockReverseMap();
-
         private static readonly Dictionary<char, int> GlobalBlockMap = new Dictionary<char, int>
         {
             { ' ', -1 }, { '.', 0 }, { 'R', 1 }, { 'g', 2 }, { 'S', 3 }, { 'T', 4 },
@@ -42,6 +40,8 @@ namespace CUCoreLib.Registries
             { 'p', 29 }, { 'h', 30 }, { 'f', 31 }, { 'b', 32 }, { '^', 33 }, { 'C', 34 },
             { 'i', 35 }
         };
+
+        private static readonly Dictionary<int, char> GlobalBlockReverseMap = BuildGlobalBlockReverseMap();
 
         private static readonly Dictionary<char, int> GlobalLiquidMap = new Dictionary<char, int>
         {

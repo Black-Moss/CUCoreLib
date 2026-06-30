@@ -19,6 +19,17 @@ namespace CUCoreLib.Data
         DropPod
     }
 
+    public enum BuildingLayer
+    {
+        Default = 0,
+        TransparentFix = 1,
+        IgnoreRaycast = 2,
+        Layer3 = 3,
+        Water = 4,
+        UI = 5,
+        Ground = 6
+    }
+
     public sealed class CustomBuildingEntityDefinition
     {
         public bool AddRigidbody2D;
@@ -51,6 +62,7 @@ namespace CUCoreLib.Data
 
         public ItemDrop[] ItemsDropOnDestroy;
         public int? Layer;
+        public BuildingLayer? LayerEnum;
         public float MaxHeatBodyTemperature;
         public bool Metallic;
         public string Name;

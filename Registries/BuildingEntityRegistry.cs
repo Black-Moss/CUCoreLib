@@ -238,7 +238,7 @@ namespace CUCoreLib.Registries
                     ["colliderOffsetX"] = definition.ColliderOffset?.x,
                     ["colliderOffsetY"] = definition.ColliderOffset?.y,
                     ["colliderIsTrigger"] = definition.ColliderIsTrigger,
-                    ["layer"] = definition.Layer,
+                    ["layer"] = ResolveAssignedLayer(definition),
                     ["addRigidbody2D"] = definition.AddRigidbody2D,
                     ["rigidbodyBodyType"] = (int)definition.RigidbodyBodyType,
                     ["rigidbodyGravityScale"] = definition.RigidbodyGravityScale,
@@ -522,7 +522,8 @@ namespace CUCoreLib.Registries
             }
 
             instance.transform.localScale = definition.Scale == Vector3.zero ? Vector3.one : definition.Scale;
-            instance.layer = definition.Layer ?? GetReferenceLayer(GetRenderReference(definition), GroundLayer);
+            instance.layer = ResolveAssignedLayer(definition)
+                             ?? GetReferenceLayer(GetRenderReference(definition), GroundLayer);
 
             var collider = instance.GetComponent<BoxCollider2D>();
             if (collider != null)
@@ -558,7 +559,7 @@ namespace CUCoreLib.Registries
 
             go.transform.localScale = definition.Scale == Vector3.zero ? Vector3.one : definition.Scale;
             var renderReference = GetRenderReference(definition);
-            go.layer = definition.Layer ?? GetReferenceLayer(renderReference, GroundLayer);
+            go.layer = ResolveAssignedLayer(definition) ?? GetReferenceLayer(renderReference, GroundLayer);
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = definition.Sprite;
@@ -708,6 +709,16 @@ namespace CUCoreLib.Registries
         {
             var reference = Resources.Load<GameObject>(resourceId);
             return reference != null ? reference.layer : fallback;
+        }
+
+        private static int? ResolveAssignedLayer(CustomBuildingEntityDefinition definition)
+        {
+            if (definition == null) return null;
+            if (definition.Layer.HasValue) return definition.Layer.Value;
+
+            return definition.LayerEnum.HasValue
+                ? (int?)definition.LayerEnum.Value
+                : null;
         }
 
         private static bool CanSpawnInLayer(CustomBuildingEntityDefinition definition, int biomeDepth)
