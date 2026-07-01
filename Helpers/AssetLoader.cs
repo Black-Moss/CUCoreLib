@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,6 +25,9 @@ namespace CUCoreLib.Helpers
         private static ManualLogSource Logger;
 
         internal static Dictionary<string, Sprite> SpriteCache =
+            new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, Sprite> SpriteVariantCache =
             new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
 
         internal static Dictionary<string, AudioClip> AudioClipCache =
@@ -94,6 +98,7 @@ namespace CUCoreLib.Helpers
             if (string.IsNullOrEmpty(normalizedId)) return;
 
             SpriteCache[normalizedId] = sprite;
+            ClearCachedSpriteVariants(normalizedId);
         }
 
         public static Sprite GetCachedSprite(string id)
@@ -111,8 +116,19 @@ namespace CUCoreLib.Helpers
 
             if (pixelsPerUnit <= 0f || Mathf.Approximately(sprite.pixelsPerUnit, pixelsPerUnit)) return sprite;
 
-            return Sprite.Create(sprite.texture, sprite.rect, sprite.pivot / sprite.rect.size, pixelsPerUnit, 0,
-                SpriteMeshType.FullRect, sprite.border);
+            var normalizedId = NormalizeCacheKey(id);
+            if (string.IsNullOrEmpty(normalizedId))
+                return CreateSpriteVariant(sprite, pixelsPerUnit);
+
+            var variantCacheKey = BuildSpriteVariantCacheKey(normalizedId, pixelsPerUnit);
+            if (SpriteVariantCache.TryGetValue(variantCacheKey, out var cachedVariant) && cachedVariant != null)
+                return cachedVariant;
+
+            var spriteVariant = CreateSpriteVariant(sprite, pixelsPerUnit);
+            if (spriteVariant == null) return null;
+
+            SpriteVariantCache[variantCacheKey] = spriteVariant;
+            return spriteVariant;
         }
 
         public static void CacheAudioClip(string id, AudioClip clip)
@@ -559,6 +575,36 @@ namespace CUCoreLib.Helpers
 
             return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f),
                 ppu);
+        }
+
+        private static Sprite CreateSpriteVariant(Sprite sourceSprite, float pixelsPerUnit)
+        {
+            if (sourceSprite == null) return null;
+
+            var spriteVariant = Sprite.Create(sourceSprite.texture, sourceSprite.rect,
+                sourceSprite.pivot / sourceSprite.rect.size, pixelsPerUnit, 0, SpriteMeshType.FullRect,
+                sourceSprite.border);
+            spriteVariant.name = sourceSprite.name;
+            return spriteVariant;
+        }
+
+        private static string BuildSpriteVariantCacheKey(string normalizedId, float pixelsPerUnit)
+        {
+            return normalizedId + "|" + pixelsPerUnit.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        private static void ClearCachedSpriteVariants(string normalizedId)
+        {
+            if (string.IsNullOrEmpty(normalizedId) || SpriteVariantCache.Count == 0) return;
+
+            var prefix = normalizedId + "|";
+            foreach (var entry in SpriteVariantCache
+                         .Where(pair => pair.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                         .ToArray())
+            {
+                SpriteVariantCache.Remove(entry.Key);
+                if (entry.Value != null) UnityEngine.Object.Destroy(entry.Value);
+            }
         }
 
         private static Sprite CreateSpriteFromTexture(Texture2D sourceTexture, float ppu, FilterMode filterMode,
