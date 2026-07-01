@@ -81,6 +81,8 @@ namespace CUCoreLib.Registries
         ///     Helper to register using string types.
         /// </summary>
         /// <param name="category">"item", "building", "moodle", or "other"</param>
+        /// <param name="key">Locale key within the selected category.</param>
+        /// <param name="text">Localized text value to register.</param>
         public static void Register(string category, string key, string text)
         {
             Register(CategoryToType(category), key, text);

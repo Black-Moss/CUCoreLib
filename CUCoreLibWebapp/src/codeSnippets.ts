@@ -1083,6 +1083,7 @@ public class SporeMineScript : MonoBehaviour
 
 function settingsCode(): string {
     return `using CUCoreLib.Data;
+using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
 using UnityEngine;
 
@@ -1176,6 +1177,23 @@ private void RegisterGlassworksSettings()
             PlayerPrefs.Save();
         }
     ));
+
+    // For simple one-key actions, CUCoreLib can own the hidden keybind ID for you.
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInInputFields = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInMainMenu = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInHealthPanel = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInInventory = true;
+    CUCoreUtils.AllowKeybindRebind("R", "Reload gun");
+}
+
+private void Update()
+{
+    if (Input.GetKeyDown(CUCoreUtils.GetFriendlyKeyBind("R")))
+    {
+        ReloadGun();
+    }
+
+    string reloadPrompt = "Press " + CUCoreUtils.GetFriendlyKeyName("R") + " to reload";
 }`;
 }
 

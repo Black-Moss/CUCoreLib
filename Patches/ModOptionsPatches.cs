@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
 using HarmonyLib;
+using UnityEngine;
 
 namespace CUCoreLib.Patches
 {
@@ -68,6 +69,28 @@ namespace CUCoreLib.Patches
 
             if (__instance && __instance.content && helper)
                 helper.FixDropdownsInContent(__instance.content);
+        }
+    }
+
+    [HarmonyPatch(typeof(KeyBinds), nameof(KeyBinds.GetBindName), typeof(string))]
+    internal static class KeyBindsGetBindNamePatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(string action, ref string __result)
+        {
+            __result = CUCoreUtils.GetFriendlyBindDisplayName(action);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(KeyBinds), nameof(KeyBinds.GetBind), typeof(string))]
+    internal static class KeyBindsGetBindPatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(string action, ref KeyCode __result)
+        {
+            __result = CUCoreUtils.GetFriendlyBindKeyCode(action);
+            return false;
         }
     }
 }

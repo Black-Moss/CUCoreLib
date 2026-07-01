@@ -2185,6 +2185,33 @@ private void Awake()
     </section>
 
     <section class="lesson-card">
+      <h2>Friendly keybind helpers</h2>
+      <p>For lightweight input actions, you can let CUCoreLib mint and own the underlying keybind ID for you. Use <span class="inline-code">GetFriendlyKeyBind</span> or <span class="inline-code">GetFriendlyKeyName</span> with a default key like <span class="inline-code">"R"</span>. CUCoreLib scopes the generated bind to the calling mod assembly, keeps the live <span class="inline-code">KeyCode</span>, and can expose it in the normal Input tab when you call <span class="inline-code">AllowKeybindRebind</span>.</p>
+      <pre><code>using CUCoreLib.Helpers;
+using UnityEngine;
+
+private void Awake()
+{
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInInputFields = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInMainMenu = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInHealthPanel = true;
+    CUCoreUtils.GetFriendlyKeyBind("R").disableInInventory = true;
+    CUCoreUtils.AllowKeybindRebind("R", "Reload gun");
+}
+
+private void Update()
+{
+    if (Input.GetKeyDown(CUCoreUtils.GetFriendlyKeyBind("R")))
+    {
+        ReloadGun();
+    }
+
+    string prompt = "Press " + CUCoreUtils.GetFriendlyKeyName("R") + " to reload";
+}</code></pre>
+      <p>The friendly-name overloads are intended for simple one-key actions. If you already have a stable namespaced settings ID and want full control over the row label/category, keep using <span class="inline-code">ModOptionDefinition.Keybind</span> directly.</p>
+    </section>
+
+    <section class="lesson-card">
       <h2>Apply callbacks</h2>
       <p>The callback receives the current value after the player changes the control or after settings are loaded. Keep it small: write your own persistent mirror if needed, update runtime state, and let vanilla settings handle the main save file.</p>
       <pre><code>ModOptionsRegistry.Register(ModOptionDefinition.Float(

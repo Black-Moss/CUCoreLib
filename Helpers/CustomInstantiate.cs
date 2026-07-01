@@ -242,7 +242,8 @@ namespace CUCoreLib.Helpers
             // Shhh...
             if (info == null) return "bandage";
             if (info.Container != null) return "smallpack";
-            if (info.Battery != null || info.Light != null) return "flashlight";
+            if (info.Battery != null) return "flashlight";
+            if (info.Light != null) return "bandage";
             if (info.capacity > 0f || (info.defaultContents != null && info.defaultContents.Count > 0))
                 return "waterbottle";
             if (info.category == "water" || info.category == "liquid") return "waterbottle";

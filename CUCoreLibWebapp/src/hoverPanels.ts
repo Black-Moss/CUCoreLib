@@ -137,6 +137,11 @@ export const hoverPanels: Record<string, HoverPanel> = {
     title: "GenerationStyle",
     body: "Controls whether CUCoreLib places the building during world generation. None disables automatic spawning, Standard uses surface raycasts, and DropPod carves terrain around a rare impact-style object."
   },
+  TileGenerationStyle: {
+    title: "TileGenerationStyle",
+    signature: "[Flags] enum TileGenerationStyle : byte",
+    body: "Byte-backed worldgen shape flags for auto-spawned tiles. Vein uses the standard ore vein walk, HeavyVeins makes denser vein passes, Singular places isolated single tiles, Stripe paints longer stripe bands, Inner biases placement toward the center of each layer, and Outskirt biases placement toward the outer edges. Combine flags with |; CUCoreLib splits SpawnAmount across the selected styles."
+  },
   HitSoundReferenceId: {
     title: "HitSoundReferenceId",
     body: "Copies a vanilla BuildingEntity hit sound from a reference prefab. Short aliases include metal -> turret, rubber -> glowplant, rustle -> geotree, and crystal -> BloodCrystal."
@@ -649,6 +654,6 @@ export const hoverPanels: Record<string, HoverPanel> = {
   },
   GetFriendlyKeyName: {
     title: "GetFriendlyKeyName",
-    body: "Returns a player-facing label for common KeyCode values. Also adds support for rebinding keys."
+    body: "Returns a player-facing key label. The string overload also resolves CUCoreLib-managed friendly keybinds that can be exposed through AllowKeybindRebind."
   }
 };

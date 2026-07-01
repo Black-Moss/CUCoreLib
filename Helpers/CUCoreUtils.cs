@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using CUCoreLib.Data;
 using CUCoreLib.Registries;
 using TMPro;
@@ -16,8 +17,69 @@ namespace CUCoreLib.Helpers
 {
     public static class CUCoreUtils
     {
+        public sealed class FriendlyKeybind
+        {
+            private readonly FriendlyKeybindEntry entry;
+
+            internal FriendlyKeybind(FriendlyKeybindEntry entry)
+            {
+                this.entry = entry;
+            }
+
+            public bool disableInInputFields
+            {
+                get => entry.DisableInInputFields;
+                set => entry.DisableInInputFields = value;
+            }
+
+            public bool disableInMainMenu
+            {
+                get => entry.DisableInMainMenu;
+                set => entry.DisableInMainMenu = value;
+            }
+
+            public bool disableInHealthPanel
+            {
+                get => entry.DisableInHealthPanel;
+                set => entry.DisableInHealthPanel = value;
+            }
+
+            public bool disableInInventory
+            {
+                get => entry.DisableInInventory;
+                set => entry.DisableInInventory = value;
+            }
+
+            public KeyCode KeyCode => ResolveKeyCode(entry);
+
+            public string KeyName => GetFriendlyKeyName(KeyCode);
+
+            public static implicit operator KeyCode(FriendlyKeybind keybind)
+            {
+                return keybind != null ? keybind.KeyCode : KeyCode.None;
+            }
+        }
+
+        internal sealed class FriendlyKeybindEntry
+        {
+            public string ActionId;
+            public string FriendlyName;
+            public KeyCode DefaultKey;
+            public KeyCode CurrentKey;
+            public string Description;
+            public bool RebindRegistered;
+            public bool DisableInInputFields;
+            public bool DisableInMainMenu;
+            public bool DisableInHealthPanel;
+            public bool DisableInInventory;
+            public FriendlyKeybind Handle;
+        }
+
         private static readonly Dictionary<string, MethodInfo> MethodCache = new Dictionary<string, MethodInfo>();
         private static readonly Dictionary<KeyCode, Sprite> KeySpriteCache = new Dictionary<KeyCode, Sprite>();
+        private static readonly Dictionary<string, FriendlyKeybindEntry> FriendlyKeybindsByActionId =
+            new Dictionary<string, FriendlyKeybindEntry>(StringComparer.Ordinal);
+
         private static Talker ElectronicTalkerProxy;
 
         // TODO allow for keybind support with FriendyKeyNames as a relay
@@ -667,6 +729,46 @@ namespace CUCoreLib.Helpers
             return FriendlyKeyNames.TryGetValue(key, out var friendly) ? friendly : key.ToString();
         }
 
+        public static string GetFriendlyKeyName(string friendlyKeybindName)
+        {
+            return GetFriendlyKeyBind(friendlyKeybindName).KeyName;
+        }
+
+        public static FriendlyKeybind GetFriendlyKeyBind(string friendlyKeybindName)
+        {
+            if (!TryGetOrCreateFriendlyKeybind(friendlyKeybindName, out var entry))
+                return null;
+
+            return entry.Handle;
+        }
+
+        public static bool AllowKeybindRebind(string friendlyKeybindName, string descriptionToShowInSettingsKeybindMenu)
+        {
+            if (!TryGetOrCreateFriendlyKeybind(friendlyKeybindName, out var entry))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(descriptionToShowInSettingsKeybindMenu))
+                entry.Description = descriptionToShowInSettingsKeybindMenu.Trim();
+
+            if (entry.RebindRegistered)
+                return true;
+
+            var label = string.IsNullOrWhiteSpace(entry.Description) ? entry.FriendlyName : entry.Description;
+            var option = ModOptionDefinition.Keybind(
+                entry.ActionId,
+                label,
+                label,
+                Setting.SettingCategory.Input,
+                entry.DefaultKey,
+                value => entry.CurrentKey = value);
+
+            if (!ModOptionsRegistry.Register(option))
+                return false;
+
+            entry.RebindRegistered = true;
+            return true;
+        }
+
         public static void SetFriendlyKeyName(KeyCode key, string displayName)
         {
             if (string.IsNullOrEmpty(displayName))
@@ -676,6 +778,225 @@ namespace CUCoreLib.Helpers
             }
 
             FriendlyKeyNames[key] = displayName;
+        }
+
+        internal static string GetFriendlyBindDisplayName(string actionId)
+        {
+            if (string.IsNullOrWhiteSpace(actionId)) return GetFriendlyKeyName(KeyCode.None);
+
+            var setting = Settings.Get<SettingKeybind>(actionId);
+            if (setting != null)
+                return GetFriendlyKeyName(setting.value);
+
+            var cachedKey = KeyBinds.GetBind(actionId);
+            if (cachedKey != KeyCode.None)
+                return GetFriendlyKeyName(cachedKey);
+
+            return FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry)
+                ? GetFriendlyKeyName(entry.CurrentKey)
+                : GetFriendlyKeyName(KeyCode.None);
+        }
+
+        internal static KeyCode GetFriendlyBindKeyCode(string actionId)
+        {
+            if (string.IsNullOrWhiteSpace(actionId)) return KeyCode.None;
+
+            return FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry)
+                ? ResolveKeyCode(entry)
+                : KeyBinds.GetBind(actionId);
+        }
+
+        private static bool TryGetOrCreateFriendlyKeybind(string friendlyKeybindName, out FriendlyKeybindEntry entry)
+        {
+            entry = null;
+            if (string.IsNullOrWhiteSpace(friendlyKeybindName)) return false;
+
+            var normalizedFriendlyName = friendlyKeybindName.Trim();
+            if (!TryParseFriendlyKeyCode(normalizedFriendlyName, out var defaultKey)) return false;
+
+            var actionId = BuildFriendlyKeybindActionId(normalizedFriendlyName);
+            if (string.IsNullOrWhiteSpace(actionId)) return false;
+
+            if (FriendlyKeybindsByActionId.TryGetValue(actionId, out entry)) return true;
+
+            entry = new FriendlyKeybindEntry
+            {
+                ActionId = actionId,
+                FriendlyName = normalizedFriendlyName,
+                DefaultKey = defaultKey,
+                CurrentKey = defaultKey
+            };
+
+            entry.Handle = new FriendlyKeybind(entry);
+
+            FriendlyKeybindsByActionId[actionId] = entry;
+            return true;
+        }
+
+        private static KeyCode ResolveKeyCode(FriendlyKeybindEntry entry)
+        {
+            if (entry == null) return KeyCode.None;
+
+            var liveSetting = Settings.Get<SettingKeybind>(entry.ActionId);
+            if (liveSetting != null)
+                entry.CurrentKey = liveSetting.value;
+            else
+            {
+                var cachedKey = KeyBinds.GetBind(entry.ActionId);
+                if (cachedKey != KeyCode.None)
+                    entry.CurrentKey = cachedKey;
+            }
+
+            if (ShouldDisableFriendlyKeybind(entry))
+                return KeyCode.None;
+
+            return entry.CurrentKey;
+        }
+
+        private static bool ShouldDisableFriendlyKeybind(FriendlyKeybindEntry entry)
+        {
+            if (entry == null) return false;
+
+            if (entry.DisableInMainMenu && IsFriendlyKeybindMainMenuBlocked())
+                return true;
+
+            if (entry.DisableInHealthPanel && IsFriendlyKeybindHealthPanelBlocked())
+                return true;
+
+            if (entry.DisableInInventory && IsFriendlyKeybindInventoryBlocked())
+                return true;
+
+            return entry.DisableInInputFields && IsFriendlyKeybindInputFieldBlocked();
+        }
+
+        private static bool IsFriendlyKeybindMainMenuBlocked()
+        {
+            return PreRunScript.instance != null && WorldGeneration.world == null;
+        }
+
+        private static bool IsFriendlyKeybindHealthPanelBlocked()
+        {
+            return PlayerCamera.main != null &&
+                   PlayerCamera.main.woundView != null &&
+                   PlayerCamera.main.woundView.activeSelf;
+        }
+
+        private static bool IsFriendlyKeybindInventoryBlocked()
+        {
+            return PlayerCamera.main != null &&
+                   PlayerCamera.main.craftingPanel != null &&
+                   PlayerCamera.main.craftingPanel.activeSelf;
+        }
+
+        private static bool IsFriendlyKeybindInputFieldBlocked()
+        {
+            if (ConsoleScript.instance != null &&
+                ConsoleScript.instance.input != null &&
+                ConsoleScript.instance.input.isFocused)
+                return true;
+
+            if (PlayerCamera.main != null &&
+                PlayerCamera.main.recipeFilterField != null &&
+                PlayerCamera.main.recipeFilterField.isFocused)
+                return true;
+
+            if (IsKrokMpChatFocused())
+                return true;
+
+            return Resources.FindObjectsOfTypeAll<TMP_InputField>()
+                .Any(field => field != null && field.isFocused);
+        }
+
+        private static bool IsKrokMpChatFocused()
+        {
+            var chatType = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(assembly =>
+                {
+                    try
+                    {
+                        return assembly.GetTypes();
+                    }
+                    catch (ReflectionTypeLoadException ex)
+                    {
+                        return ex.Types.Where(type => type != null);
+                    }
+                })
+                .FirstOrDefault(type => type != null &&
+                                        string.Equals(type.Name, "Chat", StringComparison.Ordinal) &&
+                                        string.Equals(type.Namespace, "KrokoshaCasualtiesMP", StringComparison.Ordinal));
+
+            if (chatType == null) return false;
+
+            var focusedField = chatType.GetField("CHAT_textbox_input_focused",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            if (focusedField == null || focusedField.FieldType != typeof(bool)) return false;
+
+            return (bool)focusedField.GetValue(null);
+        }
+
+        private static string BuildFriendlyKeybindActionId(string friendlyKeybindName)
+        {
+            var sourceAssembly = ContentReload.ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetCallingAssembly();
+            var assemblyName = sourceAssembly?.GetName().Name;
+            var normalizedAssembly = NormalizeFriendlyKeybindToken(assemblyName);
+            var normalizedKeybind = NormalizeFriendlyKeybindToken(friendlyKeybindName);
+            if (string.IsNullOrWhiteSpace(normalizedAssembly) || string.IsNullOrWhiteSpace(normalizedKeybind))
+                return null;
+
+            return normalizedAssembly + ".keybind." + normalizedKeybind;
+        }
+
+        private static string NormalizeFriendlyKeybindToken(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+
+            var builder = new StringBuilder(value.Length);
+            var lastWasSeparator = false;
+            foreach (var c in value.Trim().ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    builder.Append(c);
+                    lastWasSeparator = false;
+                    continue;
+                }
+
+                if (lastWasSeparator) continue;
+
+                builder.Append('-');
+                lastWasSeparator = true;
+            }
+
+            return builder.ToString().Trim('-');
+        }
+
+        private static bool TryParseFriendlyKeyCode(string rawValue, out KeyCode keyCode)
+        {
+            keyCode = KeyCode.None;
+            if (string.IsNullOrWhiteSpace(rawValue)) return false;
+
+            var trimmed = rawValue.Trim();
+
+            if (trimmed.Length == 1)
+            {
+                var single = trimmed[0];
+                if (single >= 'A' && single <= 'Z')
+                    return Enum.TryParse(single.ToString(), out keyCode);
+                if (single >= 'a' && single <= 'z')
+                    return Enum.TryParse(char.ToUpperInvariant(single).ToString(), out keyCode);
+                if (single >= '0' && single <= '9')
+                    return Enum.TryParse("Alpha" + single, out keyCode);
+            }
+
+            if (FriendlyKeyNames.FirstOrDefault(pair =>
+                    string.Equals(pair.Value, trimmed, StringComparison.OrdinalIgnoreCase)).Key is var friendlyMatch &&
+                friendlyMatch != KeyCode.None)
+            {
+                keyCode = friendlyMatch;
+                return true;
+            }
+
+            return Enum.TryParse(trimmed, true, out keyCode);
         }
 
         public static Sprite LoadEmbeddedSprite(string resourcePath, float pixelsPerUnit = AssetLoader.PPU_UI,

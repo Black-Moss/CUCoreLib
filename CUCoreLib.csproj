@@ -4,7 +4,7 @@
     <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')"/>
     <Import Project="CUCoreLib.Local.props" Condition="Exists('CUCoreLib.Local.props')"/>
     <PropertyGroup>
-        <NoWarn>$(NoWarn);MSB3277</NoWarn>
+        <NoWarn>$(NoWarn);MSB3277;1591</NoWarn>
         <BaseGamePath Condition="'$(BaseGamePath)' == '' and '$(CUCORELIB_BASE_GAME_PATH)' != ''">$(CUCORELIB_BASE_GAME_PATH)</BaseGamePath>
         <BaseGamePath Condition="'$(BaseGamePath)' == '' and Exists('C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Playtest\CasualtiesUnknown_Data\Managed\Assembly-CSharp.dll')">C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Playtest</BaseGamePath>
         <BaseGamePath Condition="'$(BaseGamePath)' == '' and Exists('C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Demo\CasualtiesUnknown_Data\Managed\Assembly-CSharp.dll')">C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Demo</BaseGamePath>
@@ -24,6 +24,7 @@
         <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
         <Deterministic>true</Deterministic>
+        <DocumentationFile>bin\$(Configuration)\CUCoreLib.xml</DocumentationFile>
         <NuGetPackageImportStamp>
         </NuGetPackageImportStamp>
     </PropertyGroup>
@@ -298,6 +299,13 @@
     <Target Name="CopyOutputDllsToPlaytestPluginsFolder" AfterTargets="AfterBuild" Condition="'$(BepInExDir)' != ''">
         <MakeDir Directories="$(BepInExDir)\plugins"/>
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BepInExDir)\plugins"/>
+    </Target>
+
+    <Target Name="CompileOnly">
+        <MSBuild
+            Projects="$(MSBuildProjectFullPath)"
+            Targets="Compile"
+            Properties="Configuration=$(Configuration);Platform=$(Platform);BepInExDir=$(BepInExDir);DisableFody=true"/>
     </Target>
 
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
