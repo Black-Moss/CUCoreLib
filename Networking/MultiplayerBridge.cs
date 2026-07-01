@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using System.Text;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
+using CUCoreLib.Util;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -267,7 +268,7 @@ namespace CUCoreLib.Networking
                 if (writer == null) return false;
 
                 var json = JsonConvert.SerializeObject(envelope, Formatting.None);
-                var encoded = Convert.ToBase64String(CUCoreUtils.CompressGZip(Encoding.UTF8.GetBytes(json)));
+                var encoded = Convert.ToBase64String(CompressionUtils.CompressGZip(Encoding.UTF8.GetBytes(json)));
 
                 if (_writerPutStringMethod != null)
                 {
@@ -302,7 +303,7 @@ namespace CUCoreLib.Networking
                 if (string.IsNullOrWhiteSpace(encoded)) return false;
 
                 var compressed = Convert.FromBase64String(encoded);
-                var decompressed = CUCoreUtils.DecompressGZip(compressed);
+                var decompressed = CompressionUtils.DecompressGZip(compressed);
                 if (decompressed == null) return false;
 
                 var json = Encoding.UTF8.GetString(decompressed);
@@ -395,7 +396,7 @@ namespace CUCoreLib.Networking
             if (_retryScheduled || !IsKrokMpExpected()) return;
 
             _retryScheduled = true;
-            CUCoreUtils.CallWhen(TryResolveRuntime, BootstrapIfPossible, 1f);
+            CoroutineUtils.CallWhen(TryResolveRuntime, BootstrapIfPossible, 1f);
         }
 
         private static void BootstrapIfPossible()

@@ -1,5 +1,6 @@
 using System.Collections;
 using CUCoreLib.Helpers;
+using CUCoreLib.Util;
 using UnityEngine;
 
 namespace CUCoreLib.ContentReload
@@ -13,7 +14,7 @@ namespace CUCoreLib.ContentReload
             if (started) return;
 
             started = true;
-            CUCoreUtils.StartCoroutine(WatchLoop());
+            CoroutineUtils.StartCoroutine(WatchLoop());
         }
 
         private static IEnumerator WatchLoop()

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using CUCoreLib.Helpers;
+using CUCoreLib.Util;
 using Newtonsoft.Json.Linq;
 
 namespace CUCoreLib.Saving
@@ -74,7 +75,7 @@ namespace CUCoreLib.Saving
             var actions = new List<Action>(_deferredActions);
             _deferredActions.Clear();
 
-            CUCoreUtils.StartCoroutine(RunDeferred(actions));
+            CoroutineUtils.StartCoroutine(RunDeferred(actions));
         }
 
         private static IEnumerator RunDeferred(List<Action> actions)

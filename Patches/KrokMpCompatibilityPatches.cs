@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
+using CUCoreLib.Util;
 using HarmonyLib;
 using MonoMod.RuntimeDetour;
 using UnityEngine;
@@ -339,7 +340,7 @@ namespace CUCoreLib.Patches
             if (_retryScheduled || !IsKrokMpExpected()) return;
 
             _retryScheduled = true;
-            CUCoreUtils.DelayCall(1f, () =>
+            CoroutineUtils.DelayCall(1f, () =>
             {
                 _retryScheduled = false;
                 if (_installed) return;

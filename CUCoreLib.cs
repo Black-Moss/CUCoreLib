@@ -9,6 +9,7 @@ using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
 using CUCoreLib.Patches;
 using CUCoreLib.Registries;
+using CUCoreLib.Util;
 using HarmonyLib;
 
 namespace CUCoreLib
@@ -66,7 +67,7 @@ namespace CUCoreLib
                     var writtenPath = LocaleRegistry.WriteLocaleFile(path);
                     var message = $"created locale at {writtenPath}";
                     Log.LogInfo(message);
-                    CUCoreUtils.ConsoleLog(ConsoleScript.instance, message);
+                    ConsoleUtils.LogToConsole(ConsoleScript.instance, message);
                 }, null, ("path", "Optional output path. Defaults to BepInEx/config/CUCoreLib/Locales/EN.json."));
 
             ConsoleCommandRegistry.Register("modlist",
@@ -91,8 +92,8 @@ namespace CUCoreLib
                     var console = ConsoleScript.instance;
                     if (console == null) return;
                     {
-                        CUCoreUtils.ConsoleLog(console, summary);
-                        foreach (var line in loadedPlugins) CUCoreUtils.ConsoleLog(console, line);
+                        ConsoleUtils.LogToConsole(console, summary);
+                        foreach (var line in loadedPlugins) ConsoleUtils.LogToConsole(console, line);
                     }
                 });
 
@@ -122,7 +123,7 @@ namespace CUCoreLib
                     var success = ContentReloadManager.ConfigureAutoHotRefresh(dllPath, enabled, out var message);
                     if (!success) throw new Exception(message);
 
-                    CUCoreUtils.ConsoleLog(ConsoleScript.instance, message);
+                    ConsoleUtils.LogToConsole(ConsoleScript.instance, message);
                 }, null,
                 ("pathToDllFile", "Path to the rebuilt DLL that should be watched."),
                 ("enable", "true to enable watch mode for that DLL, false to disable it."));

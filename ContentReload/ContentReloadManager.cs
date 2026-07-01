@@ -5,6 +5,7 @@ using System.Linq;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
+using CUCoreLib.Util;
 using Mono.Cecil;
 using UnityEngine;
 
@@ -171,7 +172,7 @@ namespace CUCoreLib.ContentReload
             if (result != null && result.Succeeded)
             {
                 var reloadLabel = GetReloadedFileName(result.SourcePath);
-                if (console != null) CUCoreUtils.ConsoleLog(console, "Reloaded " + reloadLabel + "!");
+                if (console != null) ConsoleUtils.LogToConsole(console, "Reloaded " + reloadLabel + "!");
 
                 return;
             }
@@ -198,8 +199,8 @@ namespace CUCoreLib.ContentReload
                 var normalizedModGuid = (modGuid ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(normalizedModGuid)) continue;
 
-                var persistedPath = CUCoreUtils.GetString(GetAutoHotReloadPathKey(normalizedModGuid), string.Empty);
-                var watchEnabled = CUCoreUtils.GetBool(GetAutoHotReloadEnabledKey(normalizedModGuid));
+                var persistedPath = PlayerPrefsUtils.GetString(GetAutoHotReloadPathKey(normalizedModGuid), string.Empty);
+                var watchEnabled = PlayerPrefsUtils.GetBool(GetAutoHotReloadEnabledKey(normalizedModGuid));
                 if (string.IsNullOrWhiteSpace(persistedPath) && !watchEnabled) continue;
 
                 if (config.Mods == null)
@@ -221,8 +222,8 @@ namespace CUCoreLib.ContentReload
             var normalizedModGuid = (modGuid ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(normalizedModGuid)) return;
 
-            CUCoreUtils.SetString(GetAutoHotReloadPathKey(normalizedModGuid), dllPath ?? string.Empty);
-            CUCoreUtils.SetBool(GetAutoHotReloadEnabledKey(normalizedModGuid), enabled);
+            PlayerPrefsUtils.SetString(GetAutoHotReloadPathKey(normalizedModGuid), dllPath ?? string.Empty);
+            PlayerPrefsUtils.SetBool(GetAutoHotReloadEnabledKey(normalizedModGuid), enabled);
             PlayerPrefs.Save();
         }
 
@@ -349,7 +350,7 @@ namespace CUCoreLib.ContentReload
                 if (string.IsNullOrWhiteSpace(message)) continue;
 
                 // CUCoreLibPlugin.Log?.LogInfo(message);
-                if (console != null) CUCoreUtils.ConsoleLog(console, message);
+                if (console != null) ConsoleUtils.LogToConsole(console, message);
             }
         }
     }

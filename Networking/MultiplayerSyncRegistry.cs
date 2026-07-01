@@ -4,6 +4,7 @@ using CUCoreLib.ContentReload;
 using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
 using CUCoreLib.Saving;
+using CUCoreLib.Util;
 using Newtonsoft.Json.Linq;
 
 namespace CUCoreLib.Networking
@@ -102,8 +103,8 @@ namespace CUCoreLib.Networking
             if (_retryScheduled || _cachedSnapshot == null) return;
 
             _retryScheduled = true;
-            CUCoreUtils.CallWhen(
-                () => MultiplayerBridge.IsAvailable && CUCoreUtils.IsInWorld(),
+            CoroutineUtils.CallWhen(
+                () => MultiplayerBridge.IsAvailable && CheckUtils.IsInWorld(),
                 ReplayCachedSnapshot,
                 1f);
         }
@@ -114,7 +115,7 @@ namespace CUCoreLib.Networking
             if (_cachedSnapshot == null) return;
 
             ApplySnapshotInternal(_cachedSnapshot);
-            if (!CUCoreUtils.IsInWorld())
+            if (!CheckUtils.IsInWorld())
             {
                 ScheduleReplayIfNeeded();
                 return;
@@ -154,7 +155,7 @@ namespace CUCoreLib.Networking
             if (_initialSnapshotScheduled) return;
 
             _initialSnapshotScheduled = true;
-            CUCoreUtils.CallWhen(
+            CoroutineUtils.CallWhen(
                 () => MultiplayerBridge.IsAvailable && MultiplayerBridge.IsClient,
                 RequestInitialSnapshot,
                 1f);
@@ -189,7 +190,7 @@ namespace CUCoreLib.Networking
             if (_hostSnapshotBroadcastQueued) return;
 
             _hostSnapshotBroadcastQueued = true;
-            CUCoreUtils.CallWhen(
+            CoroutineUtils.CallWhen(
                 () => MultiplayerBridge.IsAvailable && MultiplayerBridge.IsServer,
                 () =>
                 {

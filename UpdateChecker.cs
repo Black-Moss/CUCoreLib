@@ -3,6 +3,7 @@ using System.Collections;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using CUCoreLib.Helpers;
+using CUCoreLib.Util;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -134,7 +135,7 @@ namespace CUCoreLib
                 var consoleMessage = warning
                     ? "<color=#FFA500>" + message + "</color>"
                     : message;
-                CUCoreUtils.ConsoleLog(console, consoleMessage);
+                ConsoleUtils.LogToConsole(console, consoleMessage);
             }
         }
     }

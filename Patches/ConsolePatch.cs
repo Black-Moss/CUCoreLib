@@ -4,6 +4,7 @@ using System.Linq;
 using CUCoreLib.ContentReload;
 using CUCoreLib.Helpers;
 using CUCoreLib.Registries;
+using CUCoreLib.Util;
 using HarmonyLib;
 using UnityEngine;
 
@@ -67,7 +68,7 @@ namespace CUCoreLib.Patches
                 "Places a CUCoreLib-registered tile at the chosen block position.",
                 delegate(string[] args)
                 {
-                    CUCoreUtils.ConsoleCheckForWorld(__instance);
+                    CheckUtils.IsInWorld();
 
                     if (args.Length < 2) throw new Exception("Usage: settile [tileIndex] [position]");
                     if (!ushort.TryParse(args[1], out var tileIndex))
@@ -84,7 +85,7 @@ namespace CUCoreLib.Patches
                     if (!TileRegistry.SetBlock(WorldGeneration.world, blockPosition, tileIndex))
                         throw new Exception($"Failed to place tile '{tileIndex}' at block {blockPosition}.");
 
-                    CUCoreUtils.ConsoleLog(__instance,
+                    ConsoleUtils.LogToConsole(__instance,
                         $"Placed tile {tileIndex} ({definition.ID}) at {blockPosition.x},{blockPosition.y}.");
                 }, BuildSetTileAutofill(), ("tileIndex", "Registered custom tile index."),
                 ("position", "Tile position.")));
