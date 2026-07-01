@@ -12,9 +12,9 @@ namespace CUCoreLib.Registries;
 public static class ModOptionsRegistry
 {
     private const int CustomCategoryBaseIndex = 100;
-    internal static readonly List<ModOptionDefinition> RegisteredOptions = new() { };
+    internal static readonly List<ModOptionDefinition> RegisteredOptions = [];
     private static readonly HashSet<string> RegisteredIds = new(StringComparer.Ordinal);
-    private static readonly List<ModOptionCategoryEntry> CustomCategories = new();
+    private static readonly List<ModOptionCategoryEntry> CustomCategories = [];
 
     private static readonly Dictionary<string, ModOptionCategoryEntry> CustomCategoriesByKey =
         new(StringComparer.Ordinal);
@@ -45,6 +45,110 @@ public static class ModOptionsRegistry
         return true;
     }
 
+    private static string CategoryString(Setting.SettingCategory category) => category.ToString().ToLowerInvariant();
+
+    private static string MakeId(string space, Setting.SettingCategory category, string key) =>
+        $"{space}.{CategoryString(category)}.{key}";
+
+    private static string MakeId(string space, string customCategory, string key) =>
+        $"{space}.{customCategory.ToLowerInvariant()}.{key}";
+
+    private static string LabelText(string space, Setting.SettingCategory category, string key) =>
+        MakeId(space, category, key);
+
+    private static string LabelText(string space, string customCategory, string key) => MakeId(space, customCategory, key);
+
+    private static string DescriptionText(string space, Setting.SettingCategory category, string key) =>
+        $"{MakeId(space, category, key)}dsc";
+
+    private static string DescriptionText(string space, string customCategory, string key) =>
+        $"{MakeId(space, customCategory, key)}dsc";
+
+    public static bool RegisterFloat(string ns, string key, Setting.SettingCategory category,
+        float defaultValue, float min, float max, Action<float> apply = null, Func<float, string> formatValue = null)
+    {
+        return Register(ModOptionDefinition.Float(
+            MakeId(ns, category, key), LabelText(ns, category, key), DescriptionText(ns, category, key),
+            category, defaultValue, min, max, apply, formatValue));
+    }
+
+    public static bool RegisterInt(string ns, string key, Setting.SettingCategory category,
+        int defaultValue, int min, int max, Action<int> apply = null)
+    {
+        return Register(ModOptionDefinition.Int(
+            MakeId(ns, category, key), LabelText(ns, category, key), DescriptionText(ns, category, key),
+            category, defaultValue, min, max, apply));
+    }
+
+    public static bool RegisterBool(string ns, string key, Setting.SettingCategory category,
+        bool defaultValue, Action<bool> apply = null)
+    {
+        return Register(ModOptionDefinition.Bool(
+            MakeId(ns, category, key), LabelText(ns, category, key), DescriptionText(ns, category, key),
+            category, defaultValue, apply));
+    }
+
+    public static bool RegisterDropdown(string ns, string key, Setting.SettingCategory category,
+        int defaultValue, ModDropdownChoice[] choices, Action<int> apply = null)
+    {
+        return Register(ModOptionDefinition.Dropdown(
+            MakeId(ns, category, key), LabelText(ns, category, key), DescriptionText(ns, category, key),
+            category, defaultValue, choices, apply));
+    }
+
+    public static bool RegisterKeybind(string ns, string key, Setting.SettingCategory category,
+        KeyCode defaultValue, Action<KeyCode> apply = null)
+    {
+        return Register(ModOptionDefinition.Keybind(
+            MakeId(ns, category, key), LabelText(ns, category, key), DescriptionText(ns, category, key),
+            category, defaultValue, apply));
+    }
+
+    public static bool RegisterFloat(string ns, string key, string customCategory,
+        float defaultValue, float min, float max, Action<float> apply = null, Func<float, string> formatValue = null)
+    {
+        return Register(ModOptionDefinition.Float(
+            MakeId(ns, customCategory, key), LabelText(ns, customCategory, key),
+            DescriptionText(ns, customCategory, key),
+            customCategory, defaultValue, min, max, apply, formatValue));
+    }
+
+    public static bool RegisterInt(string ns, string key, string customCategory,
+        int defaultValue, int min, int max, Action<int> apply = null)
+    {
+        return Register(ModOptionDefinition.Int(
+            MakeId(ns, customCategory, key), LabelText(ns, customCategory, key),
+            DescriptionText(ns, customCategory, key),
+            customCategory, defaultValue, min, max, apply));
+    }
+
+    public static bool RegisterBool(string ns, string key, string customCategory,
+        bool defaultValue, Action<bool> apply = null)
+    {
+        return Register(ModOptionDefinition.Bool(
+            MakeId(ns, customCategory, key), LabelText(ns, customCategory, key),
+            DescriptionText(ns, customCategory, key),
+            customCategory, defaultValue, apply));
+    }
+
+    public static bool RegisterDropdown(string ns, string key, string customCategory,
+        int defaultValue, ModDropdownChoice[] choices, Action<int> apply = null)
+    {
+        return Register(ModOptionDefinition.Dropdown(
+            MakeId(ns, customCategory, key), LabelText(ns, customCategory, key),
+            DescriptionText(ns, customCategory, key),
+            customCategory, defaultValue, choices, apply));
+    }
+
+    public static bool RegisterKeybind(string ns, string key, string customCategory,
+        KeyCode defaultValue, Action<KeyCode> apply = null)
+    {
+        return Register(ModOptionDefinition.Keybind(
+            MakeId(ns, customCategory, key), LabelText(ns, customCategory, key),
+            DescriptionText(ns, customCategory, key),
+            customCategory, defaultValue, apply));
+    }
+    
     internal static void AppendRegisteredOptions(List<Setting> settings)
     {
         if (settings == null) return;
@@ -77,8 +181,6 @@ public static class ModOptionsRegistry
         if (!string.IsNullOrWhiteSpace(option.Description))
             LocaleRegistry.Register(LocaleRegistry.LocaleCategory.Option, option.Id + "dsc",
                 option.Description);
-        // todo I really need to figure this out
-        // man this is kinda ass ngl
         if (option.Kind != ModOptionKind.Dropdown || option.Choices == null) return;
 
         foreach (var choice in option.Choices)

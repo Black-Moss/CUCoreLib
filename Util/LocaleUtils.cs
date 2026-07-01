@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 
 namespace CUCoreLib.Util;
 
-public class LocaleUtils
+public static class LocaleUtils
 {
     public static bool HasKey(string category, string key)
     {

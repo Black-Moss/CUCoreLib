@@ -86,7 +86,7 @@ internal static class ConsolePatch
                 if (!TileRegistry.SetBlock(WorldGeneration.world, blockPosition, tileIndex))
                     throw new Exception($"Failed to place tile '{tileIndex}' at block {blockPosition}.");
 
-                ConsoleUtils.LogToConsole(__instance,
+                ConsoleUtils.LogToConsole(
                     $"Placed tile {tileIndex} ({definition.ID}) at {blockPosition.x},{blockPosition.y}.");
             }, BuildSetTileAutofill(), ("tileIndex", "Registered custom tile index."),
             ("position", "Tile position.")));

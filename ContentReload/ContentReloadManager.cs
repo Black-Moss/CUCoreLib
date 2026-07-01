@@ -170,12 +170,12 @@ public static class ContentReloadManager
         if (result is { Succeeded: true })
         {
             var reloadLabel = GetReloadedFileName(result.SourcePath);
-            if (console != null) ConsoleUtils.LogToConsole(console, "Reloaded " + reloadLabel + "!");
+            if (console != null) ConsoleUtils.LogToConsole("Reloaded " + reloadLabel + "!");
 
             return;
         }
 
-        WriteMessages(console, result != null ? result.Errors.ToArray() : Array.Empty<string>());
+        WriteMessages(console, result != null ? result.Errors.ToArray() : []);
         if (result != null && !string.IsNullOrWhiteSpace(result.UnsupportedReason))
             WriteMessages(console, [result.UnsupportedReason]);
     }
@@ -348,7 +348,7 @@ public static class ContentReloadManager
             if (string.IsNullOrWhiteSpace(message)) continue;
 
             // CUCoreLibPlugin.Log?.LogInfo(message);
-            if (console != null) ConsoleUtils.LogToConsole(console, message);
+            if (console != null) ConsoleUtils.LogToConsole(message);
         }
     }
 }

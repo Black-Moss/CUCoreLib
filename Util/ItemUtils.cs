@@ -56,7 +56,7 @@ public static class ItemUtils
 
     public static void ToggleFavourited(Item item)
     {
-        if (item.favourited) SetFavourited(item, !item.favourited);
+        if (item != null) SetFavourited(item, !item.favourited);
     }
 
     public static bool TryGetCustomItemInfo(string id, out CustomItemInfo info)

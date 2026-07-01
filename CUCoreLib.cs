@@ -67,7 +67,7 @@ public class CUCoreLibPlugin : BaseUnityPlugin
                 var writtenPath = LocaleRegistry.WriteLocaleFile(path);
                 var message = $"created locale at {writtenPath}";
                 Log.LogInfo(message);
-                ConsoleUtils.LogToConsole(ConsoleScript.instance, message);
+                ConsoleUtils.LogToConsole(message);
             }, null, ("path", "Optional output path. Defaults to BepInEx/config/CUCoreLib/Locales/EN.json."));
 
         ConsoleCommandRegistry.Register("modlist",
@@ -92,8 +92,8 @@ public class CUCoreLibPlugin : BaseUnityPlugin
                 var console = ConsoleScript.instance;
                 if (console == null) return;
                 {
-                    ConsoleUtils.LogToConsole(console, summary);
-                    foreach (var line in loadedPlugins) ConsoleUtils.LogToConsole(console, line);
+                    ConsoleUtils.LogToConsole(summary);
+                    foreach (var line in loadedPlugins) ConsoleUtils.LogToConsole(line);
                 }
             });
 
@@ -123,7 +123,7 @@ public class CUCoreLibPlugin : BaseUnityPlugin
                 var success = ContentReloadManager.ConfigureAutoHotRefresh(dllPath, enabled, out var message);
                 if (!success) throw new Exception(message);
 
-                ConsoleUtils.LogToConsole(ConsoleScript.instance, message);
+                ConsoleUtils.LogToConsole(message);
             }, null,
             ("pathToDllFile", "Path to the rebuilt DLL that should be watched."),
             ("enable", "true to enable watch mode for that DLL, false to disable it."));

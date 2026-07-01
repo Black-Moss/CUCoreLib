@@ -2,7 +2,7 @@
 
 namespace CUCoreLib.Util;
 
-public class TextUtils
+public static class TextUtils
 {
     public static string Color(string text, string color)
     {

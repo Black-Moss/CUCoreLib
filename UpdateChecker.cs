@@ -129,6 +129,6 @@ public class UpdateChecker : MonoBehaviour
         var consoleMessage = warning
             ? "<color=#FFA500>" + message + "</color>"
             : message;
-        ConsoleUtils.LogToConsole(_cachedConsole, consoleMessage);
+        ConsoleUtils.LogToConsole(consoleMessage);
     }
 }

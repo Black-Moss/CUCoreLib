@@ -205,10 +205,21 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="Util\AssetUtils.cs"/>
+        <Compile Include="Util\AwaitUtils.cs"/>
         <Compile Include="Util\CheckUtils.cs"/>
+        <Compile Include="Util\CompressionUtils.cs"/>
         <Compile Include="Util\ConsoleUtils.cs"/>
+        <Compile Include="Util\CoroutineUtils.cs"/>
+        <Compile Include="Util\ItemUtils.cs"/>
+        <Compile Include="Util\KeyUtils.cs"/>
         <Compile Include="Util\LocaleUtils.cs"/>
+        <Compile Include="Util\MathExtensions.cs"/>
+        <Compile Include="Util\PlayerPrefsUtils.cs"/>
+        <Compile Include="Util\PlayerUtils.cs"/>
+        <Compile Include="Util\ReflectionUtils.cs"/>
         <Compile Include="Util\TextUtils.cs"/>
+        <Compile Include="Util\WorldUtils.cs"/>
         <Compile Include="Data\CustomBuildingEntityDefinition.cs"/>
         <Compile Include="Data\ContentReloadEntryAttribute.cs"/>
         <Compile Include="Data\CustomItemInfo.cs"/>
@@ -287,16 +298,6 @@
         <Compile Include="UpdateChecker.cs"/>
         <Compile Include="Properties\AssemblyInfo.cs"/>
         <Compile Include="Helpers\FileLoader.cs"/>
-        <Compile Include="Util\AssetUtils.cs"/>
-        <Compile Include="Util\CompressionUtils.cs"/>
-        <Compile Include="Util\CoroutineUtils.cs"/>
-        <Compile Include="Util\ItemUtils.cs"/>
-        <Compile Include="Util\KeyUtils.cs"/>
-        <Compile Include="Util\MathExtensions.cs"/>
-        <Compile Include="Util\PlayerPrefsUtils.cs"/>
-        <Compile Include="Util\PlayerUtils.cs"/>
-        <Compile Include="Util\ReflectionUtils.cs"/>
-        <Compile Include="Util\AwaitUtils.cs"/>
     </ItemGroup>
     <ItemGroup>
         <None Include="Helpers\app.config"/>
