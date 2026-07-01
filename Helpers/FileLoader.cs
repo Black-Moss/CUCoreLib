@@ -102,43 +102,23 @@ namespace CUCoreLib.Helpers
             int heightMultiplier)
         {
             var asm = ResolveSourceAssembly();
-            var newFilename = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(filename));
-            if (newFilename == null)
-            {
-                Logger?.LogWarning($"Image by the name of {filename} does not exist. Check capitalization and file extension");
-                return null;
-            }
+            if (asm == null) return null;
 
-            // to read file data from manifest resource
-            var stream = asm.GetManifestResourceStream(newFilename);
-            var fileData = new byte[stream.Length]; // maybe null
-            stream.Read(fileData, 0, fileData.Length);
+            if (filterMode == FilterMode.Point && widthMultiplier <= 1 && heightMultiplier <= 1)
+                return AssetLoader.LoadEmbeddedSprite(filename, ppu, asm);
 
-            var texture = new Texture2D(2, 2, TextureFormat.RGBAHalf, false)
-            {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = filterMode,
-                name = newFilename
-            };
-            texture.LoadImage(fileData);
-            texture.Apply();
-            if (widthMultiplier > 1 || heightMultiplier > 1)
-                texture = ModifyTextures.ResizeTexture(texture, widthMultiplier, heightMultiplier);
+            var sprite = AssetLoader.CreateSpriteFromEmbeddedTexture(filename, asm, ppu, filterMode, widthMultiplier,
+                heightMultiplier);
+            if (sprite != null) return sprite;
 
-            var sprite = Sprite.Create(
-                texture,
-                new Rect(0, 0, texture.width, texture.height),
-                new Vector2(0.5f, 0.5f),
-                ppu
-            );
-            sprite.name = newFilename;
-
-            return sprite;
+            Logger?.LogWarning(
+                $"Image by the name of {filename} does not exist. Check capitalization and file extension");
+            return null;
         }
 
         private static Assembly ResolveSourceAssembly()
         {
-            return ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetExecutingAssembly();
+            return ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetCallingAssembly();
         }
 
         private static string ResolvePluginDirectory()

@@ -1378,7 +1378,43 @@ namespace CUCoreLib.Registries
         private static Dictionary<int, char> BuildGlobalBlockReverseMap()
         {
             var reverse = new Dictionary<int, char>();
-            foreach (var entry in GlobalBlockMap) reverse[entry.Value] = entry.Key;
+            reverse[-1] = ' ';
+            reverse[0] = '.';
+            reverse[1] = 'R';
+            reverse[2] = 'g';
+            reverse[3] = 'S';
+            reverse[4] = 'T';
+            reverse[5] = '#';
+            reverse[6] = 'M';
+            reverse[7] = 'G';
+            reverse[8] = 'r';
+            reverse[9] = 'P';
+            reverse[10] = 'H';
+            reverse[11] = 'W';
+            reverse[12] = 's';
+            reverse[13] = 'd';
+            reverse[14] = 'I';
+            reverse[15] = 'c';
+            reverse[16] = 'o';
+            reverse[17] = 'n';
+            reverse[18] = 'm';
+            reverse[19] = 'l';
+            reverse[20] = 'B';
+            reverse[21] = 'X';
+            reverse[22] = 'x';
+            reverse[23] = 'v';
+            reverse[24] = 'L';
+            reverse[25] = 'e';
+            reverse[26] = 'w';
+            reverse[27] = '=';
+            reverse[28] = '-';
+            reverse[29] = 'p';
+            reverse[30] = 'h';
+            reverse[31] = 'f';
+            reverse[32] = 'b';
+            reverse[33] = '^';
+            reverse[34] = 'C';
+            reverse[35] = 'i';
             return reverse;
         }
 

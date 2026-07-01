@@ -10,6 +10,7 @@ namespace CUCoreLib.Patches
         [HarmonyPostfix]
         private static void PreRunScript_Start_Postfix(PreRunScript __instance)
         {
+            AssetLoader.BeginMainMenuEmbeddedSpritePreload();
             LaunchOverrideManager.TryConsumeMenuLaunchOverride(__instance);
         }
 

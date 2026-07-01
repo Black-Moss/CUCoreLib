@@ -2751,6 +2751,7 @@ function assetPage(): string {
       <h2>Embedded assets</h2>
       <p>Use embedded assets for core art, default sounds, and data that should always ship with your mod. In Visual Studio, add the file to your project and set its Build Action to <span class="inline-code">Embedded Resource</span>.</p>
       <p>Tip: keep assets in folders such as <span class="inline-code">Images</span>, <span class="inline-code">Audio</span>, or <span class="inline-code">Data</span> so the manifest names stay predictable.</p>
+      <p>Embedded images are now auto-warmed in memory while the main menu is open, so most first-use sprite loads after that reuse the already decoded texture data. If a sprite is requested before warmup finishes, CUCoreLib still falls back to the normal synchronous load path.</p>
       <ul>
         <li>To embed a file, add it to your project and open its properties.</li>
         <li>Set the build action to <span class="inline-code">Embedded Resource</span>.</li>
@@ -2776,6 +2777,7 @@ Sprite icon = AssetLoader.LoadEmbeddedSprite("MyMod.Images.sunpear.png");
     <section class="lesson-card">
       <h2>Loose files</h2>
       <p>Use loose files when the asset should be user-editable, optional, or replaceable without recompiling the mod. For paths relative to your plugin DLL, use <span class="inline-code">LoadSpriteFromPluginFolder()</span>.</p>
+      <p>Main-menu warmup only covers embedded image resources in v1. Loose plugin-folder images still load on demand when you first request them.</p>
       <p>Both embedded and loose sprites are converted to Unity sprites with point filtering and clamp wrapping, which is friendly for pixel-art item sprites.</p>
       <pre><code>Sprite icon = AssetLoader.LoadSpriteFromPluginFolder(this, "Images/sunpear.png");</code></pre>
       <p>In this example, the file would be located at <span class="inline-code">BepInEx/plugins/MyMod/Images/sunpear.png</span>.</p>

@@ -1,9 +1,11 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using CUCoreLib.ContentReload;
 using CUCoreLib.Data;
@@ -17,9 +19,15 @@ namespace CUCoreLib.Helpers
     {
         public const float PPU_WORLD = 8f;
         public const float PPU_UI = 100f;
+        private const float EmbeddedSpritePreloadFrameBudgetSeconds = 0.004f;
+
         private static ManualLogSource Logger;
-        internal static Dictionary<string, Sprite> SpriteCache = new Dictionary<string, Sprite>();
-        internal static Dictionary<string, AudioClip> AudioClipCache = new Dictionary<string, AudioClip>();
+
+        internal static Dictionary<string, Sprite> SpriteCache =
+            new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+
+        internal static Dictionary<string, AudioClip> AudioClipCache =
+            new Dictionary<string, AudioClip>(StringComparer.OrdinalIgnoreCase);
 
         internal static Dictionary<string, RegisteredSpriteAnimation> SpriteAnimationCache =
             new Dictionary<string, RegisteredSpriteAnimation>(StringComparer.OrdinalIgnoreCase);
@@ -27,7 +35,18 @@ namespace CUCoreLib.Helpers
         private static readonly Dictionary<string, string[]> ResourceNameCache =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
-        // Prevent repeated error spam for the same missing asset lookup
+        private static readonly Dictionary<string, Texture2D> EmbeddedTextureCache =
+            new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, Sprite> EmbeddedSpriteVariantCache =
+            new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, HashSet<string>> AssemblyTextureKeys =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, HashSet<string>> AssemblySpriteVariantKeys =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
         private static readonly HashSet<string> LoggedMissingResources =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -50,6 +69,16 @@ namespace CUCoreLib.Helpers
                 ".jpg",
                 ".jpeg"
             };
+
+        private static readonly Queue<EmbeddedSpritePreloadEntry> EmbeddedSpritePreloadQueue =
+            new Queue<EmbeddedSpritePreloadEntry>();
+
+        private static readonly HashSet<string> QueuedEmbeddedTextureKeys =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private static Coroutine embeddedSpritePreloadCoroutine;
+        private static bool embeddedSpritePreloadDiscovered;
+        private static bool embeddedSpritePreloadCompleted;
 
         public static void Initialize(ManualLogSource logger)
         {
@@ -141,47 +170,107 @@ namespace CUCoreLib.Helpers
             return LoadSpriteInternal(resourcePath, PPU_UI, sourceAssembly);
         }
 
-        private static Sprite LoadSpriteInternal(string resourcePath, float ppu, Assembly sourceAssembly)
+        internal static Texture2D LoadEmbeddedTexture(string resourcePath, Assembly sourceAssembly = null)
         {
+            if (sourceAssembly == null)
+                sourceAssembly = ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetCallingAssembly();
+
             if (sourceAssembly == null) return null;
 
-            var stream = OpenEmbeddedResourceStream(resourcePath, sourceAssembly);
-
-            if (stream == null)
+            var resolvedResourceName = FindEmbeddedResourceName(resourcePath, sourceAssembly);
+            if (string.IsNullOrEmpty(resolvedResourceName))
             {
                 LogMissingEmbeddedResource(resourcePath, sourceAssembly, "sprite");
                 return null;
             }
 
-            using (stream)
+            return LoadEmbeddedTextureByResolvedResourceName(sourceAssembly, resolvedResourceName);
+        }
+
+        internal static Sprite CreateSpriteFromEmbeddedTexture(string resourcePath, Assembly sourceAssembly, float ppu,
+            FilterMode filterMode, int widthMultiplier, int heightMultiplier)
+        {
+            var texture = LoadEmbeddedTexture(resourcePath, sourceAssembly);
+            if (texture == null) return null;
+
+            var spriteName = FindEmbeddedResourceName(resourcePath, sourceAssembly);
+            return CreateSpriteFromTexture(texture, ppu, filterMode, widthMultiplier, heightMultiplier, spriteName,
+                false);
+        }
+
+        internal static void BeginMainMenuEmbeddedSpritePreload()
+        {
+            if (embeddedSpritePreloadCompleted || embeddedSpritePreloadCoroutine != null) return;
+
+            if (!embeddedSpritePreloadDiscovered)
             {
-                var fileData = new byte[stream.Length];
-                stream.Read(fileData, 0, fileData.Length); // This is fine imho
-                return CreateSpriteFromBytes(fileData, ppu);
+                DiscoverEmbeddedSpritePreloadQueue();
+                embeddedSpritePreloadDiscovered = true;
+
+                if (EmbeddedSpritePreloadQueue.Count == 0)
+                {
+                    embeddedSpritePreloadCompleted = true;
+                    return;
+                }
             }
+
+            if (EmbeddedSpritePreloadQueue.Count == 0)
+            {
+                embeddedSpritePreloadCompleted = true;
+                return;
+            }
+
+            embeddedSpritePreloadCoroutine = CUCoreUtils.StartCoroutine(PreloadEmbeddedSpritesInMainMenu());
         }
 
-        public static Sprite LoadSpriteFromFile(string filePath, float pixelsPerUnit = PPU_WORLD)
+        internal static void InvalidateEmbeddedCachesForModGuid(string modGuid)
         {
-            if (File.Exists(filePath)) return CreateSpriteFromBytes(File.ReadAllBytes(filePath), pixelsPerUnit);
-            LogMissingFileResource(filePath, "sprite");
-            return null;
+            if (string.IsNullOrWhiteSpace(modGuid)) return;
+
+            if (Chainloader.PluginInfos.TryGetValue(modGuid, out var pluginInfo))
+            {
+                var assembly = pluginInfo?.Instance != null ? pluginInfo.Instance.GetType().Assembly : null;
+                InvalidateEmbeddedCachesForAssembly(assembly);
+            }
+
+            ResetEmbeddedSpritePreloadState();
         }
 
-        public static Sprite LoadSpriteFromBytes(byte[] data, float pixelsPerUnit = PPU_WORLD)
+        internal static void InvalidateEmbeddedCachesForAssembly(Assembly assembly)
         {
-            if (data == null || data.Length == 0) return null;
+            if (assembly == null) return;
 
-            return CreateSpriteFromBytes(data, pixelsPerUnit);
-        }
+            var assemblyKey = GetAssemblyCacheKey(assembly);
+            if (string.IsNullOrWhiteSpace(assemblyKey)) return;
 
-        public static Sprite LoadSpriteFromPluginFolder(BaseUnityPlugin plugin, string relativePath,
-            float pixelsPerUnit = PPU_WORLD)
-        {
-            var fullPath = GetPluginFolderPath(plugin, relativePath);
-            return string.IsNullOrEmpty(fullPath)
-                ? null
-                : LoadSpriteFromFile(fullPath, pixelsPerUnit);
+            if (AssemblySpriteVariantKeys.TryGetValue(assemblyKey, out var spriteVariantKeys))
+            {
+                foreach (var spriteKey in spriteVariantKeys.ToArray())
+                {
+                    if (!EmbeddedSpriteVariantCache.TryGetValue(spriteKey, out var sprite) || sprite == null) continue;
+
+                    EmbeddedSpriteVariantCache.Remove(spriteKey);
+                    UnityEngine.Object.Destroy(sprite);
+                }
+
+                AssemblySpriteVariantKeys.Remove(assemblyKey);
+            }
+
+            if (AssemblyTextureKeys.TryGetValue(assemblyKey, out var textureKeys))
+            {
+                foreach (var textureKey in textureKeys.ToArray())
+                {
+                    if (!EmbeddedTextureCache.TryGetValue(textureKey, out var texture) || texture == null) continue;
+
+                    EmbeddedTextureCache.Remove(textureKey);
+                    UnityEngine.Object.Destroy(texture);
+                }
+
+                AssemblyTextureKeys.Remove(assemblyKey);
+            }
+
+            ResourceNameCache.Remove(assemblyKey);
+            LoggedMissingResources.RemoveWhere(key => key.IndexOf(assemblyKey, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         public static RegisteredSpriteAnimation RegisterFrameAnimation(string id, IEnumerable<Sprite> frames,
@@ -253,6 +342,7 @@ namespace CUCoreLib.Helpers
             var extension = Path.GetExtension(pathOrResource ?? string.Empty);
             if (!extension.Equals(".gif", StringComparison.OrdinalIgnoreCase) &&
                 !extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase)) return null;
+
             Logger?.LogWarning(
                 "Runtime .gif/.mp4 import into Unity VideoClip assets is not supported in this game build. Use RegisterFrameAnimation instead!");
             Logger?.LogWarning("Sorry about that.");
@@ -265,7 +355,6 @@ namespace CUCoreLib.Helpers
             if (sourceAssembly == null)
                 sourceAssembly = ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetCallingAssembly();
 
-            // always false
             if (sourceAssembly == null) return null;
 
             var clipCacheKey = $"{sourceAssembly.FullName}:{NormalizeResourcePath(resourcePath)}";
@@ -325,7 +414,6 @@ namespace CUCoreLib.Helpers
                 sourceAssembly = ContentReloadSession.GetSourceAssemblyOverride() ?? Assembly.GetCallingAssembly();
 
             var foundResource = FindEmbeddedResourceName(resourcePath, sourceAssembly);
-
             if (string.IsNullOrEmpty(foundResource))
             {
                 LogMissingEmbeddedResource(resourcePath, sourceAssembly, "text");
@@ -333,24 +421,343 @@ namespace CUCoreLib.Helpers
             }
 
             using (var stream = sourceAssembly.GetManifestResourceStream(foundResource))
-            using (var reader = new StreamReader(stream)) // maybe null
+            using (var reader = new StreamReader(stream))
             {
                 return reader.ReadToEnd();
             }
         }
 
-        private static Sprite CreateSpriteFromBytes(byte[] data, float ppu)
+        public static Sprite LoadSpriteFromFile(string filePath, float pixelsPerUnit = PPU_WORLD)
         {
+            if (File.Exists(filePath)) return CreateSpriteFromBytes(File.ReadAllBytes(filePath), pixelsPerUnit);
+
+            LogMissingFileResource(filePath, "sprite");
+            return null;
+        }
+
+        public static Sprite LoadSpriteFromBytes(byte[] data, float pixelsPerUnit = PPU_WORLD)
+        {
+            if (data == null || data.Length == 0) return null;
+
+            return CreateSpriteFromBytes(data, pixelsPerUnit);
+        }
+
+        public static Sprite LoadSpriteFromPluginFolder(BaseUnityPlugin plugin, string relativePath,
+            float pixelsPerUnit = PPU_WORLD)
+        {
+            var fullPath = GetPluginFolderPath(plugin, relativePath);
+            return string.IsNullOrEmpty(fullPath)
+                ? null
+                : LoadSpriteFromFile(fullPath, pixelsPerUnit);
+        }
+
+        public static bool TryApplyAnimation(SpriteRenderer renderer, string animationId)
+        {
+            if (renderer == null || string.IsNullOrWhiteSpace(animationId)) return false;
+
+            var animation = GetCachedSpriteAnimation(animationId);
+            if (animation == null) return false;
+
+            var player = renderer.GetComponent<AnimatedSpriteRenderer>();
+            if (player == null) player = renderer.gameObject.AddComponent<AnimatedSpriteRenderer>();
+
+            player.SetAnimation(animationId, animation);
+            return true;
+        }
+
+        public static bool TryApplyAnimation(Image image, string animationId)
+        {
+            if (image == null || string.IsNullOrWhiteSpace(animationId)) return false;
+
+            var animation = GetCachedSpriteAnimation(animationId);
+            if (animation == null) return false;
+
+            var player = image.GetComponent<AnimatedImage>();
+            if (player == null) player = image.gameObject.AddComponent<AnimatedImage>();
+
+            player.SetAnimation(animationId, animation);
+            return true;
+        }
+
+        private static Sprite LoadSpriteInternal(string resourcePath, float ppu, Assembly sourceAssembly)
+        {
+            if (sourceAssembly == null) return null;
+
+            var resolvedResourceName = FindEmbeddedResourceName(resourcePath, sourceAssembly);
+            if (string.IsNullOrEmpty(resolvedResourceName))
+            {
+                LogMissingEmbeddedResource(resourcePath, sourceAssembly, "sprite");
+                return null;
+            }
+
+            return LoadEmbeddedSpriteVariant(sourceAssembly, resolvedResourceName, ppu);
+        }
+
+        private static Sprite LoadEmbeddedSpriteVariant(Assembly sourceAssembly, string resolvedResourceName, float ppu)
+        {
+            var texture = LoadEmbeddedTextureByResolvedResourceName(sourceAssembly, resolvedResourceName);
+            if (texture == null) return null;
+
+            var assemblyKey = GetAssemblyCacheKey(sourceAssembly);
+            var textureCacheKey = BuildEmbeddedTextureCacheKey(assemblyKey, resolvedResourceName);
+            var spriteVariantKey = BuildEmbeddedSpriteVariantKey(textureCacheKey, ppu);
+            if (EmbeddedSpriteVariantCache.TryGetValue(spriteVariantKey, out var cachedSprite) && cachedSprite != null)
+                return cachedSprite;
+
+            var sprite = CreateSpriteFromTexture(texture, ppu, FilterMode.Point, 1, 1, resolvedResourceName, true);
+            if (sprite == null) return null;
+
+            EmbeddedSpriteVariantCache[spriteVariantKey] = sprite;
+            AddAssemblyKey(AssemblySpriteVariantKeys, assemblyKey, spriteVariantKey);
+            return sprite;
+        }
+
+        private static Texture2D LoadEmbeddedTextureByResolvedResourceName(Assembly sourceAssembly,
+            string resolvedResourceName)
+        {
+            var assemblyKey = GetAssemblyCacheKey(sourceAssembly);
+            var textureCacheKey = BuildEmbeddedTextureCacheKey(assemblyKey, resolvedResourceName);
+            if (EmbeddedTextureCache.TryGetValue(textureCacheKey, out var cachedTexture) && cachedTexture != null)
+                return cachedTexture;
+
+            using (var stream = sourceAssembly.GetManifestResourceStream(resolvedResourceName))
+            {
+                if (stream == null)
+                {
+                    LogMissingEmbeddedResource(resolvedResourceName, sourceAssembly, "sprite");
+                    return null;
+                }
+
+                var fileData = ReadAllBytes(stream);
+                var texture = CreateTextureFromBytes(fileData, resolvedResourceName, FilterMode.Point);
+                if (texture == null) return null;
+
+                EmbeddedTextureCache[textureCacheKey] = texture;
+                AddAssemblyKey(AssemblyTextureKeys, assemblyKey, textureCacheKey);
+                return texture;
+            }
+        }
+
+        private static Texture2D CreateTextureFromBytes(byte[] data, string textureName, FilterMode filterMode)
+        {
+            if (data == null || data.Length == 0) return null;
+
             var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
             {
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp
+                filterMode = filterMode,
+                wrapMode = TextureWrapMode.Clamp,
+                name = textureName
             };
 
-            if (texture.LoadImage(data))
-                return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f),
-                    ppu);
-            return null;
+            return texture.LoadImage(data) ? texture : null;
+        }
+
+        private static Sprite CreateSpriteFromBytes(byte[] data, float ppu)
+        {
+            var texture = CreateTextureFromBytes(data, string.Empty, FilterMode.Point);
+            if (texture == null) return null;
+
+            return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f),
+                ppu);
+        }
+
+        private static Sprite CreateSpriteFromTexture(Texture2D sourceTexture, float ppu, FilterMode filterMode,
+            int widthMultiplier, int heightMultiplier, string spriteName, bool useSourceTextureDirectly)
+        {
+            if (sourceTexture == null) return null;
+
+            var finalTexture = sourceTexture;
+            var needsUniqueTexture = !useSourceTextureDirectly || filterMode != FilterMode.Point ||
+                                     widthMultiplier > 1 || heightMultiplier > 1;
+
+            if (needsUniqueTexture)
+            {
+                finalTexture = DuplicateTexture(sourceTexture, spriteName);
+                if (finalTexture == null) return null;
+            }
+
+            if (widthMultiplier > 1 || heightMultiplier > 1)
+            {
+                finalTexture = ModifyTextures.ResizeTexture(finalTexture, widthMultiplier, heightMultiplier);
+            }
+
+            finalTexture.filterMode = filterMode;
+            finalTexture.wrapMode = TextureWrapMode.Clamp;
+            if (!string.IsNullOrWhiteSpace(spriteName)) finalTexture.name = spriteName;
+
+            var sprite = Sprite.Create(finalTexture, new Rect(0, 0, finalTexture.width, finalTexture.height),
+                new Vector2(0.5f, 0.5f), ppu);
+            if (!string.IsNullOrWhiteSpace(spriteName)) sprite.name = spriteName;
+
+            return sprite;
+        }
+
+        private static Texture2D DuplicateTexture(Texture2D sourceTexture, string textureName)
+        {
+            try
+            {
+                var duplicate = new Texture2D(sourceTexture.width, sourceTexture.height, TextureFormat.RGBA32, false)
+                {
+                    filterMode = sourceTexture.filterMode,
+                    wrapMode = sourceTexture.wrapMode,
+                    name = textureName
+                };
+
+                duplicate.SetPixels32(sourceTexture.GetPixels32());
+                duplicate.Apply();
+                return duplicate;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning("Could not duplicate texture '" + (sourceTexture.name ?? textureName) +
+                                   "' for a custom sprite variant.\n" + ex);
+                return null;
+            }
+        }
+
+        private static IEnumerator PreloadEmbeddedSpritesInMainMenu()
+        {
+            while (EmbeddedSpritePreloadQueue.Count > 0)
+            {
+                if (!CUCoreUtils.IsMainMenuReady())
+                {
+                    embeddedSpritePreloadCoroutine = null;
+                    yield break;
+                }
+
+                var frameStart = Time.realtimeSinceStartup;
+                do
+                {
+                    if (EmbeddedSpritePreloadQueue.Count == 0) break;
+
+                    var entry = EmbeddedSpritePreloadQueue.Dequeue();
+                    QueuedEmbeddedTextureKeys.Remove(entry.TextureCacheKey);
+
+                    if (entry.Assembly == null) continue;
+                    if (EmbeddedTextureCache.ContainsKey(entry.TextureCacheKey)) continue;
+
+                    _ = LoadEmbeddedTextureByResolvedResourceName(entry.Assembly, entry.ResourceName);
+                } while (EmbeddedSpritePreloadQueue.Count > 0 &&
+                         Time.realtimeSinceStartup - frameStart < EmbeddedSpritePreloadFrameBudgetSeconds);
+
+                yield return null;
+            }
+
+            embeddedSpritePreloadCompleted = true;
+            embeddedSpritePreloadCoroutine = null;
+        }
+
+        private static void DiscoverEmbeddedSpritePreloadQueue()
+        {
+            EmbeddedSpritePreloadQueue.Clear();
+            QueuedEmbeddedTextureKeys.Clear();
+
+            foreach (var pluginInfo in Chainloader.PluginInfos.Values
+                         .OrderBy(info => info.Metadata?.GUID ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+            {
+                var assembly = pluginInfo?.Instance != null ? pluginInfo.Instance.GetType().Assembly : null;
+                if (assembly == null) continue;
+
+                var assemblyKey = GetAssemblyCacheKey(assembly);
+                foreach (var resourceName in GetManifestResourceNames(assembly)
+                             .Where(IsSupportedEmbeddedImageResource)
+                             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+                {
+                    var textureCacheKey = BuildEmbeddedTextureCacheKey(assemblyKey, resourceName);
+                    if (EmbeddedTextureCache.ContainsKey(textureCacheKey)) continue;
+                    if (!QueuedEmbeddedTextureKeys.Add(textureCacheKey)) continue;
+
+                    EmbeddedSpritePreloadQueue.Enqueue(new EmbeddedSpritePreloadEntry(assembly, resourceName,
+                        textureCacheKey));
+                }
+            }
+        }
+
+        private static void ResetEmbeddedSpritePreloadState()
+        {
+            EmbeddedSpritePreloadQueue.Clear();
+            QueuedEmbeddedTextureKeys.Clear();
+            embeddedSpritePreloadCoroutine = null;
+            embeddedSpritePreloadCompleted = false;
+            embeddedSpritePreloadDiscovered = false;
+        }
+
+        private static bool IsSupportedEmbeddedImageResource(string resourceName)
+        {
+            if (string.IsNullOrWhiteSpace(resourceName)) return false;
+
+            return SupportedImageExtensions.Contains(Path.GetExtension(resourceName));
+        }
+
+        private static int ExtractTrailingFrameNumber(string fileNameWithoutExtension)
+        {
+            if (string.IsNullOrWhiteSpace(fileNameWithoutExtension)) return int.MaxValue;
+
+            var end = fileNameWithoutExtension.Length - 1;
+            while (end >= 0 && char.IsDigit(fileNameWithoutExtension[end])) end--;
+
+            var numericSuffix = fileNameWithoutExtension.Substring(end + 1);
+            return int.TryParse(numericSuffix, out var frameNumber) ? frameNumber : int.MaxValue;
+        }
+
+        private static string FindEmbeddedResourceName(string resourcePath, Assembly sourceAssembly)
+        {
+            if (sourceAssembly == null) return null;
+
+            var searchPattern = NormalizeResourcePath(resourcePath);
+            if (string.IsNullOrEmpty(searchPattern)) return null;
+
+            var searchPatternWithoutExtension = NormalizeResourceStem(resourcePath);
+            var resourceNames = GetManifestResourceNames(sourceAssembly);
+            if (resourceNames.Length == 0) return null;
+
+            var exactMatch =
+                resourceNames.FirstOrDefault(r => string.Equals(r, resourcePath, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(exactMatch)) return exactMatch;
+
+            var normalizedMatch = resourceNames.FirstOrDefault(r =>
+                string.Equals(NormalizeResourcePath(r), searchPattern, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(normalizedMatch)) return normalizedMatch;
+
+            var suffixMatch =
+                resourceNames.FirstOrDefault(r => r.EndsWith(searchPattern, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(suffixMatch)) return suffixMatch;
+
+            var filenamePattern = NormalizeResourcePath(Path.GetFileName(resourcePath));
+            if (!string.IsNullOrEmpty(filenamePattern))
+            {
+                var filenameMatch = resourceNames.FirstOrDefault(r =>
+                    r.EndsWith(filenamePattern, StringComparison.OrdinalIgnoreCase) ||
+                    NormalizeResourcePath(r).EndsWith(filenamePattern, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(filenameMatch)) return filenameMatch;
+            }
+
+            if (string.IsNullOrEmpty(searchPatternWithoutExtension)) return null;
+
+            var stemMatch = resourceNames.FirstOrDefault(r =>
+            {
+                var normalizedStem = NormalizeResourceStem(r);
+                return string.Equals(normalizedStem, searchPatternWithoutExtension, StringComparison.OrdinalIgnoreCase)
+                       || normalizedStem.EndsWith("." + searchPatternWithoutExtension,
+                           StringComparison.OrdinalIgnoreCase);
+            });
+
+            return string.IsNullOrEmpty(stemMatch) ? null : stemMatch;
+        }
+
+        private static string[] GetManifestResourceNames(Assembly sourceAssembly)
+        {
+            if (sourceAssembly == null) return Array.Empty<string>();
+
+            var cacheKey = GetAssemblyCacheKey(sourceAssembly);
+            if (string.IsNullOrWhiteSpace(cacheKey)) return sourceAssembly.GetManifestResourceNames();
+
+            if (ResourceNameCache.TryGetValue(cacheKey, out var cachedNames)) return cachedNames;
+
+            var names = sourceAssembly.GetManifestResourceNames();
+            ResourceNameCache[cacheKey] = names;
+            return names;
         }
 
         private static string GetPluginFolderPath(BaseUnityPlugin plugin, string relativePath)
@@ -391,116 +798,45 @@ namespace CUCoreLib.Helpers
                 : key.Trim();
         }
 
-        public static bool TryApplyAnimation(SpriteRenderer renderer, string animationId)
+        private static string GetAssemblyCacheKey(Assembly sourceAssembly)
         {
-            if (renderer == null || string.IsNullOrWhiteSpace(animationId)) return false;
+            if (sourceAssembly == null) return string.Empty;
 
-            var animation = GetCachedSpriteAnimation(animationId);
-            if (animation == null) return false;
-
-            var player = renderer.GetComponent<AnimatedSpriteRenderer>();
-            if (player == null) player = renderer.gameObject.AddComponent<AnimatedSpriteRenderer>();
-
-            player.SetAnimation(animationId, animation);
-            return true;
+            return sourceAssembly.FullName ?? sourceAssembly.GetName().Name ?? string.Empty;
         }
 
-        public static bool TryApplyAnimation(Image image, string animationId)
+        private static string BuildEmbeddedTextureCacheKey(string assemblyKey, string resourceName)
         {
-            if (image == null || string.IsNullOrWhiteSpace(animationId)) return false;
-
-            var animation = GetCachedSpriteAnimation(animationId);
-            if (animation == null) return false;
-
-            var player = image.GetComponent<AnimatedImage>();
-            if (player == null) player = image.gameObject.AddComponent<AnimatedImage>();
-
-            player.SetAnimation(animationId, animation);
-            return true;
+            return assemblyKey + "|" + NormalizeResourcePath(resourceName);
         }
 
-        private static int ExtractTrailingFrameNumber(string fileNameWithoutExtension)
+        private static string BuildEmbeddedSpriteVariantKey(string textureCacheKey, float ppu)
         {
-            if (string.IsNullOrWhiteSpace(fileNameWithoutExtension)) return int.MaxValue;
-
-            var end = fileNameWithoutExtension.Length - 1;
-            while (end >= 0 && char.IsDigit(fileNameWithoutExtension[end])) end--;
-
-            var numericSuffix = fileNameWithoutExtension.Substring(end + 1);
-            // Non-numbered names sort last when frame files are ordered
-            return int.TryParse(numericSuffix, out var frameNumber) ? frameNumber : int.MaxValue;
+            return textureCacheKey + "|" + ppu.ToString("R");
         }
 
-        private static string FindEmbeddedResourceName(string resourcePath, Assembly sourceAssembly)
+        private static void AddAssemblyKey(Dictionary<string, HashSet<string>> index, string assemblyKey, string key)
         {
-            if (sourceAssembly == null) return null;
+            if (string.IsNullOrWhiteSpace(assemblyKey) || string.IsNullOrWhiteSpace(key)) return;
 
-            var searchPattern = NormalizeResourcePath(resourcePath);
-            if (string.IsNullOrEmpty(searchPattern)) return null;
-            var searchPatternWithoutExtension = NormalizeResourceStem(resourcePath);
-
-            var resourceNames = GetManifestResourceNames(sourceAssembly);
-            if (resourceNames.Length == 0) return null;
-
-            // strict -> permissive order
-            // probably shouldn't add fuzzy matching
-            var exactMatch =
-                resourceNames.FirstOrDefault(r => string.Equals(r, resourcePath, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(exactMatch)) return exactMatch;
-
-            var normalizedMatch = resourceNames.FirstOrDefault(r =>
-                string.Equals(NormalizeResourcePath(r), searchPattern, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(normalizedMatch)) return normalizedMatch;
-
-            var suffixMatch =
-                resourceNames.FirstOrDefault(r => r.EndsWith(searchPattern, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(suffixMatch)) return suffixMatch;
-
-            var filenamePattern = NormalizeResourcePath(Path.GetFileName(resourcePath));
-            if (!string.IsNullOrEmpty(filenamePattern))
+            if (!index.TryGetValue(assemblyKey, out var keys) || keys == null)
             {
-                var filenameMatch = resourceNames.FirstOrDefault(r =>
-                    r.EndsWith(filenamePattern, StringComparison.OrdinalIgnoreCase) ||
-                    NormalizeResourcePath(r).EndsWith(filenamePattern, StringComparison.OrdinalIgnoreCase));
-
-                if (!string.IsNullOrEmpty(filenameMatch)) return filenameMatch;
+                keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                index[assemblyKey] = keys;
             }
 
-            if (string.IsNullOrEmpty(searchPatternWithoutExtension)) return null;
+            keys.Add(key);
+        }
+
+        private static byte[] ReadAllBytes(Stream stream)
+        {
+            if (stream == null) return Array.Empty<byte>();
+
+            using (var memory = new MemoryStream())
             {
-                var stemMatch = resourceNames.FirstOrDefault(r =>
-                {
-                    var normalizedStem = NormalizeResourceStem(r);
-                    return string.Equals(normalizedStem, searchPatternWithoutExtension,
-                               StringComparison.OrdinalIgnoreCase)
-                           || normalizedStem.EndsWith("." + searchPatternWithoutExtension,
-                               StringComparison.OrdinalIgnoreCase);
-                });
-
-                if (!string.IsNullOrEmpty(stemMatch)) return stemMatch;
+                stream.CopyTo(memory);
+                return memory.ToArray();
             }
-
-            return null;
-        }
-
-        private static Stream OpenEmbeddedResourceStream(string resourcePath, Assembly sourceAssembly)
-        {
-            var resourceName = FindEmbeddedResourceName(resourcePath, sourceAssembly);
-            return string.IsNullOrEmpty(resourceName) ? null : sourceAssembly.GetManifestResourceStream(resourceName);
-        }
-
-        private static string[] GetManifestResourceNames(Assembly sourceAssembly)
-        {
-            if (sourceAssembly == null) return Array.Empty<string>();
-
-            var cacheKey = sourceAssembly.FullName ?? sourceAssembly.GetName().Name;
-            if (string.IsNullOrWhiteSpace(cacheKey)) return sourceAssembly.GetManifestResourceNames();
-
-            if (ResourceNameCache.TryGetValue(cacheKey, out var cachedNames)) return cachedNames;
-
-            var names = sourceAssembly.GetManifestResourceNames();
-            ResourceNameCache[cacheKey] = names;
-            return names;
         }
 
         private static void LogMissingEmbeddedResource(string resourcePath, Assembly sourceAssembly,
@@ -509,7 +845,8 @@ namespace CUCoreLib.Helpers
             if (sourceAssembly == null || string.IsNullOrWhiteSpace(resourcePath)) return;
 
             var normalizedPath = NormalizeResourcePath(resourcePath);
-            var key = "embedded:" + resourceType + ":" + sourceAssembly.FullName + ":" + normalizedPath;
+            var assemblyKey = GetAssemblyCacheKey(sourceAssembly);
+            var key = "embedded:" + resourceType + ":" + assemblyKey + ":" + normalizedPath;
             if (!LoggedMissingResources.Add(key)) return;
 
             Logger?.LogWarning(
@@ -580,6 +917,20 @@ namespace CUCoreLib.Helpers
             var clip = AudioClip.Create(resourceName, samplesPerChannel, channels, sampleRate, false);
             clip.SetData(samples.ToArray(), 0);
             return clip;
+        }
+
+        private sealed class EmbeddedSpritePreloadEntry
+        {
+            public EmbeddedSpritePreloadEntry(Assembly assembly, string resourceName, string textureCacheKey)
+            {
+                Assembly = assembly;
+                ResourceName = resourceName;
+                TextureCacheKey = textureCacheKey;
+            }
+
+            public Assembly Assembly { get; }
+            public string ResourceName { get; }
+            public string TextureCacheKey { get; }
         }
     }
 }

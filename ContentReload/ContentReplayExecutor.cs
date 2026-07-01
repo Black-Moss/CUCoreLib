@@ -7,6 +7,7 @@ using System.Runtime.Serialization;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using CUCoreLib.Data;
+using CUCoreLib.Helpers;
 using CUCoreLib.Patches;
 using CUCoreLib.Registries;
 
@@ -67,6 +68,7 @@ namespace CUCoreLib.ContentReload
                 : null;
 
             var existingContent = CaptureExistingContent(report.ModGuid);
+            AssetLoader.InvalidateEmbeddedCachesForModGuid(report.ModGuid);
             ClearExistingContent(report.ModGuid, result);
 
             using (ContentReloadSession.Begin(report.ModGuid, assembly, report.SelectedPath,
