@@ -54,6 +54,13 @@ namespace CUCoreLib.Helpers
 
             public string KeyName => GetFriendlyKeyName(KeyCode);
 
+            public bool IsPressed()
+            {
+                if (!Input.GetKeyDown(KeyCode))
+                    return false;
+                return !ShouldDisableFriendlyKeybind(entry);
+            }
+
             public static implicit operator KeyCode(FriendlyKeybind keybind)
             {
                 return keybind != null ? keybind.KeyCode : KeyCode.None;
@@ -842,9 +849,6 @@ namespace CUCoreLib.Helpers
             var liveSetting = Settings.Get<SettingKeybind>(entry.ActionId);
             if (liveSetting != null)
                 entry.CurrentKey = liveSetting.value;
-
-            if (ShouldDisableFriendlyKeybind(entry))
-                return KeyCode.None;
 
             return entry.CurrentKey;
         }
