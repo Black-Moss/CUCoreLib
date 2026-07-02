@@ -904,8 +904,7 @@ namespace CUCoreLib.Helpers
             if (IsKrokMpChatFocused())
                 return true;
 
-            var selected = EventSystem.current?.currentSelectedGameObject;
-		    var inputField = selected != null ? selected.GetComponent<TMP_InputField>() : null;
+            var inputField = EventSystem.current?.currentSelectedGameObject?.GetComponent<TMP_InputField>();
 		    return inputField != null && inputField.isFocused;
         }
 
