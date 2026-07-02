@@ -38,6 +38,8 @@ namespace CUCoreLib.Registries
                 "sandvinerope"
             };
 
+        private static bool NetworkSpawnComponentsWarningLogged;
+
         private static readonly HashSet<string> WarnedMissingIconIds =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -373,13 +375,21 @@ namespace CUCoreLib.Registries
                     info.CustomData = customData.ToObject<Dictionary<string, object>>() ??
                                       new Dictionary<string, object>();
 
-                var spawnComponents = obj["spawnComponents"];
-                if (spawnComponents is JArray spawnComponentArray)
-                    info.SpawnComponents = spawnComponentArray.ToObject<List<string>>() ?? new List<string>();
+                if (obj["spawnComponents"] is JArray)
+                    WarnIgnoredNetworkSpawnComponents();
 
                 // Recreate registry entries from the net request
                 Register(id, info);
             }
+        }
+
+        private static void WarnIgnoredNetworkSpawnComponents()
+        {
+            if (NetworkSpawnComponentsWarningLogged) return;
+
+            NetworkSpawnComponentsWarningLogged = true;
+            CUCoreLibPlugin.Log?.LogWarning(
+                "CUCoreLib Items: Ignoring network snapshot 'spawnComponents'. SpawnComponents are only honored from local registration.");
         }
 
         public static bool TryGetCustomInfo(string id, out CustomItemInfo info)

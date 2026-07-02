@@ -1529,25 +1529,65 @@ using UnityEngine;
 
 private void Awake()
 {
-    // Run code after a short realtime delay.
-    CUCoreUtils.DelayCall(1f, () => Logger.LogInfo("One second later."));
-
-    // Wait for the runtime world before touching PlayerCamera or WorldGeneration.
+    // General runtime helpers
     CUCoreUtils.StartCoroutine(WaitForWorld());
+    CUCoreUtils.DelayCall(1f, () => Logger.LogInfo("One second later."));
+    CUCoreUtils.CallWhen(() => CUCoreUtils.IsWorldGenerationReady(), () => Logger.LogInfo("World ready."));
 
-    // Store simple persistent toggles without repeating PlayerPrefs. Also allows for external .cfg files and in-game toggling,
+    // PlayerPrefsUtils
     bool enabled = CUCoreUtils.GetBool("mymod.enabled", true);
     CUCoreUtils.SetBool("mymod.enabled", enabled);
+    float volume = CUCoreUtils.GetFloat("mymod.volume", 0.75f);
+    CUCoreUtils.SetFloat("mymod.volume", volume);
+    string profile = CUCoreUtils.GetString("mymod.profile", "default");
+    CUCoreUtils.SetString("mymod.profile", profile);
 
-    // Display keys with nicer labels in UI text, and handle custom keybind support. (This defaults to "Mouse2")
+    // KeyUtils
     string keyName = CUCoreUtils.GetFriendlyKeyName(KeyCode.Mouse2);
+    var reloadBind = CUCoreUtils.GetFriendlyKeyBind("R");
+    reloadBind.disableInInventory = true;
+    CUCoreUtils.AllowKeybindRebind("R", "Reload");
+
+    // PlayerUtils
+    if (CUCoreUtils.TryGetBody(out Body body))
+    {
+        CUCoreUtils.ShowAlert("Body found.");
+        CUCoreUtils.Talk("Hello there.");
+        CUCoreUtils.TalkElectronic("Beep boop.");
+    }
+
+    Vector2 mousePos = CUCoreUtils.GetMousePosition();
+    AudioClip clip = null;
+    CUCoreUtils.PlaySoundAt(clip, volume: 0.7f, delay: 0.1f, position: mousePos, pitch: 1.1f);
+
+    // PlayerInventoryUtils
+    if (CUCoreUtils.TryGetHeldItem(out Item held))
+    {
+        Logger.LogInfo($"Holding: {held.name}");
+    }
+
+    CUCoreUtils.GiveItem("glass", 1);
+    CUCoreUtils.GiveItemSlot("glass", 0, 1);
+    bool isModded = CUCoreUtils.IsModdedItem("glassworks.someitem");
+
+    // ReflectionUtils + console
+    CUCoreUtils.GetMethod(this, "Awake");
+    CUCoreUtils.InvokeMethod(this, "Awake");
+    CUCoreUtils.ConsoleCheckForWorld(ConsoleScript.instance);
+    CUCoreUtils.ConsoleLog(ConsoleScript.instance, "Utility test");
+
+    // MathExtensions + misc
+    bool finite = mousePos.IsFinite();
+    Sprite keySprite = CUCoreUtils.GetKeySprite(KeyCode.E);
+    Sprite embedded = CUCoreUtils.LoadEmbeddedSprite("Images.icon.png");
+    byte[] gzip = CUCoreUtils.CompressGZip(new byte[] { 1, 2, 3 });
+    byte[] raw = CUCoreUtils.DecompressGZip(gzip);
 }
 
 private System.Collections.IEnumerator WaitForWorld()
 {
     yield return CUCoreUtils.AwaitWorldGeneration();
 
-    // Safe point for world/player dependent work.
     Logger.LogInfo("World is ready!");
 }`;
 }

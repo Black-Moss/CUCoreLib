@@ -19,7 +19,7 @@ namespace CUCoreLib
     {
         public const string GUID = "net.cucorelib";
         public const string MODNAME = "CUCoreLib";
-        public const string VERSION = "1.0.1";
+        public const string VERSION = "1.0.2";
 
         internal static ManualLogSource Log;
         // Alllright. Let's get this party rolling.

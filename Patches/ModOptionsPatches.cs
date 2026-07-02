@@ -78,7 +78,9 @@ namespace CUCoreLib.Patches
         [HarmonyPrefix]
         private static bool Prefix(string action, ref string __result)
         {
-            __result = CUCoreUtils.GetFriendlyBindDisplayName(action);
+            if (!CUCoreUtils.TryGetFriendlyBindDisplayName(action, out __result))
+                return true;
+
             return false;
         }
     }
@@ -89,7 +91,9 @@ namespace CUCoreLib.Patches
         [HarmonyPrefix]
         private static bool Prefix(string action, ref KeyCode __result)
         {
-            __result = CUCoreUtils.GetFriendlyBindKeyCode(action);
+            if (!CUCoreUtils.TryGetFriendlyBindKeyCode(action, out __result))
+                return true;
+
             return false;
         }
     }

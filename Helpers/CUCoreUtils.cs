@@ -780,30 +780,32 @@ namespace CUCoreLib.Helpers
             FriendlyKeyNames[key] = displayName;
         }
 
-        internal static string GetFriendlyBindDisplayName(string actionId)
+        internal static bool TryGetFriendlyBindDisplayName(string actionId, out string displayName)
         {
-            if (string.IsNullOrWhiteSpace(actionId)) return GetFriendlyKeyName(KeyCode.None);
+            displayName = null;
+            if (string.IsNullOrWhiteSpace(actionId)) return false;
+
+            if (!FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry))
+                return false;
 
             var setting = Settings.Get<SettingKeybind>(actionId);
             if (setting != null)
-                return GetFriendlyKeyName(setting.value);
+                entry.CurrentKey = setting.value;
 
-            var cachedKey = KeyBinds.GetBind(actionId);
-            if (cachedKey != KeyCode.None)
-                return GetFriendlyKeyName(cachedKey);
-
-            return FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry)
-                ? GetFriendlyKeyName(entry.CurrentKey)
-                : GetFriendlyKeyName(KeyCode.None);
+            displayName = GetFriendlyKeyName(entry.CurrentKey);
+            return true;
         }
 
-        internal static KeyCode GetFriendlyBindKeyCode(string actionId)
+        internal static bool TryGetFriendlyBindKeyCode(string actionId, out KeyCode keyCode)
         {
-            if (string.IsNullOrWhiteSpace(actionId)) return KeyCode.None;
+            keyCode = KeyCode.None;
+            if (string.IsNullOrWhiteSpace(actionId)) return false;
 
-            return FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry)
-                ? ResolveKeyCode(entry)
-                : KeyBinds.GetBind(actionId);
+            if (!FriendlyKeybindsByActionId.TryGetValue(actionId, out var entry))
+                return false;
+
+            keyCode = ResolveKeyCode(entry);
+            return true;
         }
 
         private static bool TryGetOrCreateFriendlyKeybind(string friendlyKeybindName, out FriendlyKeybindEntry entry)
@@ -840,12 +842,6 @@ namespace CUCoreLib.Helpers
             var liveSetting = Settings.Get<SettingKeybind>(entry.ActionId);
             if (liveSetting != null)
                 entry.CurrentKey = liveSetting.value;
-            else
-            {
-                var cachedKey = KeyBinds.GetBind(entry.ActionId);
-                if (cachedKey != KeyCode.None)
-                    entry.CurrentKey = cachedKey;
-            }
 
             if (ShouldDisableFriendlyKeybind(entry))
                 return KeyCode.None;

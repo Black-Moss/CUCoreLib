@@ -34,6 +34,7 @@ namespace CUCoreLib.Registries
         private static readonly string[] EmptyCategories = Array.Empty<string>();
         private static readonly int GroundMask = LayerMask.GetMask("Ground");
         private static readonly int GroundLayer = LayerMask.NameToLayer("Ground");
+        private static bool NetworkSpawnComponentsWarningLogged;
         private static string ActiveOwnerId;
 
         public static IReadOnlyDictionary<string, CustomBuildingEntityDefinition> RegisteredDefinitionsView
@@ -344,10 +345,12 @@ namespace CUCoreLib.Registries
                     HeatRadius = obj.Value<float?>("heatRadius") ?? 0f,
                     HeatPerSecond = obj.Value<float?>("heatPerSecond") ?? 0f,
                     MaxHeatBodyTemperature = obj.Value<float?>("maxHeatBodyTemperature") ?? 0f,
-                    SpawnComponents =
-                        (obj["spawnComponents"] as JArray)?.ToObject<List<string>>() ?? new List<string>(),
+                    SpawnComponents = new List<string>(),
                     Components = NetworkSnapshotSerialization.ReadTypeNames(obj["components"])
                 };
+
+                if (obj["spawnComponents"] is JArray)
+                    WarnIgnoredNetworkSpawnComponents();
 
                 if (obj["itemsDropOnDestroy"] is JArray drops)
                     definition.ItemsDropOnDestroy = drops.ToObject<ItemDrop[]>();
@@ -357,6 +360,15 @@ namespace CUCoreLib.Registries
 
                 Register(id, definition);
             }
+        }
+
+        private static void WarnIgnoredNetworkSpawnComponents()
+        {
+            if (NetworkSpawnComponentsWarningLogged) return;
+
+            NetworkSpawnComponentsWarningLogged = true;
+            CUCoreLibPlugin.Log?.LogWarning(
+                "CUCoreLib Buildings: Ignoring network snapshot 'spawnComponents'. SpawnComponents are only honored from local registration.");
         }
 
         public static bool Contains(string id)

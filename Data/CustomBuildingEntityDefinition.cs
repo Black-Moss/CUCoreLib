@@ -160,7 +160,7 @@ namespace CUCoreLib.Data
         /// <summary>
         /// Automatic world-generation preset for this entity.
         /// </summary>
-        public BuildingGenerationStyle GenerationStyle = BuildingGenerationStyle.None;
+        public BuildingGenerationStyle GenerationStyle = BuildingGenerationStyle.Standard;
 
         /// <summary>
         /// Number of guaranteed drop rolls attempted from the chance-based drop table.

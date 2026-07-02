@@ -2186,7 +2186,8 @@ private void Awake()
 
     <section class="lesson-card">
       <h2>Friendly keybind helpers</h2>
-      <p>For lightweight input actions, you can let CUCoreLib mint and own the underlying keybind ID for you. Use <span class="inline-code">GetFriendlyKeyBind</span> or <span class="inline-code">GetFriendlyKeyName</span> with a default key like <span class="inline-code">"R"</span>. CUCoreLib scopes the generated bind to the calling mod assembly, keeps the live <span class="inline-code">KeyCode</span>, and can expose it in the normal Input tab when you call <span class="inline-code">AllowKeybindRebind</span>.</p>
+      <p>CUCoreLib also helps with key input actions. Use <span class="inline-code">GetFriendlyKeyBind</span> or <span class="inline-code">GetFriendlyKeyName</span> with a default key like <span class="inline-code">"R"</span>.</p>
+      <p>This allows you to easily reuse the same keycode, with the added benefit of being able to disable it in certain contexts, allowing settings rebinds, and mod collision handling.</p>
       <pre><code>using CUCoreLib.Helpers;
 using UnityEngine;
 
@@ -2999,6 +3000,15 @@ private void RegisterLateRecipes() { ... }</code></pre>
       <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads item, liquid, recipe, and locale/text content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support save providers, moodles, Harmony patches, mod options, or multiplayer registration just yet.</p>
       </section>
 
+    <section class="lesson-card">
+      <h2>Testing in multiplayer</h2>
+      <ul>
+        <li>In <span class="inline-code">Casualties Unknown Demo\\CasualtiesUnknown_Data\\boot.config</span>, remove the <span class="inline-code">forceSingleInstance: 1</span> line.</li>
+        <li>Open the multiplayer mod on two instances and swap from Steam to IP hosting.</li>
+        <li>The name of the client and the host must be different.</li>
+        <li>Connect on both, and you can test multiplayer interactions.</li>
+      </ul>
+    </section>
 
     <section class="lesson-card">
       <h2>Launch overrides and optimizations</h2>
@@ -3044,26 +3054,187 @@ exit /b 0
 function utilsPage(): string {
   return `
     <section class="lesson-card">
-      <h2>Timing and readiness</h2>
-      <p><span class="inline-code">DelayCall</span>, <span class="inline-code">CallWhen</span>, and <span class="inline-code">StartCoroutine</span> run work from a hidden persistent MonoBehaviour. Use <span class="inline-code">AwaitWorldGeneration</span> before touching world or player state.</p>
-      <pre><code>yield return CUCoreUtils.AwaitWorldGeneration();</code></pre>
+      <h2>CUCoreUtils surface map</h2>
+      <p>This page documents the current public surface in <span class="inline-code">Helpers/CUCoreUtils.cs</span>. The repo does not currently split these into separate <span class="inline-code">Util/*.cs</span> files, so the sections below use those category names as an organization aid.</p>
+      <p>Where CUCoreLib exposes both PascalCase and camelCase names, both are listed below. The camelCase forms are compatibility aliases, not different behaviors.</p>
     </section>
+
     <section class="lesson-card">
-      <h2>Small wrappers</h2>
-        <p><span class="inline-code">GetBool</span>, <span class="inline-code">GetFloat</span>, <span class="inline-code">GetString</span>, and their matching setters wrap <span class="inline-code">PlayerPrefs</span> so simple persisted values stay consistent without repeating boilerplate.</p>
-        <p><span class="inline-code">IsInWorld</span>, <span class="inline-code">TryGetHeldItem</span>, <span class="inline-code">GiveItem</span>, <span class="inline-code">ShowAlert</span>, <span class="inline-code">GetMousePosition</span>, and <span class="inline-code">PlaySoundAt</span> cover common in-world interactions through the current player/body and UI/audio seams.</p>
-      <p><span class="inline-code">GetFriendlyKeyName</span> converts raw <span class="inline-code">KeyCode</span> values into labels that read better in settings text, prompts, and rebinding UI.</p>
-    </section>
-    <details open>
-      <summary>Reflection, console, and compression</summary>
-      <div class="details-body">
-        <ul>
-          <li><span class="inline-code">InvokeMethod</span> and <span class="inline-code">GetMethod</span> are for rare private-method interop.</li>
-          <li><span class="inline-code">ConsoleLog</span> and <span class="inline-code">ConsoleCheckForWorld</span> help commands report cleanly and fail safely when no runtime world is loaded.</li>
-          <li><span class="inline-code">CompressString</span> and <span class="inline-code">DecompressString</span> are utility helpers for compact text payloads when you need lightweight save or clipboard transport.</li>
-        </ul>
+      <h2>General runtime helpers</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">StartCoroutine</span></td><td><span class="inline-code">IEnumerator routine</span></td><td>Runs a coroutine from CUCoreLib's hidden persistent runner.</td></tr>
+            <tr><td><span class="inline-code">StartCoroutine</span></td><td><span class="inline-code">Func&lt;IEnumerator&gt; routineFactory</span></td><td>Builds the coroutine lazily, then runs it through the same shared runner.</td></tr>
+            <tr><td><span class="inline-code">DelayCall</span></td><td><span class="inline-code">float delaySeconds, Action action</span></td><td>Runs an action after a realtime delay.</td></tr>
+            <tr><td><span class="inline-code">CallWhen</span></td><td><span class="inline-code">Func&lt;bool&gt; condition, Action action, float checkRepeatTimeSeconds = 0f</span></td><td>Polls until the condition is true, then runs the action.</td></tr>
+            <tr><td><span class="inline-code">AwaitMainMenu</span> / <span class="inline-code">awaitMainMenu</span></td><td><span class="inline-code">float checkRepeatTimeSeconds = 0f</span></td><td>Coroutine wait helper for the main menu becoming available.</td></tr>
+            <tr><td><span class="inline-code">AwaitWorldGeneration</span> / <span class="inline-code">awaitWorldGeneration</span></td><td><span class="inline-code">float checkRepeatTimeSeconds = 0f</span></td><td>Coroutine wait helper for the runtime world finishing generation.</td></tr>
+            <tr><td><span class="inline-code">IsMainMenuReady</span></td><td>None</td><td>Returns whether the game is currently at a usable main-menu state.</td></tr>
+            <tr><td><span class="inline-code">IsWorldGenerationReady</span></td><td>None</td><td>Returns whether the world exists and is no longer generating.</td></tr>
+          </tbody>
+        </table>
       </div>
-    </details>
+    </section>
+
+    <section class="lesson-card">
+      <h2>KeyUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method / Member</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">FriendlyKeybind.disableInInputFields</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while a text input is focused.</td></tr>
+            <tr><td><span class="inline-code">FriendlyKeybind.disableInMainMenu</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the main menu is open.</td></tr>
+            <tr><td><span class="inline-code">FriendlyKeybind.disableInHealthPanel</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the wound or health panel is open.</td></tr>
+            <tr><td><span class="inline-code">FriendlyKeybind.disableInInventory</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the inventory or crafting panel is open.</td></tr>
+            <tr><td><span class="inline-code">FriendlyKeybind.KeyCode</span></td><td>None</td><td>Resolves the active <span class="inline-code">KeyCode</span> after settings and block-state checks.</td></tr>
+            <tr><td><span class="inline-code">FriendlyKeybind.KeyName</span></td><td>None</td><td>Returns the player-facing display name for the active key.</td></tr>
+            <tr><td><span class="inline-code">GetKeySprite</span></td><td><span class="inline-code">KeyCode key, string spritePrefix = "Key_"</span></td><td>Looks up a matching key sprite from loaded resources.</td></tr>
+            <tr><td><span class="inline-code">GetFriendlyKeyName</span></td><td><span class="inline-code">KeyCode key</span></td><td>Returns a friendlier display label for a raw key.</td></tr>
+            <tr><td><span class="inline-code">GetFriendlyKeyName</span></td><td><span class="inline-code">string friendlyKeybindName</span></td><td>Returns the display label for a CUCoreLib-managed friendly keybind.</td></tr>
+            <tr><td><span class="inline-code">GetFriendlyKeyBind</span></td><td><span class="inline-code">string friendlyKeybindName</span></td><td>Returns a bind handle that can be configured and queried later.</td></tr>
+            <tr><td><span class="inline-code">AllowKeybindRebind</span></td><td><span class="inline-code">string friendlyKeybindName, string descriptionToShowInSettingsKeybindMenu</span></td><td>Registers the bind in the in-game keybind settings menu.</td></tr>
+            <tr><td><span class="inline-code">SetFriendlyKeyName</span></td><td><span class="inline-code">KeyCode key, string displayName</span></td><td>Overrides the displayed label for a key.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>PlayerPrefsUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">GetBool</span> / <span class="inline-code">getBool</span></td><td><span class="inline-code">string key, bool defaultValue = false</span></td><td>Reads a boolean value from <span class="inline-code">PlayerPrefs</span>.</td></tr>
+            <tr><td><span class="inline-code">SetBool</span> / <span class="inline-code">setBool</span></td><td><span class="inline-code">string key, bool value</span></td><td>Stores a boolean value in <span class="inline-code">PlayerPrefs</span>.</td></tr>
+            <tr><td><span class="inline-code">GetFloat</span> / <span class="inline-code">getFloat</span></td><td><span class="inline-code">string key, float defaultValue = 0f</span></td><td>Reads a float value from <span class="inline-code">PlayerPrefs</span>.</td></tr>
+            <tr><td><span class="inline-code">SetFloat</span> / <span class="inline-code">setFloat</span></td><td><span class="inline-code">string key, float value</span></td><td>Stores a float value in <span class="inline-code">PlayerPrefs</span>.</td></tr>
+            <tr><td><span class="inline-code">GetString</span> / <span class="inline-code">getString</span></td><td><span class="inline-code">string key, string defaultValue = ""</span></td><td>Reads a string value from <span class="inline-code">PlayerPrefs</span>.</td></tr>
+            <tr><td><span class="inline-code">SetString</span> / <span class="inline-code">setString</span></td><td><span class="inline-code">string key, string value</span></td><td>Stores a string value in <span class="inline-code">PlayerPrefs</span>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>PlayerUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">IsInWorld</span> / <span class="inline-code">isInWorld</span></td><td>None</td><td>Returns whether a usable runtime world and player body are available.</td></tr>
+            <tr><td><span class="inline-code">TryGetBody</span> / <span class="inline-code">tryGetBody</span></td><td><span class="inline-code">out Body body</span></td><td>Attempts to get the active player body.</td></tr>
+            <tr><td><span class="inline-code">TryGetCamera</span> / <span class="inline-code">tryGetCamera</span></td><td><span class="inline-code">out PlayerCamera camera</span></td><td>Attempts to get the active player camera.</td></tr>
+            <tr><td><span class="inline-code">GetMousePosition</span> / <span class="inline-code">getMousePosition</span></td><td>None</td><td>Returns the current mouse or target-look position, depending on player state.</td></tr>
+            <tr><td><span class="inline-code">ShowAlert</span> / <span class="inline-code">showAlert</span></td><td><span class="inline-code">string text, bool? important = false</span></td><td>Shows an on-screen alert immediately.</td></tr>
+            <tr><td><span class="inline-code">Alert</span> / <span class="inline-code">alert</span></td><td><span class="inline-code">string text, bool important, float delay = 0f</span></td><td>Shows an on-screen alert immediately or after a delay.</td></tr>
+            <tr><td><span class="inline-code">Talk</span> / <span class="inline-code">talk</span></td><td><span class="inline-code">string dialogue</span></td><td>Routes dialogue through the player body's talker.</td></tr>
+            <tr><td><span class="inline-code">TalkElectronic</span> / <span class="inline-code">talkElectronic</span></td><td><span class="inline-code">string dialogue, Item item = null</span></td><td>Routes dialogue through an item's talker or a watch-style fallback proxy.</td></tr>
+            <tr><td><span class="inline-code">PlaySoundAt</span> / <span class="inline-code">playSoundAt</span></td><td><span class="inline-code">AudioClip clip, Vector2? pos = null</span></td><td>Plays a clip at a position or at the player by default.</td></tr>
+            <tr><td><span class="inline-code">PlaySoundAt</span> / <span class="inline-code">playSoundAt</span></td><td><span class="inline-code">AudioClip clip, float? volume = null, float? delay = null, Vector2? position = null, float? pitch = null</span></td><td>Plays a clip with optional volume, delay, position, and pitch overrides.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>PlayerInventoryUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">TryGetHeldItem</span> / <span class="inline-code">tryGetHeldItem</span></td><td><span class="inline-code">out Item item</span></td><td>Attempts to get the item currently held by the player.</td></tr>
+            <tr><td><span class="inline-code">TryGetHoveredItem</span> / <span class="inline-code">tryGetHoveredItem</span></td><td><span class="inline-code">out Item item</span></td><td>Attempts to find the item currently under the mouse, either in UI or in the world.</td></tr>
+            <tr><td><span class="inline-code">GiveItem</span> / <span class="inline-code">giveItem</span></td><td><span class="inline-code">string id, int count</span></td><td>Spawns item instances near the player and auto-picks them up.</td></tr>
+            <tr><td><span class="inline-code">GiveItemSlot</span> / <span class="inline-code">giveItemSlot</span></td><td><span class="inline-code">string id, int slot, int count</span></td><td>Spawns item instances near the player and tries to put them into a specific slot.</td></tr>
+            <tr><td><span class="inline-code">TryGetCustomItemInfo</span> / <span class="inline-code">tryGetCustomItemInfo</span></td><td><span class="inline-code">string id, out CustomItemInfo info</span></td><td>Looks up registered custom item metadata by ID.</td></tr>
+            <tr><td><span class="inline-code">IsModdedItem</span> / <span class="inline-code">isModdedItem</span></td><td><span class="inline-code">string itemId</span></td><td>Returns whether an item ID belongs to a recognized modded item path.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>PlayerLimbUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">DoAmputate</span> / <span class="inline-code">doAmputate</span></td><td><span class="inline-code">Item item, Limb limb</span></td><td>Forwards into the vanilla amputation interaction instead of requiring copied limb-use logic.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>ReflectionUtils</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">GetMethod</span></td><td><span class="inline-code">object target, string methodName</span></td><td>Returns a reflected method from the target object or type.</td></tr>
+            <tr><td><span class="inline-code">InvokeMethod</span></td><td><span class="inline-code">object target, string methodName, params object[] args</span></td><td>Looks up a method and invokes it with the supplied arguments.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>MathExtensions</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">IsFinite</span></td><td><span class="inline-code">this float value</span></td><td>Returns whether a float is neither <span class="inline-code">NaN</span> nor infinity.</td></tr>
+            <tr><td><span class="inline-code">IsFinite</span></td><td><span class="inline-code">this Vector2 value</span></td><td>Returns whether both vector components are finite.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Console and misc helpers</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">ConsoleLog</span></td><td><span class="inline-code">ConsoleScript instance, string message</span></td><td>Writes a message into the in-game console through the game's internal logging path.</td></tr>
+            <tr><td><span class="inline-code">ConsoleRunCommand</span></td><td><span class="inline-code">ConsoleScript instance, string commandString</span></td><td>Executes a command string through the in-game console.</td></tr>
+            <tr><td><span class="inline-code">ConsoleCheckForWorld</span></td><td><span class="inline-code">ConsoleScript instance</span></td><td>Runs the game's console-side world check before world-dependent commands.</td></tr>
+            <tr><td><span class="inline-code">LoadEmbeddedSprite</span></td><td><span class="inline-code">string resourcePath, float pixelsPerUnit = AssetLoader.PPU_UI, Assembly sourceAssembly = null</span></td><td>Pass-through helper for loading an embedded sprite.</td></tr>
+            <tr><td><span class="inline-code">CompressGZip</span></td><td><span class="inline-code">byte[] data</span></td><td>Compresses a byte array with GZip.</td></tr>
+            <tr><td><span class="inline-code">DecompressGZip</span></td><td><span class="inline-code">byte[] compressedData</span></td><td>Decompresses a GZip byte array.</td></tr>
+            <tr><td><span class="inline-code">CompressDeflate</span></td><td><span class="inline-code">byte[] data</span></td><td>Compresses a byte array with Deflate.</td></tr>
+            <tr><td><span class="inline-code">DecompressDeflate</span></td><td><span class="inline-code">byte[] compressedData</span></td><td>Decompresses a Deflate byte array.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Currently empty categories</h2>
+      <p>For the current worktree, there are no dedicated public <span class="inline-code">CUCoreUtils</span> members that map cleanly to the category names <span class="inline-code">LocaleUtils</span>, <span class="inline-code">PlayerSkillUtils</span>, or <span class="inline-code">TextUtils</span>.</p>
+    </section>
   `;
 }
 
