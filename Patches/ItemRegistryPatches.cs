@@ -370,14 +370,18 @@ namespace CUCoreLib.Patches
             if (NotSpawnWithBatteryField != null) NotSpawnWithBatteryField.SetValue(bat, !def.Battery.SpawnWithBattery);
 
             var configuredBatteryType = ResolveConfiguredBatteryType(def.Battery);
-            if ((forceBatteryType || string.IsNullOrEmpty(bat.batteryType)) &&
-                !string.IsNullOrWhiteSpace(configuredBatteryType))
+            var shouldAssignBatteryType = def.Battery.SpawnWithBattery &&
+                                          (forceBatteryType || string.IsNullOrEmpty(bat.batteryType));
+            if (shouldAssignBatteryType && !string.IsNullOrWhiteSpace(configuredBatteryType))
                 bat.batteryType = configuredBatteryType;
 
             if (!initializeState) return;
 
             if (!def.Battery.SpawnWithBattery)
             {
+                bat.batteryType = string.Empty;
+                bat.batteryWasFavourited = false;
+                bat.maxCharge = 0f;
                 item.condition = 0f;
                 return;
             }

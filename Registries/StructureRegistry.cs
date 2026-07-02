@@ -57,6 +57,7 @@ namespace CUCoreLib.Registries
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static GameObject BackgroundTemplate;
+        private static bool RegisteredStructureSummaryLogged;
 
         public static bool RegisterFromJson(string id, string json, string sourceLabel = null)
         {
@@ -76,21 +77,16 @@ namespace CUCoreLib.Registries
                 return false;
             }
 
-            var stopwatch = Stopwatch.StartNew();
             try
             {
                 var definition = ParseDefinition(id.Trim(), json, sourceLabel ?? "json");
                 if (definition == null) return false;
 
                 RegisteredDefinitions[definition.ID] = definition;
-                stopwatch.Stop();
-
-                LogStructureRegistration(definition, sourceLabel, stopwatch.ElapsedMilliseconds);
                 return true;
             }
             catch (Exception ex)
             {
-                stopwatch.Stop();
                 CUCoreLibPlugin.Log?.LogWarning("Failed to register structure '" + id.Trim() + "' from " +
                                                 (sourceLabel ?? "json") + ": " + ex.Message);
                 return false;
@@ -157,13 +153,11 @@ namespace CUCoreLib.Registries
         {
             if (!TryGetDefinition(id, out var definition)) return false;
 
+            LogRegisteredStructureSummaryIfNeeded();
+
             using (seedOverride.HasValue ? StructureSeededRandom.PushOverride(seedOverride.Value) : null)
             {
-                var stopwatch = Stopwatch.StartNew();
                 PlaceStructure(position, definition);
-                stopwatch.Stop();
-                CUCoreLibPlugin.Log?.LogInfo("Placed structure '" + definition.ID + "' in " +
-                                             stopwatch.ElapsedMilliseconds + "ms.");
             }
 
             return true;
@@ -178,13 +172,12 @@ namespace CUCoreLib.Registries
 
             if (world == null || RegisteredDefinitions.Count == 0) yield break;
 
+            LogRegisteredStructureSummaryIfNeeded();
             StructureSeededRandom.InitializeForStructures();
 
             var currentDepth = world.biomeDepth;
             var occupiedRects = new List<StructurePlacementRect>();
             var totalRequestedSpawnCount = 0;
-            var placementStopwatch = Stopwatch.StartNew();
-
             foreach (var definition in RegisteredDefinitions.Values.OrderBy(entry => entry.ID, StringComparer.OrdinalIgnoreCase))
             {
                 if (definition.SpawnCounts == null || currentDepth < 0 || currentDepth >= definition.SpawnCounts.Length)
@@ -215,10 +208,6 @@ namespace CUCoreLib.Registries
                     yield return null;
                 }
             }
-
-            placementStopwatch.Stop();
-            CUCoreLibPlugin.Log?.LogInfo("CUCoreLib multi-block structure worldgen finished in " +
-                                         placementStopwatch.ElapsedMilliseconds + "ms.");
         }
 
         private static bool TryGetDefinition(string id, out RegisteredStructureDefinition definition)
@@ -315,18 +304,12 @@ namespace CUCoreLib.Registries
                                              " terrainGenAreas entries. CUCoreLib v1 imports and preserves compatibility with the payload shape, but does not execute terrainGenAreas yet.");
         }
 
-        private static void LogStructureRegistration(RegisteredStructureDefinition definition, string sourceLabel,
-            long elapsedMilliseconds)
+        private static void LogRegisteredStructureSummaryIfNeeded()
         {
-            if (definition?.CompiledStructure == null) return;
+            if (RegisteredStructureSummaryLogged || RegisteredDefinitions.Count <= 0) return;
 
-            CUCoreLibPlugin.Log?.LogInfo("Registered structure '" + definition.ID + "' from " +
-                                         (sourceLabel ?? "json") + " (" +
-                                         definition.CompiledStructure.Width + "x" +
-                                         definition.CompiledStructure.Height + ", " +
-                                         definition.CompiledStructure.Entities.Count + " entity markers, " +
-                                         (definition.CompiledLootMarkers?.Count ?? 0) + " loot markers, " +
-                                         elapsedMilliseconds + "ms compile).");
+            RegisteredStructureSummaryLogged = true;
+            CUCoreLibPlugin.Log?.LogInfo("Added " + RegisteredDefinitions.Count + " custom structures.");
         }
 
         private static bool HasUnsupportedDynamicGeneration(RegisteredStructureDefinition definition, JObject root,

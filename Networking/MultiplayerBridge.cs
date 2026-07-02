@@ -17,8 +17,10 @@ namespace CUCoreLib.Networking
         private const string PluginGuid = "KrokoshaCasualtiesMP";
         private const string MpTypeName = "KrokoshaCasualtiesMP.KrokoshaScavMultiplayer";
         private const string NetTypeName = "KrokoshaCasualtiesMP.Net";
+        private const string NetTypeEnumName = "KrokoshaCasualtiesMP.Net+NetType";
         private const string ServerMainTypeName = "KrokoshaCasualtiesMP.ServerMain";
         private const string ClientMainTypeName = "KrokoshaCasualtiesMP.ClientMain";
+        private const string LiteNetTransportTypeName = "KrokoshaCasualtiesMP.TransportLiteNetLib";
         private const string MessageField = "msg";
         private const string ChannelField = "channel";
         private const string KindField = "kind";
@@ -43,8 +45,10 @@ namespace CUCoreLib.Networking
         private static Assembly _krokAssembly;
         private static Type _mpType;
         private static Type _netType;
+        private static Type _netModeType;
         private static Type _serverMainType;
         private static Type _clientMainType;
+        private static Type _liteNetTransportType;
         private static Type _deliveryMethodType;
         private static Type _readerType;
         private static Type _writerType;
@@ -56,6 +60,8 @@ namespace CUCoreLib.Networking
         private static MethodInfo _registerClientReceiverMethod;
         private static MethodInfo _writerPutStringMethod;
         private static MethodInfo _readerGetStringMethod;
+        private static MethodInfo _liteNetConnectMethod;
+        private static MethodInfo _serverAnnounceGameStartMethod;
         private static object _reliableOrdered;
         private static object _reliableUnordered;
 
@@ -65,6 +71,50 @@ namespace CUCoreLib.Networking
         public static bool IsClient => GetNetBool("is_client");
         public static bool IsServer => GetNetBool("is_server");
         public static bool IsHost => GetNetBool("is_host");
+
+        public static bool TryConfigureLocalIdentity(string username, string address)
+        {
+            if (!TryResolveRuntime()) return false;
+            if (_mpType == null) return false;
+
+            try
+            {
+                SetStaticStringProperty(_mpType, "INPUT_USERNAME", username);
+                SetStaticStringProperty(_mpType, "INPUT_IPPORT", address);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib failed to configure KrokMP local identity.\n" + ex);
+                return false;
+            }
+        }
+
+        public static bool TryStartLocalQuickTestHost(string address)
+        {
+            return TryStartLocalConnection(address, "Host");
+        }
+
+        public static bool TryStartLocalQuickTestClient(string address)
+        {
+            return TryStartLocalConnection(address, "Client");
+        }
+
+        public static bool TryAnnounceGameStart()
+        {
+            if (!TryResolveRuntime() || _serverAnnounceGameStartMethod == null) return false;
+
+            try
+            {
+                _serverAnnounceGameStartMethod.Invoke(null, null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib failed to announce KrokMP game start.\n" + ex);
+                return false;
+            }
+        }
 
         public static void Initialize()
         {
@@ -422,9 +472,12 @@ namespace CUCoreLib.Networking
 
             _mpType = _krokAssembly.GetType(MpTypeName, false);
             _netType = _krokAssembly.GetType(NetTypeName, false);
+            _netModeType = _krokAssembly.GetType(NetTypeEnumName, false);
             _serverMainType = _krokAssembly.GetType(ServerMainTypeName, false);
             _clientMainType = _krokAssembly.GetType(ClientMainTypeName, false);
-            if (_mpType == null || _netType == null || _serverMainType == null || _clientMainType == null) return false;
+            _liteNetTransportType = _krokAssembly.GetType(LiteNetTransportTypeName, false);
+            if (_mpType == null || _netType == null || _netModeType == null || _serverMainType == null ||
+                _clientMainType == null || _liteNetTransportType == null) return false;
 
             var liteNetLibAssembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(assembly =>
                 string.Equals(assembly.GetName().Name, "LiteNetLib", StringComparison.OrdinalIgnoreCase));
@@ -450,10 +503,15 @@ namespace CUCoreLib.Networking
                 new[] { "RegisterClientReceiver", "RegisterClientReciever" }, new[] { typeof(ushort), null });
             _writerPutStringMethod = ResolveStringPutMethod();
             _readerGetStringMethod = ResolveStringGetMethod();
+            _liteNetConnectMethod = ResolveMethod(_liteNetTransportType, new[] { "OnWantToConnect" },
+                new[] { typeof(string), _netModeType });
+            _serverAnnounceGameStartMethod = ResolveMethod(_serverMainType, new[] { "Server_Announce_GAME_START" },
+                Type.EmptyTypes);
 
             if (_createWriterMethod == null || _clientSendMethod == null || _serverSendToMethod == null ||
                 _serverSendToClientsMethod == null || _registerServerReceiverMethod == null ||
-                _registerClientReceiverMethod == null) return false;
+                _registerClientReceiverMethod == null || _liteNetConnectMethod == null ||
+                _serverAnnounceGameStartMethod == null) return false;
 
             _reliableOrdered = Enum.Parse(_deliveryMethodType, "ReliableOrdered");
             _reliableUnordered = Enum.Parse(_deliveryMethodType, "ReliableUnordered");
@@ -586,6 +644,33 @@ namespace CUCoreLib.Networking
         private static bool IsUnsignedIntegerLike(Type type)
         {
             return type == typeof(byte) || type == typeof(ushort) || type == typeof(uint) || type == typeof(ulong);
+        }
+
+        private static bool TryStartLocalConnection(string address, string modeName)
+        {
+            if (!TryResolveRuntime() || _liteNetConnectMethod == null || _netModeType == null) return false;
+
+            try
+            {
+                var targetAddress = string.IsNullOrWhiteSpace(address) ? "localhost:7790" : address.Trim();
+                var mode = Enum.Parse(_netModeType, modeName);
+                var result = _liteNetConnectMethod.Invoke(null, new object[] { targetAddress, mode });
+                return result is bool connected && connected;
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib failed to start KrokMP localhost quick test mode.\n" + ex);
+                return false;
+            }
+        }
+
+        private static void SetStaticStringProperty(Type type, string propertyName, string value)
+        {
+            var property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Static);
+            if (property == null || !property.CanWrite || property.PropertyType != typeof(string))
+                throw new MissingMemberException(type.FullName, propertyName);
+
+            property.SetValue(null, value ?? string.Empty, null);
         }
     }
 }
