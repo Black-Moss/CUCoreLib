@@ -7,7 +7,7 @@ I figured that this would be nice to have, as to easily take a look at everythin
 - Added a multi-block structure system via `StructureRegistry`, for custom structures. Will need to integrate still via the custom-structure-webapp side, though...
 - Added expanded minigame helper support, subject to change
 - Added keybind and keycode-related support
-- Added XML documentation comments across the codebase!
+- Added XML documentation comments across the codebase! (this is the large change of the version)
 - Added preloading for embedded images for optimization
 - BuildingEntites how has a SpawnLayers field
 - Added InventoryIconScale field to items
