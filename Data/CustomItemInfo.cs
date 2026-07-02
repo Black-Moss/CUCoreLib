@@ -43,6 +43,11 @@ namespace CUCoreLib.Data
         public Sprite Icon;
 
         /// <summary>
+        /// Additional multiplier applied only to inventory icon rendering.
+        /// </summary>
+        public float InventoryIconScale = 1.0f;
+
+        /// <summary>
         /// Optional registered sprite animation id applied to <see cref="Icon"/>.
         /// </summary>
         public string IconAnimationId;

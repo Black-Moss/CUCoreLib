@@ -11,6 +11,7 @@ namespace CUCoreLib.Registries
     public static class MoodleRegistry
     {
         private const float DefaultHoldSeconds = 0.75f;
+        private const float VanillaMoodlePixelsPerUnit = 33.33f;
         private static readonly List<IBodyMoodleContributor> BodyContributors = new List<IBodyMoodleContributor>();
         private static readonly List<ILimbMoodleContributor> LimbContributors = new List<ILimbMoodleContributor>();
 
@@ -311,7 +312,11 @@ namespace CUCoreLib.Registries
         {
             if (iconSprite == null) return null;
 
-            if (Mathf.Approximately(iconSprite.pixelsPerUnit, AssetLoader.PPU_UI)) return iconSprite;
+            if (Mathf.Approximately(iconSprite.pixelsPerUnit, VanillaMoodlePixelsPerUnit)) return iconSprite;
+
+            // Preserve intentionally custom PPU choices made by the caller.
+            if (!Mathf.Approximately(iconSprite.pixelsPerUnit, AssetLoader.PPU_WORLD) &&
+                !Mathf.Approximately(iconSprite.pixelsPerUnit, AssetLoader.PPU_UI)) return iconSprite;
 
             var instanceId = iconSprite.GetInstanceID();
             if (UiSpriteCache.TryGetValue(instanceId, out var cachedSprite) && cachedSprite != null)
@@ -321,7 +326,7 @@ namespace CUCoreLib.Registries
                 iconSprite.texture,
                 iconSprite.rect,
                 iconSprite.pivot / iconSprite.rect.size,
-                AssetLoader.PPU_UI,
+                VanillaMoodlePixelsPerUnit,
                 0,
                 SpriteMeshType.FullRect,
                 iconSprite.border);

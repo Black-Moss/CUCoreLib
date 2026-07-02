@@ -136,6 +136,13 @@ namespace CUCoreLib.Patches
             return scaledByDimensions * baseScale;
         }
 
+        internal static float ResolveInventoryIconScale(Item item, CustomItemInfo def)
+        {
+            if (def == null) return 1f;
+
+            return Mathf.Max(0.01f, ResolveSpriteScale(item, def)) * Mathf.Max(0.01f, def.InventoryIconScale);
+        }
+
         private static bool TryResolveSpriteScaleFromDimensions(Item item, CustomItemInfo def, out float scale)
         {
             scale = 1f;
@@ -432,7 +439,7 @@ namespace CUCoreLib.Patches
             __instance.itemImg.sprite = sprite;
             __instance.itemImg.rectTransform.sizeDelta =
                 PlayerCamera.ImageSizeDelta(sprite.texture, 3f, __instance.maxImageSize) *
-                Mathf.Max(0.01f, ResolveSpriteScale(item, def));
+                ResolveInventoryIconScale(item, def);
         }
 
         [HarmonyPatch(typeof(LightItem), "Start")]

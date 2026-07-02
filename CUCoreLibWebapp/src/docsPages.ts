@@ -1027,6 +1027,7 @@ status.ExposureSeconds += Time.deltaTime;</code></pre>
       <pre><code>[HarmonyPatch(typeof(Body), "Update")]
 public static class BodyUpdateStatusPatch
 {
+    [HarmonyPostfix]
     private static void Postfix(Body __instance)
     {
        
@@ -1405,6 +1406,12 @@ WriteUnityLog = false</code></pre>
       # Setting type: Boolean
       # Default value: false
       HideManagerGameObject = true</code></pre>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Why am I missing a using directive or an assembly reference?</h2>
+      <p>If Visual Studio says it cannot find CUCoreLib types, the template usually still points at the wrong game install path. Update the <span class="inline-code">vars.targets</span> file inside your template folder so it points to the folder where Casualties Unknown Demo is installed.</p>
+      <p>After saving <span class="inline-code">vars.targets</span>, restart Visual Studio if it was already open so it reloads the updated reference path.</p>
     </section>
 
     <section class="lesson-card">
@@ -2302,6 +2309,7 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">WornSprite</span></td><td><span class="inline-code">Sprite</span></td><td>Optional sprite applied while a wearable custom item is worn, then restored to <span class="inline-code">Icon</span> when dropped.</td></tr>
             <tr><td><span class="inline-code">WornSpriteOffset</span></td><td><span class="inline-code">Vector2</span></td><td>Optional local-space offset applied to the worn item sprite after vanilla attaches it to <span class="inline-code">desiredWearLimb</span>.</td></tr>
             <tr><td><span class="inline-code">SpriteScale</span></td><td><span class="inline-code">float</span></td><td>Scale applied to the generated runtime template. Keep this near <span class="inline-code">1f</span> unless your art was made at a different size.</td></tr>
+            <tr><td><span class="inline-code">InventoryIconScale</span></td><td><span class="inline-code">float</span></td><td>Extra multiplier applied only to the inventory icon UI size after the normal sprite scale has been resolved. Leave it at <span class="inline-code">1f</span> unless you want the inventory icon smaller or larger than the in-world sprite.</td></tr>
             <tr><td><span class="inline-code">SpriteScaleDimensions</span></td><td><span class="inline-code">SpriteScaleDimensions</span></td><td>Scales the sprite toward a target pixel size like <span class="inline-code">(14f, 14f)</span>. Add <span class="inline-code">true</span> as the third tuple value to stop once either axis reaches the requested size instead of forcing both axes to meet it.</td></tr>
             <tr><td><span class="inline-code">SpawnFrequency</span></td><td><span class="inline-code">int</span></td><td>Loot pool injection weight. <span class="inline-code">0</span> means craft-only, <span class="inline-code">1</span> is the normal default, higher values make it more common.</td></tr>
             <tr><td><span class="inline-code">Container</span></td><td><span class="inline-code">ContainerProperties</span></td><td>Adds/configures a vanilla <span class="inline-code">Container</span> component on spawned items.</td></tr>

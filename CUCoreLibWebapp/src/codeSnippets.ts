@@ -1967,6 +1967,7 @@ using UnityEngine;
 [HarmonyPatch(typeof(Body), "Update")]
 public static class LeadPoisoningPatch
 {
+    [HarmonyPostfix]
     private static void Postfix(Body __instance)
     {
         LeadPoisoningStatus status = __instance.GetStatus<LeadPoisoningStatus>();
