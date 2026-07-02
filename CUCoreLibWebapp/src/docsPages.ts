@@ -1117,9 +1117,32 @@ function moodlesPage(): string {
         "You're feeling a bit woozy and fatigued...",
         critical: false,
         chippedOnly: false,
-        important: true // optional, defaults to true
     );</code></pre>
     <img src="/images/moodle-ingame.png" alt="Example custom moodle with a custom icon" class="screenshot">
+    </section>
+
+    <section class="lesson-card">
+      <h2>AddMoodle parameters/fields</h2>
+      <div class="table-wrap">
+        <table class="field-table">
+          <thead>
+            <tr><th>Parameter</th><th>Type</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="inline-code">intensity</span></td><td><span class="inline-code">int</span></td><td>Picks the vanilla moodle background tier. Use the intensity table below for the visual mapping.</td></tr>
+            <tr><td><span class="inline-code">icon</span></td><td><span class="inline-code">Sprite</span></td><td>Sprite icon.</td></tr>
+            <tr><td><span class="inline-code">iconId</span></td><td><span class="inline-code">string</span></td><td>String-based overload only. Don't use, unless the icon already exists in <span class="inline-code">MoodleManager.icons</span>.</td></tr>
+            <tr><td><span class="inline-code">name</span></td><td><span class="inline-code">string</span></td><td>Mouseover title text shown on the moodle. Can be localized.</td></tr>
+            <tr><td><span class="inline-code">description</span></td><td><span class="inline-code">string</span></td><td>Mouseover description text shown in the hover/details UI. Can be localized.</td></tr>
+            <tr><td><span class="inline-code">critical</span></td><td><span class="inline-code">bool</span></td><td>Adds the vanilla critical overlay glow. This is separate from the intensity number.</td></tr>
+            <tr><td><span class="inline-code">chippedOnly</span></td><td><span class="inline-code">bool</span></td><td>If <span class="inline-code">true</span>, the moodle will only be displayed when the player has a chip.</td></tr>
+            <tr><td><span class="inline-code">important</span></td><td><span class="inline-code">bool</span></td><td>If <span class="inline-code">false</span>, the moodle will be displayed in the unimportant hidden-ish section to the right.</td></tr>
+            <tr><td><span class="inline-code">key</span></td><td><span class="inline-code">string</span></td><td>Optional stable queue key. Supply this when a moodle changes severity over time. (Where you only want one moodle with the same key active at a time.)</td></tr>
+            <tr><td><span class="inline-code">holdSeconds</span></td><td><span class="inline-code">float</span></td><td>How long the queued moodle stays visible without being refreshed. The default is <span class="inline-code">0.75f</span>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>If you want animated icons instead, <span class="inline-code">AddAnimatedMoodle(...)</span> swaps the icon argument for <span class="inline-code">animationId</span> but otherwise follows the same parameter meanings.</p>
     </section>
 
     <section class="lesson-card">
