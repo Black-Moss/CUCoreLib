@@ -12,6 +12,7 @@ using TMPro;
 using UnityEngine;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using Object = UnityEngine.Object;
+using UnityEngine.EventSystems;
 
 namespace CUCoreLib.Helpers
 {
@@ -53,6 +54,13 @@ namespace CUCoreLib.Helpers
             public KeyCode KeyCode => ResolveKeyCode(entry);
 
             public string KeyName => GetFriendlyKeyName(KeyCode);
+
+            public bool IsPressed()
+            {
+                if (!Input.GetKeyDown(KeyCode))
+                    return false;
+                return !ShouldDisableFriendlyKeybind(entry);
+            }
 
             public static implicit operator KeyCode(FriendlyKeybind keybind)
             {
@@ -843,9 +851,6 @@ namespace CUCoreLib.Helpers
             if (liveSetting != null)
                 entry.CurrentKey = liveSetting.value;
 
-            if (ShouldDisableFriendlyKeybind(entry))
-                return KeyCode.None;
-
             return entry.CurrentKey;
         }
 
@@ -899,8 +904,8 @@ namespace CUCoreLib.Helpers
             if (IsKrokMpChatFocused())
                 return true;
 
-            return Resources.FindObjectsOfTypeAll<TMP_InputField>()
-                .Any(field => field != null && field.isFocused);
+            var inputField = EventSystem.current?.currentSelectedGameObject?.GetComponent<TMP_InputField>();
+		    return inputField != null && inputField.isFocused;
         }
 
         private static bool IsKrokMpChatFocused()
