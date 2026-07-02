@@ -899,8 +899,9 @@ namespace CUCoreLib.Helpers
             if (IsKrokMpChatFocused())
                 return true;
 
-            return Resources.FindObjectsOfTypeAll<TMP_InputField>()
-                .Any(field => field != null && field.isFocused);
+            var selected = EventSystem.current?.currentSelectedGameObject;
+		    var inputField = selected != null ? selected.GetComponent<TMP_InputField>() : null;
+		    return inputField != null && inputField.isFocused;
         }
 
         private static bool IsKrokMpChatFocused()
