@@ -172,11 +172,13 @@ namespace CUCoreLib.ContentReload
             {
                 var reloadLabel = GetReloadedFileName(result.SourcePath);
                 if (console != null) CUCoreUtils.ConsoleLog(console, "Reloaded " + reloadLabel + "!");
+                WriteMessages(console, result.Skipped);
 
                 return;
             }
 
             WriteMessages(console, result != null ? result.Errors.ToArray() : Array.Empty<string>());
+            WriteMessages(console, result != null ? result.Skipped.ToArray() : Array.Empty<string>());
             if (result != null && !string.IsNullOrWhiteSpace(result.UnsupportedReason))
                 WriteMessages(console, new[] { result.UnsupportedReason });
         }

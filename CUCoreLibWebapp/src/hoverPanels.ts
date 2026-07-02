@@ -55,7 +55,22 @@ export const hoverPanels: Record<string, HoverPanel> = {
   ContentReloadEntry: {
     title: "ContentReloadEntry",
     signature: "[ContentReloadEntry(ContentReloadEntryStage stage, Order = 0)]",
-    body: "Attribute that opts a parameterless method into strict content reload. CUCoreLib replays tagged methods by stage, then by Order, without rerunning your plugin Awake."
+    body: "Attribute that opts a parameterless method into strict content reload. Use it on plugin methods or inside a CCLContentHost class when you need an explicit stage or ordering override."
+  },
+  CCLContentHost: {
+    title: "CCLContentHost",
+    signature: "[CCLContentHost]",
+    body: "Class-level hot reload opt-in. Mark a static or instance content class with this attribute and CUCoreLib will scan its parameterless methods, infer supported registration stages, and replay them during strict reload."
+  },
+  CCLReloadIgnore: {
+    title: "CCLReloadIgnore",
+    signature: "[CCLReloadIgnore]",
+    body: "Method-level opt-out for CCLContentHost classes. Use it when a parameterless helper would otherwise be discovered by the strict reload scanner."
+  },
+  CCLBase: {
+    title: "CCLBase",
+    signature: "abstract class CCLBase",
+    body: "Optional helper base for instance-backed content hosts. Derive from it when you want a reusable content object, then call CCLBase.Initialize(this) from your plugin Awake so the host can access the live plugin instance during startup."
   },
   ConsoleCheckForWorld: {
     title: "ConsoleCheckForWorld",

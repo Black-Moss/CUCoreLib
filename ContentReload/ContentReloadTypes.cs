@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CUCoreLib.Data;
 
 namespace CUCoreLib.ContentReload
 {
@@ -20,6 +21,7 @@ namespace CUCoreLib.ContentReload
         private readonly List<string> errors = new List<string>();
         private readonly List<string> info = new List<string>();
         private readonly List<string> recognizedMethods = new List<string>();
+        private readonly List<string> ranMethods = new List<string>();
         private readonly List<string> skipped = new List<string>();
 
         public string ModGuid { get; internal set; }
@@ -31,8 +33,8 @@ namespace CUCoreLib.ContentReload
         public IReadOnlyList<string> Info => info;
         public IReadOnlyList<string> Skipped => skipped;
         public IReadOnlyList<string> Errors => errors;
-        // not use RecognizedMethods
         public IReadOnlyList<string> RecognizedMethods => recognizedMethods;
+        public IReadOnlyList<string> RanMethods => ranMethods;
         public bool Succeeded => string.IsNullOrWhiteSpace(UnsupportedReason) && errors.Count == 0;
 
         internal void AddInfo(string message)
@@ -54,6 +56,12 @@ namespace CUCoreLib.ContentReload
         {
             if (!string.IsNullOrWhiteSpace(methodName) && !recognizedMethods.Contains(methodName))
                 recognizedMethods.Add(methodName);
+        }
+
+        internal void AddRanMethod(string methodName)
+        {
+            if (!string.IsNullOrWhiteSpace(methodName) && !ranMethods.Contains(methodName))
+                ranMethods.Add(methodName);
         }
     }
 
@@ -94,15 +102,34 @@ namespace CUCoreLib.ContentReload
         public string SelectedSourceLabel { get; set; }
         public string PluginTypeFullName { get; set; }
         public string UnsupportedReason { get; set; }
-        public List<string> RecognizedMethods { get; } = new List<string>();
-        // not use Notes
+        public List<DiscoveredReloadMethod> Methods { get; } = new List<DiscoveredReloadMethod>();
+        public List<SkippedReloadMethod> SkippedMethods { get; } = new List<SkippedReloadMethod>();
         public List<string> Notes { get; } = new List<string>();
+        public List<string> RecognizedMethods { get; } = new List<string>();
 
         public bool IsSupported =>
             string.IsNullOrWhiteSpace(UnsupportedReason) &&
             !string.IsNullOrWhiteSpace(PluginTypeFullName) &&
-            RecognizedMethods.Count > 0 &&
+            Methods.Count > 0 &&
             !string.IsNullOrWhiteSpace(SelectedPath);
+    }
+
+    internal sealed class DiscoveredReloadMethod
+    {
+        public string DisplayName { get; set; }
+        public string DeclaringTypeFullName { get; set; }
+        public string MethodName { get; set; }
+        public bool IsStatic { get; set; }
+        public bool IsPluginMethod { get; set; }
+        public ContentReloadEntryStage Stage { get; set; }
+        public int Order { get; set; }
+        public int DiscoveryIndex { get; set; }
+    }
+
+    internal sealed class SkippedReloadMethod
+    {
+        public string DisplayName { get; set; }
+        public string Reason { get; set; }
     }
 
     internal sealed class ContentObservedFileState

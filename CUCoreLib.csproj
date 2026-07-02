@@ -206,6 +206,8 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Data\CustomBuildingEntityDefinition.cs"/>
+        <Compile Include="Data\CCLContentHostAttribute.cs"/>
+        <Compile Include="Data\CCLReloadIgnoreAttribute.cs"/>
         <Compile Include="Data\ContentReloadEntryAttribute.cs"/>
         <Compile Include="Data\CustomItemInfo.cs"/>
         <Compile Include="Data\CustomLiquidInfo.cs"/>
@@ -219,6 +221,7 @@
         <Compile Include="Data\CustomTileDefinition.cs"/>
         <Compile Include="ContentReload\ContentAssemblyResolver.cs"/>
         <Compile Include="ContentReload\ContentCompatibilityScanner.cs"/>
+        <Compile Include="ContentReload\ContentHostRuntime.cs"/>
         <Compile Include="ContentReload\ContentReloadManager.cs"/>
         <Compile Include="ContentReload\ContentReloadSession.cs"/>
         <Compile Include="ContentReload\ContentReloadTypes.cs"/>
@@ -227,6 +230,7 @@
         <Compile Include="Helpers\AssetLoader.cs"/>
         <Compile Include="Helpers\AnimatedImage.cs"/>
         <Compile Include="Helpers\AnimatedSpriteRenderer.cs"/>
+        <Compile Include="Helpers\CCLBase.cs"/>
         <Compile Include="Helpers\CUCoreUtils.cs"/>
         <Compile Include="Helpers\CustomBuildingRuntime.cs"/>
         <Compile Include="Helpers\MinigameHelpers.cs"/>

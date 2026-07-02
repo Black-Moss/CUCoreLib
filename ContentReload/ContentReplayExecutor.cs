@@ -35,6 +35,9 @@ namespace CUCoreLib.ContentReload
             foreach (var recognizedMethod in report.RecognizedMethods)
                 result.AddRecognizedMethod(recognizedMethod);
 
+            foreach (var skippedMethod in report.SkippedMethods)
+                result.AddSkipped(skippedMethod.DisplayName + ": " + skippedMethod.Reason);
+
             if (!report.IsSupported)
             {
                 if (!string.IsNullOrWhiteSpace(report.UnsupportedReason)) result.AddError(report.UnsupportedReason);
@@ -51,21 +54,13 @@ namespace CUCoreLib.ContentReload
                 return result;
             }
 
-            var methods = report.RecognizedMethods
-                .Select(methodName => pluginType.GetMethod(methodName,
-                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                .Where(method => method != null && method.GetParameters().Length == 0)
-                .ToArray();
-
-            if (methods.Length == 0)
+            var invocations = ResolveInvocations(assembly, pluginType, report, result);
+            if (invocations.Count == 0)
             {
-                result.AddError("No invokable content methods were resolved from the reloaded assembly.");
+                result.UnsupportedReason = "No invokable content methods were resolved from the reloaded assembly.";
+                result.AddError(result.UnsupportedReason);
                 return result;
             }
-
-            var pluginInstance = methods.Any(method => !method.IsStatic)
-                ? CreatePluginReplayInstance(pluginType, report)
-                : null;
 
             var existingContent = CaptureExistingContent(report.ModGuid);
             AssetLoader.InvalidateEmbeddedCachesForModGuid(report.ModGuid);
@@ -79,28 +74,31 @@ namespace CUCoreLib.ContentReload
             using (LocaleRegistry.BeginOwnerRegistration(report.ModGuid))
             using (BuildingEntityRegistry.BeginOwnerRegistration(report.ModGuid))
             {
-                foreach (var method in methods)
+                foreach (var invocation in invocations)
                 {
                     try
                     {
-                        method.Invoke(method.IsStatic ? null : pluginInstance, null);
-                        result.AddInfo("Ran " + method.Name + "().");
+                        invocation.Method.Invoke(invocation.Method.IsStatic ? null : invocation.Target, null);
+                        result.AddRanMethod(invocation.DisplayName);
+                        result.AddInfo("Ran " + invocation.DisplayName + "().");
                     }
                     catch (TargetInvocationException ex)
                     {
                         var inner = ex.InnerException ?? ex;
                         Rollback(report.ModGuid, existingContent, result);
-                        result.AddError("Method '" + method.Name + "' failed: " + inner.Message);
+                        result.AddError("Method '" + invocation.DisplayName + "' failed: " + inner.Message);
                         CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" +
-                                                        method.Name + "' for '" + report.ModGuid + "'.\n" + inner);
+                                                        invocation.DisplayName + "' for '" + report.ModGuid + "'.\n" +
+                                                        inner);
                         return result;
                     }
                     catch (Exception ex)
                     {
                         Rollback(report.ModGuid, existingContent, result);
-                        result.AddError("Method '" + method.Name + "' failed: " + ex.Message);
+                        result.AddError("Method '" + invocation.DisplayName + "' failed: " + ex.Message);
                         CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload failed while running '" +
-                                                        method.Name + "' for '" + report.ModGuid + "'.\n" + ex);
+                                                        invocation.DisplayName + "' for '" + report.ModGuid + "'.\n" +
+                                                        ex);
                         return result;
                     }
                 }
@@ -110,6 +108,68 @@ namespace CUCoreLib.ContentReload
 
             result.AddInfo("Strict content reload completed.");
             return result;
+        }
+
+        private static List<ResolvedInvocation> ResolveInvocations(Assembly assembly, Type pluginType,
+            ContentCompatibilityReport report, ContentReloadResult result)
+        {
+            var invocations = new List<ResolvedInvocation>();
+            object pluginInstance = null;
+            var hostInstances = new Dictionary<string, object>(StringComparer.Ordinal);
+
+            foreach (var discoveredMethod in report.Methods)
+            {
+                var declaringType = assembly.GetType(discoveredMethod.DeclaringTypeFullName, false);
+                if (declaringType == null)
+                {
+                    result.AddSkipped(discoveredMethod.DisplayName +
+                                      ": Reloaded assembly did not contain declaring type '" +
+                                      discoveredMethod.DeclaringTypeFullName + "'.");
+                    continue;
+                }
+
+                var method = declaringType.GetMethod(discoveredMethod.MethodName,
+                    BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (method == null || method.GetParameters().Length != 0)
+                {
+                    result.AddSkipped(discoveredMethod.DisplayName +
+                                      ": Reloaded assembly did not contain an invokable parameterless method.");
+                    continue;
+                }
+
+                object target = null;
+                if (!method.IsStatic)
+                {
+                    if (discoveredMethod.IsPluginMethod)
+                    {
+                        if (pluginInstance == null) pluginInstance = CreatePluginReplayInstance(pluginType, report);
+                        target = pluginInstance;
+                    }
+                    else
+                    {
+                        if (!hostInstances.TryGetValue(discoveredMethod.DeclaringTypeFullName, out target))
+                        {
+                            target = CreateHostReplayInstance(declaringType, report, out var reason);
+                            if (target == null)
+                            {
+                                result.AddSkipped(discoveredMethod.DisplayName + ": " + reason);
+                                continue;
+                            }
+
+                            hostInstances[discoveredMethod.DeclaringTypeFullName] = target;
+                        }
+                    }
+                }
+
+                invocations.Add(new ResolvedInvocation
+                {
+                    DisplayName = discoveredMethod.DisplayName,
+                    Method = method,
+                    Target = target
+                });
+            }
+
+            return invocations;
         }
 
         private static ContentOwnerSnapshot CaptureExistingContent(string modGuid)
@@ -199,6 +259,16 @@ namespace CUCoreLib.ContentReload
             return instance;
         }
 
+        private static object CreateHostReplayInstance(Type hostType, ContentCompatibilityReport report,
+            out string reason)
+        {
+            var instance = ContentHostRuntime.CreateHostInstance(hostType, report.ModGuid, out reason);
+            if (instance == null) return null;
+
+            TryAssignLoggerField(hostType, instance);
+            return instance;
+        }
+
         private static void TryAssignPluginInfo(Type pluginType, object instance, ContentCompatibilityReport report)
         {
             try
@@ -214,7 +284,6 @@ namespace CUCoreLib.ContentReload
 
                 if (infoField != null)
                     infoField.SetValue(instance, currentInfo);
-                // infoProperty != null always ture
                 else if (infoProperty != null && infoProperty.CanWrite)
                     infoProperty.SetValue(instance, currentInfo, null);
             }
@@ -224,10 +293,10 @@ namespace CUCoreLib.ContentReload
             }
         }
 
-        private static void TryAssignLoggerField(Type pluginType, object instance)
+        private static void TryAssignLoggerField(Type type, object instance)
         {
-            var fields = pluginType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-                                              BindingFlags.NonPublic);
+            var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
+                                        BindingFlags.NonPublic);
             foreach (var field in fields)
             {
                 if (field.FieldType != typeof(ManualLogSource)) continue;
@@ -276,6 +345,13 @@ namespace CUCoreLib.ContentReload
             public IDictionary<string, CustomLiquidInfo> Liquids;
             public IDictionary<int, Dictionary<string, string>> Locales;
             public IEnumerable<Recipe> Recipes;
+        }
+
+        private sealed class ResolvedInvocation
+        {
+            public string DisplayName;
+            public MethodInfo Method;
+            public object Target;
         }
     }
 }

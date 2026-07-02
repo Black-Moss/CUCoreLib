@@ -2994,7 +2994,7 @@ function debugTestingPage(): string {
   return `
     <section class="lesson-card">
       <h2>Fast mod-testing loop</h2>
-      <p>Most CUCoreLib iteration gets faster when you separate startup-only work from content registration. Keep console commands, Harmony patches, and other one-time setup in <span class="inline-code">Awake()</span>, but move content into split methods like <span class="inline-code">LoadAssets()</span>, <span class="inline-code">RegisterItems()</span>, <span class="inline-code">RegisterLiquids()</span>, and <span class="inline-code">RegisterRecipes()</span>.</p>
+      <p>Most CUCoreLib iteration gets faster when you separate startup-only work from content registration. Keep console commands, Harmony patches, and other one-time setup in <span class="inline-code">Awake()</span>, but move reloadable content into a dedicated host class or explicit replay methods.</p>
       <p>That split helps even before hot reload enters the picture. However, hot reload makes this much much faster. Let's learn how to use it.</p>
     </section>
 
@@ -3003,16 +3003,21 @@ function debugTestingPage(): string {
       
       <h2>Usage</h2>
       
-      <p>The preferred entrypoint contract is an explicit attribute on parameterless methods:</p>
-      <pre><code>[ContentReloadEntry(ContentReloadEntryStage.LoadAssets)]
-private void LoadAcidAssets() { ... }
+      <p>The preferred entrypoint contract is a class-level opt-in on a content host:</p>
+      <pre><code>[CCLContentHost]
+internal sealed class FantasyContent : CCLBase
+{
+    public void CacheMyAssets() { ... }
+    public void AddMyItems() { ... }
 
-[ContentReloadEntry(ContentReloadEntryStage.RegisterItems)]
-private void RegisterAcidItems() { ... }
+    [ContentReloadEntry(ContentReloadEntryStage.RegisterRecipes, Order = 10)]
+    public void AddLateRecipes() { ... }
 
-[ContentReloadEntry(ContentReloadEntryStage.RegisterRecipes, Order = 10)]
-private void RegisterLateRecipes() { ... }</code></pre>
-      <p>Methods are replayed by stage, then by optional <span class="inline-code">Order</span>. Mods that want strict content reload support must opt in with <span class="inline-code">[ContentReloadEntry(...)]</span> on parameterless methods.</p>
+    [CCLReloadIgnore]
+    public void DebugSpawnItem() { ... }
+}</code></pre>
+      <p>Inside a <span class="inline-code">[CCLContentHost]</span> class, CUCoreLib scans parameterless methods, infers the reload stage from the registry calls it finds, and replays supported methods in stage order. Use <span class="inline-code">[ContentReloadEntry(...)]</span> only when you need an explicit stage or custom ordering, and <span class="inline-code">[CCLReloadIgnore]</span> to opt a helper out.</p>
+      <p>Static host classes work too, which means existing <span class="inline-code">FantasyContent</span>-style files can opt in with a single class attribute. If you prefer an instance-backed host, derive from <span class="inline-code">CCLBase</span> and call <span class="inline-code">CCLBase.Initialize(this)</span> from your plugin <span class="inline-code">Awake()</span>.</p>
       ${docsVideo(externalVideoUrls.hotReload, "/videos/hot-reload.mp4", "screenshot docs-video")}
 
       <h2>Commands</h2>
@@ -3027,8 +3032,18 @@ private void RegisterLateRecipes() { ... }</code></pre>
         <li><span class="inline-code">autohotreload &lt;filepath&gt; false</span> disables the saved watch mode for that DLL.</li>
       </ul>
 
+      <h2>Automatic discovery rules</h2>
+      <ul>
+        <li>Supported v1 surfaces are locale/text, liquids, items, basic building entities, and recipes.</li>
+        <li>Method names do not matter. CUCoreLib classifies host methods by what they register.</li>
+        <li>Asset loading can stay inline with registration, or live in a host method that only loads assets.</li>
+        <li>If a method mixes multiple supported registration surfaces, CUCoreLib skips it and tells you to split it.</li>
+        <li>If a method mixes registration with unsupported side effects such as scene spawning, tiles, structures, save hooks, or Harmony setup, CUCoreLib skips it with a diagnostic instead of replaying it.</li>
+      </ul>
+
        <h2>Limitations</h2>
-      <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads item, liquid, recipe, and locale/text content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support save providers, moodles, Harmony patches, mod options, or multiplayer registration just yet.</p>
+      <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads locale/text, liquid, item, basic building, and recipe content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support tiles, structures, save providers, moodles, Harmony patches, mod options, console command registration, or multiplayer registration just yet.</p>
+      <p>When strict reload skips a discovered method, the reload summary reports the exact method and why it was skipped.</p>
       </section>
 
     <section class="lesson-card">
