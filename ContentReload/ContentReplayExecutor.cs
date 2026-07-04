@@ -230,6 +230,15 @@ namespace CUCoreLib.ContentReload
 
             try
             {
+                ItemRegistryPatches.RefreshLiveInstances();
+            }
+            catch (Exception ex)
+            {
+                CUCoreLibPlugin.Log?.LogWarning("CUCoreLib strict content reload item refresh failed.\n" + ex);
+            }
+
+            try
+            {
                 BuildingEntityRegistry.RefreshLiveInstances(buildingIds);
             }
             catch (Exception ex)

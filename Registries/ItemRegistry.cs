@@ -483,6 +483,16 @@ namespace CUCoreLib.Registries
                 return true;
             }
 
+            var customTemplate = CustomInstantiate.GetOrCreateTemplate(normalizedId);
+            if (customTemplate != null && customTemplate.TryGetComponent<SpriteRenderer>(out var customRenderer) &&
+                customRenderer != null && customRenderer.sprite != null)
+            {
+                sprite = customRenderer.sprite;
+                AssetLoader.CacheSprite(normalizedId, sprite);
+                WarnedMissingIconIds.Remove(normalizedId);
+                return true;
+            }
+
             var prefab = Resources.Load<GameObject>(normalizedId);
             if (prefab != null && prefab.TryGetComponent<SpriteRenderer>(out var renderer) && renderer != null &&
                 renderer.sprite != null)

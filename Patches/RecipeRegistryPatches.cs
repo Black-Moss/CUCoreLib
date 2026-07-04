@@ -58,8 +58,7 @@ namespace CUCoreLib.Patches
                 return false;
             }
 
-            __result = (null, Color.white);
-            return false;
+            return true;
         }
 
         [HarmonyPatch(typeof(PlayerCamera), "RefreshRecipeList")]

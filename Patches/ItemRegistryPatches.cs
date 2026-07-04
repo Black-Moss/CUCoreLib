@@ -72,6 +72,36 @@ namespace CUCoreLib.Patches
             ApplyCustomHeldOffset(item, def);
         }
 
+        internal static void RefreshLiveInstances(IEnumerable<string> itemIds = null)
+        {
+            if (Item.allItems == null || Item.allItems.Count == 0) return;
+
+            var filteredIds = itemIds != null
+                ? new HashSet<string>(itemIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()),
+                    StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            foreach (var item in Item.allItems.ToArray())
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.id)) continue;
+                if (filteredIds != null && !filteredIds.Contains(item.id)) continue;
+                if (!ItemRegistry.TryGetCustomInfo(item, out var def) || def == null) continue;
+
+                var preferWornSprite = IsCurrentlyWornWearable(item, def);
+                ApplyCustomItemRuntime(item, preferWornSprite);
+
+                if (preferWornSprite && item.TryGetComponent<Wearable>(out var wearable))
+                {
+                    var body = item.transform.parent != null ? item.transform.parent.GetComponentInParent<Body>() : null;
+                    if (body != null)
+                    {
+                        wearable.ClearSprites();
+                        wearable.CreateSprites(body);
+                    }
+                }
+            }
+        }
+
         internal static Sprite GetInventorySprite(Item item, CustomItemInfo def)
         {
             if (def != null && !string.IsNullOrWhiteSpace(def.IconAnimationId))
@@ -186,6 +216,15 @@ namespace CUCoreLib.Patches
             if (slot == null || !slot.isHand) return;
 
             item.transform.localPosition = new Vector3(0f, 0f, item.transform.localPosition.z);
+        }
+
+        private static bool IsCurrentlyWornWearable(Item item, CustomItemInfo def)
+        {
+            if (item == null || def == null || def.WornSprite == null) return false;
+            if (!item.TryGetComponent<Wearable>(out _)) return false;
+
+            var parent = item.transform.parent;
+            return parent != null && parent.GetComponent<Limb>() != null;
         }
 
         private static void ApplyCustomItemComponents(Item item, CustomItemInfo def)
