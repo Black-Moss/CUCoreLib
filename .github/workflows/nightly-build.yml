@@ -1,12 +1,16 @@
 name: Nightly Build
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: '0 9 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GCS_REFS_OBJECT: gs://cucorelib-game-files/cu-build-refs.zip
@@ -69,12 +73,49 @@ jobs:
         run: |
           msbuild 'CUCoreLib.csproj' /t:Compile /p:Configuration=Release /p:Platform=AnyCPU /p:BepInExDir=
 
+      - name: Package nightly zip
+        shell: powershell
+        run: |
+          $stageDir = Join-Path $env:RUNNER_TEMP 'CUCoreLib-nightly'
+          $zipPath = Join-Path $env:RUNNER_TEMP 'cu-nightly.zip'
+
+          if (Test-Path $stageDir)
+          {
+              Remove-Item -LiteralPath $stageDir -Recurse -Force
+          }
+
+          if (Test-Path $zipPath)
+          {
+              Remove-Item -LiteralPath $zipPath -Force
+          }
+
+          New-Item -ItemType Directory -Path $stageDir | Out-Null
+          Copy-Item 'obj\Release\CUCoreLib.dll' -Destination $stageDir
+          Copy-Item 'obj\Release\CUCoreLib.pdb' -Destination $stageDir
+          Copy-Item 'bin\Release\CUCoreLib.xml' -Destination $stageDir
+          Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $zipPath
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: CUCoreLib-nightly
           path: |
-            bin\Release\CUCoreLib.dll
-            bin\Release\CUCoreLib.pdb
+            obj\Release\CUCoreLib.dll
+            obj\Release\CUCoreLib.pdb
             bin\Release\CUCoreLib.xml
+            ${{ runner.temp }}\cu-nightly.zip
           if-no-files-found: error
+
+      - name: Publish nightly prerelease
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly Build
+          prerelease: true
+          make_latest: false
+          generate_release_notes: false
+          body: |
+            Latest automated nightly build from `main`.
+          files: |
+            ${{ runner.temp }}\cu-nightly.zip
