@@ -14,6 +14,7 @@ permissions:
 
 env:
   GCS_REFS_OBJECT: gs://cucorelib-game-files/cu-build-refs.zip
+  NIGHTLY_ZIP_NAME: CUCoreLib-nightly-prerelease.zip
 
 jobs:
   build:
@@ -77,7 +78,7 @@ jobs:
         shell: powershell
         run: |
           $stageDir = Join-Path $env:RUNNER_TEMP 'CUCoreLib-nightly'
-          $zipPath = Join-Path $env:RUNNER_TEMP 'cu-nightly.zip'
+          $zipPath = Join-Path $env:RUNNER_TEMP $env:NIGHTLY_ZIP_NAME
 
           if (Test-Path $stageDir)
           {
@@ -103,7 +104,7 @@ jobs:
             obj\Release\CUCoreLib.dll
             obj\Release\CUCoreLib.pdb
             bin\Release\CUCoreLib.xml
-            ${{ runner.temp }}\cu-nightly.zip
+            ${{ runner.temp }}\${{ env.NIGHTLY_ZIP_NAME }}
           if-no-files-found: error
 
       - name: Publish nightly prerelease
@@ -125,4 +126,4 @@ jobs:
             Thanks for testing and reporting issues!
             
           files: |
-            ${{ runner.temp }}\CUCoreLib-nightly-prerelease.zip
+            ${{ runner.temp }}\${{ env.NIGHTLY_ZIP_NAME }}
