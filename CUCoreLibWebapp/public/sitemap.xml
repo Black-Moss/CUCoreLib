@@ -10,6 +10,7 @@
   <url><loc>https://cucorelib.jimmyking.dev/docs/audio/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/item/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/advanced-item/</loc></url>
+  <url><loc>https://cucorelib.jimmyking.dev/docs/custom-item-scripts/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/recipe/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/liquids/</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/docs/player/</loc></url>
@@ -38,6 +39,7 @@
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/audio.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/item.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/advanced-item.json</loc></url>
+  <url><loc>https://cucorelib.jimmyking.dev/api/topics/custom-item-scripts.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/recipe.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/liquids.json</loc></url>
   <url><loc>https://cucorelib.jimmyking.dev/api/topics/player.json</loc></url>

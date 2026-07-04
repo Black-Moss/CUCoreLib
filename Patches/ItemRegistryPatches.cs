@@ -24,6 +24,9 @@ namespace CUCoreLib.Patches
         private static readonly HashSet<string> WarnedInvalidDecayConfigurations =
             new HashSet<string>();
 
+        private static readonly HashSet<string> WarnedInvalidSpawnComponents =
+            new HashSet<string>();
+
         // Startup injection
         [HarmonyPatch("SetupItems")]
         [HarmonyPostfix]
@@ -515,17 +518,41 @@ namespace CUCoreLib.Patches
         {
             if (item == null || def?.SpawnComponents == null || def.SpawnComponents.Count == 0) return;
 
-            foreach (var componentType in from componentName in def.SpawnComponents
-                     where !string.IsNullOrWhiteSpace(componentName)
-                     select Type.GetType(componentName, false)
-                     into componentType
-                     where componentType != null
-                     where typeof(MonoBehaviour).IsAssignableFrom(componentType)
-                     where item.GetComponent(componentType) == null
-                     select componentType)
+            foreach (var componentName in def.SpawnComponents)
             {
+                if (string.IsNullOrWhiteSpace(componentName))
+                {
+                    WarnInvalidSpawnComponent(item, componentName, "entry is blank");
+                    continue;
+                }
+
+                var componentType = Type.GetType(componentName, false);
+                if (componentType == null)
+                {
+                    WarnInvalidSpawnComponent(item, componentName, "type could not be resolved");
+                    continue;
+                }
+
+                if (!typeof(MonoBehaviour).IsAssignableFrom(componentType))
+                {
+                    WarnInvalidSpawnComponent(item, componentName, "resolved type is not a MonoBehaviour");
+                    continue;
+                }
+
+                if (item.GetComponent(componentType) != null) continue;
                 item.gameObject.AddComponent(componentType);
             }
+        }
+
+        private static void WarnInvalidSpawnComponent(Item item, string rawEntry, string issue)
+        {
+            var itemId = string.IsNullOrWhiteSpace(item != null ? item.id : null) ? "<unknown>" : item.id;
+            var entry = rawEntry ?? "<null>";
+            var warningKey = itemId + "|" + entry + "|" + issue;
+            if (!WarnedInvalidSpawnComponents.Add(warningKey)) return;
+
+            CUCoreLibPlugin.Log?.LogWarning(
+                "Item '" + itemId + "' has an invalid SpawnComponents entry '" + entry + "': " + issue + ".");
         }
 
         [HarmonyPatch(typeof(LightItem), "Update")]

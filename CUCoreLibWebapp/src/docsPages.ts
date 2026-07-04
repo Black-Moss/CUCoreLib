@@ -65,6 +65,13 @@ export const pages: Page[] = [
     lead: "Using CustomItemInfo"
   },
   {
+    id: "custom-item-scripts",
+    label: "Creating Custom Item Scripts",
+    crumb: "Items / Liquids",
+    title: "Creating Custom Item Scripts",
+    lead: "Attach MonoBehaviours to custom items, read custom item metadata, and structure wearable runtime logic."
+  },
+  {
     id: "recipe",
     label: "Recipe API",
     crumb: "Content APIs",
@@ -269,6 +276,7 @@ export function pageBody(page: PageId, nextItemState: ItemState, nextRecipeState
   else if (page === "tools") content = toolsPage();
   else if (page === "item") content = itemPage();
   else if (page === "advanced-item") content = advancedItemPage();
+  else if (page === "custom-item-scripts") content = customItemScriptsPage();
   else if (page === "liquids") content = liquidsPage();
   else if (page === "player") content = playerPage();
   else if (page === "statuses") content = statusesPage();
@@ -591,11 +599,6 @@ StructureRegistry.TrySetSpawnCounts("fieldlab", 0, 1, 2, 2, 3);</code></pre>
       <p>During world generation, CUCoreLib reads the current biome depth, picks the matching count, and places the already-compiled structure payload for each spawn.</p>
     </section>
 
-    <section class="lesson-card">
-      <h2>Loot marker pass</h2>
-      <p><span class="inline-code">lootRules</span> and <span class="inline-code">lootPools</span> now run as a separate seeded pass over precompiled marker positions. CUCoreLib still compiles the static blocks, liquids, backgrounds, and non-loot entity placements once at import time, then only rolls the cached loot markers during structure placement.</p>
-      <p>That keeps the runtime cost proportional to the number of loot markers instead of forcing a full structure reparse or recompilation for every spawn.</p>
-    </section>
 
   `;
 }
@@ -1770,6 +1773,122 @@ function toolsPage(): string {
   `;
 }
 
+function customItemScriptsPage(): string {
+  return `
+    <section class="lesson-card">
+      <h2>When to use a custom item script</h2>
+      <p>Use a custom item script when plain <span class="inline-code">useAction</span>, <span class="inline-code">useLimbAction</span>, <span class="inline-code">ToolProperties</span>, or wearable stats are not enough. A script is the right tool when the item needs its own runtime state, periodic logic, event-style reactions, or behavior that depends on whether it is lying in the world, held, or worn.</p>
+      <p>CUCoreLib adds item scripts through <span class="inline-code">CustomItemInfo.AddSpawnComponent&lt;T&gt;()</span>. That helper stores the correct assembly-qualified type name in <span class="inline-code">SpawnComponents</span>, and CUCoreLib attaches the <span class="inline-code">MonoBehaviour</span> to each spawned item instance the first time the item appears.</p>
+      <p>If you have not read the broader custom-item surface yet, keep the <a href="/docs/advanced-item/" data-page="advanced-item">Advanced Item API</a> page open beside this one. That page covers the item fields and built-in modules; this page is specifically about the script side.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>How the script gets attached</h2>
+      <p>Register the item normally, then chain <span class="inline-code">AddSpawnComponent&lt;YourScript&gt;()</span> on the <span class="inline-code">CustomItemInfo</span> object. Your script runs on the spawned item GameObject, so you can use standard Unity callbacks like <span class="inline-code">Awake</span>, <span class="inline-code">Start</span>, and <span class="inline-code">Update</span>.</p>
+      <pre><code>ItemRegistry.Register(
+    "stormmantle",
+    new CustomItemInfo
+    {
+        fullName = "Storm Mantle",
+        category = "tool",
+        wearable = true,
+        wearableCanBeHeld = true,
+        desiredWearLimb = "UpTorso",
+        wearSlotId = "outertorso"
+    }
+    .AddSpawnComponent&lt;StormMantleScript&gt;(),
+    icon
+);</code></pre>
+      <p>The script is added to every real item instance. That means dropped items, spawned loot, save-loaded items, and equipped wearables all use the same script class.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Reading the item and its custom metadata</h2>
+      <p>Inside the script, cache the attached <span class="inline-code">Item</span> component first. If you need registration-time tuning values, use <span class="inline-code">ItemRegistry.TryGetCustomData&lt;T&gt;</span> or <span class="inline-code">CUCoreUtils.TryGetCustomItemInfo</span> instead of hard-coding everything directly into the script.</p>
+      <pre><code>private Item item;
+private float warmthBonus;
+
+private void Awake()
+{
+    item = GetComponent&lt;Item&gt;();
+
+    if (item != null && ItemRegistry.TryGetCustomData&lt;float&gt;(item, "warmthBonus", out float configuredWarmth))
+        warmthBonus = configuredWarmth;
+}</code></pre>
+      <p>Use <span class="inline-code">CustomData</span> for small registration-time knobs like ranges, multipliers, effect durations, or mode names. Keep mutable per-instance state on the script itself.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Equippable example</h2>
+      <p>This example registers a wearable mantle and adds a script that only applies its effect while the item is actually worn. The script detects the worn state by checking whether the item sits under a <span class="inline-code">Limb</span> transform, which matches the same parentage CUCoreLib already uses for worn-sprite refresh.</p>
+      <pre><code>ItemRegistry.Register(
+    "stormmantle",
+    new CustomItemInfo
+    {
+        fullName = "Storm Mantle",
+        description = "A lined mantle that steadies the body in cold weather.",
+        category = "tool",
+        wearable = true,
+        wearableCanBeHeld = true,
+        desiredWearLimb = "UpTorso",
+        wearSlotId = "outertorso",
+        wearableIsolation = 0.16f,
+        wearableArmor = 0.08f,
+        weight = 1.3f,
+        value = 24,
+        tags = "cangetwet",
+        rec = new Recognition(5),
+        CustomData =
+        {
+            ["warmthBonus"] = 0.35f
+        }
+    }
+    .AddSpawnComponent&lt;StormMantleScript&gt;(),
+    AssetLoader.LoadEmbeddedSprite("Images.stormmantle.png")
+);</code></pre>
+      <p>The paired script can then grant a mild warmth effect only while equipped:</p>
+      <pre><code>public sealed class StormMantleScript : MonoBehaviour
+{
+    private Item item;
+    private float warmthBonus = 0.25f;
+
+    private void Awake()
+    {
+        item = GetComponent&lt;Item&gt;();
+
+        if (item != null && ItemRegistry.TryGetCustomData&lt;float&gt;(item, "warmthBonus", out float configuredWarmth))
+            warmthBonus = configuredWarmth;
+    }
+
+    private void Update()
+    {
+        Limb wornLimb = item != null && item.transform.parent != null
+            ? item.transform.parent.GetComponent&lt;Limb&gt;()
+            : null;
+        if (wornLimb == null) return;
+
+        Body body = wornLimb.body;
+        if (body == null) return;
+
+        body.clothingTemperature += warmthBonus * Time.deltaTime;
+    }
+}</code></pre>
+      <p>This pattern works well for passive wearable effects: warmth, movement modifiers, periodic healing, visual state, or compatibility hooks into other systems.</p>
+    </section>
+
+    <section class="lesson-card">
+      <h2>Practical guidance</h2>
+      <ul>
+        <li>Cache <span class="inline-code">Item</span> and any other required components in <span class="inline-code">Awake</span> or <span class="inline-code">Start</span> instead of calling <span class="inline-code">GetComponent</span> every frame.</li>
+        <li>Keep wearable-only behavior behind a worn-state check. The same item script also exists while the item is dropped or sitting in inventory.</li>
+        <li>Use <span class="inline-code">CustomData</span> for tuning constants and the script fields for mutable state.</li>
+        <li>If your script needs save data, use CUCoreLib's save/status systems. A <span class="inline-code">MonoBehaviour</span> field alone is not a save format.</li>
+        <li>Reach for plain <span class="inline-code">useAction</span> or built-in item modules first when they already solve the problem. Scripts are for the cases that actually need runtime behavior.</li>
+      </ul>
+    </section>
+  `;
+}
+
 function liquidsPage(): string {
   return `
     <section class="lesson-card">
@@ -2345,7 +2464,7 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">Bandage</span></td><td><span class="inline-code">BandageProperties</span></td><td>Installs a vanilla-style <span class="inline-code">BandageMinigame</span> limb action and applies limb healing, pain reduction, and bandage slow values.</td></tr>
             <tr><td><span class="inline-code">Syringe</span></td><td><span class="inline-code">SyringeProperties</span></td><td>Adds syringe-style liquid injection behavior through <span class="inline-code">WaterContainerItem</span> and <span class="inline-code">SyringeMinigame</span>.</td></tr>
             <tr><td><span class="inline-code">Tool</span></td><td><span class="inline-code">ToolProperties</span></td><td>Builds a vanilla <span class="inline-code">AttackInfo</span> and calls <span class="inline-code">Body.Attack</span> for melee-style tools or weapons.</td></tr>
-            <tr><td><span class="inline-code">SpawnComponents</span></td><td><span class="inline-code">List&lt;string&gt;</span></td><td>Qualified <span class="inline-code">MonoBehaviour</span> type names CUCoreLib adds to the spawned item GameObject the first time the item appears. For plugin-defined scripts, use the assembly-qualified form like <span class="inline-code">"YourNamespace.YourClass, YourModDll"</span>.</td></tr>
+            <tr><td><span class="inline-code">SpawnComponents</span></td><td><span class="inline-code">List&lt;string&gt;</span></td><td>Backing list of runtime-resolvable <span class="inline-code">MonoBehaviour</span> type names CUCoreLib adds to the spawned item GameObject the first time the item appears. For plugin-defined scripts, prefer <span class="inline-code">AddSpawnComponent&lt;T&gt;()</span> so you do not have to hand-write the assembly-qualified name.</td></tr>
             <tr><td><span class="inline-code">CustomData</span></td><td><span class="inline-code">Dictionary&lt;string, object&gt;</span></td><td>Registration-time metadata for your own mod code. Read it later with <span class="inline-code">ItemRegistry.TryGetCustomData&lt;T&gt;</span>.</td></tr>
           </tbody>
         </table>
@@ -2657,6 +2776,7 @@ function advancedItemPage(): string {
     <section class="lesson-card">
       <h2>Equippables</h2>
       <p>Wearables are regular items with wearable fields set. <span class="inline-code">wearSlotId</span> is the save/load and replacement key. <span class="inline-code">desiredWearLimb</span> points the primary visual/armor behavior at a body region, while <span class="inline-code">wearableArmor</span> and <span class="inline-code">wearableIsolation</span> affect protection and temperature. Use <span class="inline-code">MultiWornSprites</span> when the same wearable should also draw extra pieces on other limbs.</p>
+      <p>If a wearable needs a custom script, use the same item-side <span class="inline-code">AddSpawnComponent&lt;T&gt;()</span> helper described below. There is no separate wearable-only script hook.</p>
       <pre><code> ItemRegistry.Register(
      "fieldpack",
      new CustomItemInfo
@@ -2713,22 +2833,19 @@ decayInfo = (byte)(
 
     <section class="lesson-card">
       <h2>SpawnComponents type names</h2>
-      <p><span class="inline-code">SpawnComponents</span> strings need to be resolved with <span class="inline-code">Type.GetType(...)</span>. Plain names like <span class="inline-code">nameof(SomeScript)</span> usually will not resolve for a <span class="inline-code">MonoBehaviour</span> declared inside your plugin DLL, so CUCoreLib skips that component.</p>
+      <p>For plugin-authored item scripts, prefer <span class="inline-code">AddSpawnComponent&lt;T&gt;()</span>. It stores the runtime-resolvable assembly-qualified name for you, so you do not have to hand-write <span class="inline-code">Type.GetType(...)</span> strings.</p>
       <pre><code>ItemRegistry.Register(
     "ToggleBlade",
     new CustomItemInfo
     {
         fullName = "Toggle blade",
-        category = "weapon",
-        SpawnComponents = new List&lt;string&gt;
-        {
-            "YourNamespace.ToggleBladeScript, YourModDll"
-        }
-    },
+        category = "weapon"
+    }
+    .AddSpawnComponent&lt;ToggleBladeScript&gt;(),
     icon
 );</code></pre>
-      <p>Use the full type name plus the assembly name without the <span class="inline-code">.dll</span> extension. Example: if the class is <span class="inline-code">TestModd.ToggleBladeScript</span> inside <span class="inline-code">TestModd.dll</span>, register <span class="inline-code">"TestModd.ToggleBladeScript, TestModd"</span>.</p>
-      <p>Current runtime note: if <span class="inline-code">Type.GetType(...)</span> returns <span class="inline-code">null</span>, <span class="inline-code">ApplyCustomSpawnComponents</span> silently skips that entry, so a bad string will fail with no warning.</p>
+      <p><span class="inline-code">SpawnComponents</span> remains the backing list, so you can still fill it manually for uncommon reflection-driven cases. When you do, use the full type name plus the assembly name without the <span class="inline-code">.dll</span> extension. Example: <span class="inline-code">"TestModd.ToggleBladeScript, TestModd"</span>.</p>
+      <p>Current runtime note: invalid raw entries are skipped and now log a warning with the item ID and failing entry.</p>
     </section>
 
     <section class="lesson-card">
@@ -3001,19 +3118,7 @@ function consolePage(): string {
         <p>Because the second argument description starts with <span class="inline-code">bool</span>, vanilla adds <span class="inline-code">true</span> and <span class="inline-code">false</span> suggestions automatically. Descriptions beginning with <span class="inline-code">position</span> get <span class="inline-code">cursor</span>, <span class="inline-code">player</span>, <span class="inline-code">random</span>, and <span class="inline-code">#.#</span>.</p>
       </div>
     </details>
-    <section class="lesson-card">
-      <h2>Built-in debugwatch overlay</h2>
-      <p>CUCoreLib now includes a built-in <span class="inline-code">debugwatch</span> command for runtime value watching. It is aimed at mod authors who want a quick live overlay without writing their own UI.</p>
-      <p>The command resolves supported static fields by reflected <span class="inline-code">Type.member</span> name, then shows watched values as white text in the top-right corner while a world is active.</p>
-      <pre><code>debugwatch add MyNamespace.MyPlugin.healthRate
-debugwatch add MyNamespace.MyPlugin.debugEnabled
-debugwatch list
-debugwatch hide
-debugwatch show
-debugwatch remove MyNamespace.MyPlugin.healthRate
-debugwatch clear</code></pre>
-      <p>V1 supports static fields only. Supported field types are simple values such as numbers, <span class="inline-code">bool</span>, <span class="inline-code">string</span>, enums, and <span class="inline-code">Vector2</span>/<span class="inline-code">Vector3</span>.</p>
-    </section>
+    
   `;
 }
 
@@ -3082,36 +3187,16 @@ function debugTestingPage(): string {
       <p>For testing elements that are not covered by hot reload, CUCoreLib has a configuration for loading directly into a test world or tutorial.</p>
       <p>In BepInEx -> Config -> CUCoreLib.cfg, there are options to instantly load the debug world or tutorial on launch.</p>
       <img src="images/cucorelib-config.png" alt="CUCoreLib .cfg config" class="screenshot">
-      <p>Similarly, you may want to consider a batch script for automating the testing process. For instance, a .bat script:</p>
-      <pre><code>
-@echo off
-setlocal EnableExtensions
+    </section>
 
-set "GAME_DIR=C:\Program Files (x86)\Steam\steamapps\common\Casualties Unknown Demo"
-set "PLUGIN_DIR=%GAME_DIR%\BepInEx\plugins"
-set "SOURCE_DLL=PATH_TO_bin\Debug\FILENAME.dll"
-
-echo Closing scav
-taskkill /F /IM "CasualtiesUnknown.exe" >nul 2>&1
-timeout /t 1 /nobreak >nul
-
-echo.
-echo Copying .dll file
-copy /Y "%SOURCE_DLL%" "%PLUGIN_DIR%\" >nul
-
-echo.
-echo Launching through Steam...
-start "" "steam://rungameid/4576510"
-
-timeout /t 3 /nobreak >nul
-tasklist /FI "IMAGENAME eq CasualtiesUnknown.exe" | find /I "CasualtiesUnknown.exe" >nul
-if errorlevel 1 (
-    echo Steam launch did not start the game (offline?). Falling back to local executable...
-    start "" "%GAME_DIR%\CasualtiesUnknown.exe"
-)
-endlocal
-exit /b 0
-      </pre></code>
+    <section class="lesson-card">
+      <h2>Debugwatch overlay</h2>
+      <p>CUCoreLib also includes a built-in <span class="inline-code">debugwatch</span> command for runtime value watching and debugging.</p>
+      <p>The command resolves supported static fields by reflected <span class="inline-code">Type.member</span> name, then shows watched values as white text in the top-right corner while a world is active.</p>
+      <pre><code>debugwatch add MyNamespace.MyPlugin.healthRate
+debugwatch add MyNamespace.MyPlugin.debugEnabled
+debugwatch clear</code></pre>
+      <p>Currently, debugwatch supports static fields only. Supported field types are simple values such as numbers, <span class="inline-code">bool</span>, <span class="inline-code">string</span>, enums, and <span class="inline-code">Vector2</span>/<span class="inline-code">Vector3</span>.</p>
     </section>
 
 
@@ -3122,8 +3207,8 @@ function utilsPage(): string {
   return `
     <section class="lesson-card">
       <h2>CUCoreUtils surface map</h2>
-      <p>This page documents the current public surface in <span class="inline-code">Helpers/CUCoreUtils.cs</span>. The repo does not currently split these into separate <span class="inline-code">Util/*.cs</span> files, so the sections below use those category names as an organization aid.</p>
-      <p>Where CUCoreLib exposes both PascalCase and camelCase names, both are listed below. The camelCase forms are compatibility aliases, not different behaviors.</p>
+      <p>This page documents the current public surface in <span class="inline-code">Helpers/CUCoreUtils.cs</span>.</p>
+      <p>Where CUCoreLib exposes both PascalCase and camelCase names, both are listed below.</p>
     </section>
 
     <section class="lesson-card">
@@ -3142,31 +3227,6 @@ function utilsPage(): string {
             <tr><td><span class="inline-code">AwaitWorldGeneration</span> / <span class="inline-code">awaitWorldGeneration</span></td><td><span class="inline-code">float checkRepeatTimeSeconds = 0f</span></td><td>Coroutine wait helper for the runtime world finishing generation.</td></tr>
             <tr><td><span class="inline-code">IsMainMenuReady</span></td><td>None</td><td>Returns whether the game is currently at a usable main-menu state.</td></tr>
             <tr><td><span class="inline-code">IsWorldGenerationReady</span></td><td>None</td><td>Returns whether the world exists and is no longer generating.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="lesson-card">
-      <h2>KeyUtils</h2>
-      <div class="table-wrap">
-        <table class="field-table">
-          <thead>
-            <tr><th>Method / Member</th><th>Args</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="inline-code">FriendlyKeybind.disableInInputFields</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while a text input is focused.</td></tr>
-            <tr><td><span class="inline-code">FriendlyKeybind.disableInMainMenu</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the main menu is open.</td></tr>
-            <tr><td><span class="inline-code">FriendlyKeybind.disableInHealthPanel</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the wound or health panel is open.</td></tr>
-            <tr><td><span class="inline-code">FriendlyKeybind.disableInInventory</span></td><td><span class="inline-code">bool</span></td><td>Disables the bind while the inventory or crafting panel is open.</td></tr>
-            <tr><td><span class="inline-code">FriendlyKeybind.KeyCode</span></td><td>None</td><td>Resolves the active <span class="inline-code">KeyCode</span> after settings and block-state checks.</td></tr>
-            <tr><td><span class="inline-code">FriendlyKeybind.KeyName</span></td><td>None</td><td>Returns the player-facing display name for the active key.</td></tr>
-            <tr><td><span class="inline-code">GetKeySprite</span></td><td><span class="inline-code">KeyCode key, string spritePrefix = "Key_"</span></td><td>Looks up a matching key sprite from loaded resources.</td></tr>
-            <tr><td><span class="inline-code">GetFriendlyKeyName</span></td><td><span class="inline-code">KeyCode key</span></td><td>Returns a friendlier display label for a raw key.</td></tr>
-            <tr><td><span class="inline-code">GetFriendlyKeyName</span></td><td><span class="inline-code">string friendlyKeybindName</span></td><td>Returns the display label for a CUCoreLib-managed friendly keybind.</td></tr>
-            <tr><td><span class="inline-code">GetFriendlyKeyBind</span></td><td><span class="inline-code">string friendlyKeybindName</span></td><td>Returns a bind handle that can be configured and queried later.</td></tr>
-            <tr><td><span class="inline-code">AllowKeybindRebind</span></td><td><span class="inline-code">string friendlyKeybindName, string descriptionToShowInSettingsKeybindMenu</span></td><td>Registers the bind in the in-game keybind settings menu.</td></tr>
-            <tr><td><span class="inline-code">SetFriendlyKeyName</span></td><td><span class="inline-code">KeyCode key, string displayName</span></td><td>Overrides the displayed label for a key.</td></tr>
           </tbody>
         </table>
       </div>
@@ -3203,11 +3263,11 @@ function utilsPage(): string {
             <tr><td><span class="inline-code">TryGetBody</span> / <span class="inline-code">tryGetBody</span></td><td><span class="inline-code">out Body body</span></td><td>Attempts to get the active player body.</td></tr>
             <tr><td><span class="inline-code">TryGetCamera</span> / <span class="inline-code">tryGetCamera</span></td><td><span class="inline-code">out PlayerCamera camera</span></td><td>Attempts to get the active player camera.</td></tr>
             <tr><td><span class="inline-code">GetMousePosition</span> / <span class="inline-code">getMousePosition</span></td><td>None</td><td>Returns the current mouse or target-look position, depending on player state.</td></tr>
-            <tr><td><span class="inline-code">ShowAlert</span> / <span class="inline-code">showAlert</span></td><td><span class="inline-code">string text, bool? important = false</span></td><td>Shows an on-screen alert immediately.</td></tr>
-            <tr><td><span class="inline-code">Alert</span> / <span class="inline-code">alert</span></td><td><span class="inline-code">string text, bool important, float delay = 0f</span></td><td>Shows an on-screen alert immediately or after a delay.</td></tr>
+            <tr><td><span class="inline-code">ShowAlert</span> / <span class="inline-code">showAlert</span></td><td><span class="inline-code">string text, bool? important = false</span></td><td>Shows an on-screen alert (popup) immediately.</td></tr>
+            <tr><td><span class="inline-code">Alert</span> / <span class="inline-code">alert</span></td><td><span class="inline-code">string text, bool important, float delay = 0f</span></td><td>Shows an on-screen alert (popup) immediately or after a delay.</td></tr>
             <tr><td><span class="inline-code">Talk</span> / <span class="inline-code">talk</span></td><td><span class="inline-code">string dialogue</span></td><td>Routes dialogue through the player body's talker.</td></tr>
             <tr><td><span class="inline-code">TalkElectronic</span> / <span class="inline-code">talkElectronic</span></td><td><span class="inline-code">string dialogue, Item item = null</span></td><td>Routes dialogue through an item's talker or a watch-style fallback proxy.</td></tr>
-            <tr><td><span class="inline-code">PlaySoundAt</span> / <span class="inline-code">playSoundAt</span></td><td><span class="inline-code">AudioClip clip, Vector2? pos = null</span></td><td>Plays a clip at a position or at the player by default.</td></tr>
+            <tr><td><span class="inline-code">PlaySoundAt</span> / <span class="inline-code">playSoundAt</span></td><td><span class="inline-code">AudioClip clip, Vector2? pos = null</span></td><td>Plays a clip at a position or at the player by default. Potentially see Sound.Play as an alternative.</td></tr>
             <tr><td><span class="inline-code">PlaySoundAt</span> / <span class="inline-code">playSoundAt</span></td><td><span class="inline-code">AudioClip clip, float? volume = null, float? delay = null, Vector2? position = null, float? pitch = null</span></td><td>Plays a clip with optional volume, delay, position, and pitch overrides.</td></tr>
           </tbody>
         </table>
@@ -3242,7 +3302,7 @@ function utilsPage(): string {
             <tr><th>Method</th><th>Args</th><th>Description</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="inline-code">DoAmputate</span> / <span class="inline-code">doAmputate</span></td><td><span class="inline-code">Item item, Limb limb</span></td><td>Forwards into the vanilla amputation interaction instead of requiring copied limb-use logic.</td></tr>
+            <tr><td><span class="inline-code">DoAmputate</span> / <span class="inline-code">doAmputate</span></td><td><span class="inline-code">Item item, Limb limb</span></td><td>Ow!</td></tr>
           </tbody>
         </table>
       </div>
@@ -3263,20 +3323,6 @@ function utilsPage(): string {
       </div>
     </section>
 
-    <section class="lesson-card">
-      <h2>MathExtensions</h2>
-      <div class="table-wrap">
-        <table class="field-table">
-          <thead>
-            <tr><th>Method</th><th>Args</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="inline-code">IsFinite</span></td><td><span class="inline-code">this float value</span></td><td>Returns whether a float is neither <span class="inline-code">NaN</span> nor infinity.</td></tr>
-            <tr><td><span class="inline-code">IsFinite</span></td><td><span class="inline-code">this Vector2 value</span></td><td>Returns whether both vector components are finite.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
 
     <section class="lesson-card">
       <h2>Console and misc helpers</h2>
@@ -3289,7 +3335,6 @@ function utilsPage(): string {
             <tr><td><span class="inline-code">ConsoleLog</span></td><td><span class="inline-code">ConsoleScript instance, string message</span></td><td>Writes a message into the in-game console through the game's internal logging path.</td></tr>
             <tr><td><span class="inline-code">ConsoleRunCommand</span></td><td><span class="inline-code">ConsoleScript instance, string commandString</span></td><td>Executes a command string through the in-game console.</td></tr>
             <tr><td><span class="inline-code">ConsoleCheckForWorld</span></td><td><span class="inline-code">ConsoleScript instance</span></td><td>Runs the game's console-side world check before world-dependent commands.</td></tr>
-            <tr><td><span class="inline-code">LoadEmbeddedSprite</span></td><td><span class="inline-code">string resourcePath, float pixelsPerUnit = AssetLoader.PPU_UI, Assembly sourceAssembly = null</span></td><td>Pass-through helper for loading an embedded sprite.</td></tr>
             <tr><td><span class="inline-code">CompressGZip</span></td><td><span class="inline-code">byte[] data</span></td><td>Compresses a byte array with GZip.</td></tr>
             <tr><td><span class="inline-code">DecompressGZip</span></td><td><span class="inline-code">byte[] compressedData</span></td><td>Decompresses a GZip byte array.</td></tr>
             <tr><td><span class="inline-code">CompressDeflate</span></td><td><span class="inline-code">byte[] data</span></td><td>Compresses a byte array with Deflate.</td></tr>
@@ -3299,10 +3344,6 @@ function utilsPage(): string {
       </div>
     </section>
 
-    <section class="lesson-card">
-      <h2>Currently empty categories</h2>
-      <p>For the current worktree, there are no dedicated public <span class="inline-code">CUCoreUtils</span> members that map cleanly to the category names <span class="inline-code">LocaleUtils</span>, <span class="inline-code">PlayerSkillUtils</span>, or <span class="inline-code">TextUtils</span>.</p>
-    </section>
   `;
 }
 

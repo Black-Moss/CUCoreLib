@@ -165,6 +165,62 @@ namespace CUCoreLib.Data
         }
 
         /// <summary>
+        /// Adds a spawn-time MonoBehaviour attachment using the runtime type of <typeparamref name="T"/>.
+        /// </summary>
+        public CustomItemInfo AddSpawnComponent<T>() where T : MonoBehaviour
+        {
+            return AddSpawnComponent(typeof(T));
+        }
+
+        /// <summary>
+        /// Adds a spawn-time MonoBehaviour attachment using a runtime-resolvable assembly-qualified type name.
+        /// </summary>
+        public CustomItemInfo AddSpawnComponent(Type componentType)
+        {
+            if (componentType == null)
+            {
+                CUCoreLib.CUCoreLibPlugin.Log?.LogWarning(
+                    "AddSpawnComponent skipped because no component type was provided.");
+                return this;
+            }
+
+            if (!typeof(MonoBehaviour).IsAssignableFrom(componentType))
+            {
+                CUCoreLib.CUCoreLibPlugin.Log?.LogWarning(
+                    "AddSpawnComponent skipped because type '" + componentType.FullName +
+                    "' is not a MonoBehaviour.");
+                return this;
+            }
+
+            var assemblyQualifiedName = componentType.AssemblyQualifiedName;
+            if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
+            {
+                CUCoreLib.CUCoreLibPlugin.Log?.LogWarning(
+                    "AddSpawnComponent skipped because type '" + componentType.FullName +
+                    "' does not have an assembly-qualified name.");
+                return this;
+            }
+
+            if (!SpawnComponents.Contains(assemblyQualifiedName, StringComparer.Ordinal))
+                SpawnComponents.Add(assemblyQualifiedName);
+
+            return this;
+        }
+
+        /// <summary>
+        /// Adds multiple spawn-time MonoBehaviour attachments using runtime-resolvable assembly-qualified type names.
+        /// </summary>
+        public CustomItemInfo AddSpawnComponents(params Type[] componentTypes)
+        {
+            if (componentTypes == null || componentTypes.Length == 0) return this;
+
+            foreach (var componentType in componentTypes)
+                AddSpawnComponent(componentType);
+
+            return this;
+        }
+
+        /// <summary>
         /// Tracks an explicit assignment to the vanilla usable flag so later defaulting logic does not overwrite it.
         /// </summary>
         public new bool usable

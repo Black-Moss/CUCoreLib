@@ -241,7 +241,7 @@ export const hoverPanels: Record<string, HoverPanel> = {
   },
   CustomItemInfo: {
     title: "CustomItemInfo",
-    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, MultiWornSprites, LiquidMask, SpawnFrequency, SpriteScale, InventoryIconScale, SpriteScaleDimensions, or CustomData."
+    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, MultiWornSprites, LiquidMask, SpawnFrequency, SpriteScale, InventoryIconScale, SpriteScaleDimensions, CustomData, and fluent spawn-script helpers like AddSpawnComponent<T>()."
   },
   LiquidMask: {
     title: "LiquidMask",

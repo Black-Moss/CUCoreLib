@@ -2,7 +2,7 @@
   "version": "1.0",
   "library": "CUCoreLib",
   "description": "Machine-readable CUCoreLib web docs generated from the interactive docs sources.",
-  "generatedAt": "2026-07-04T22:16:59.078Z",
+  "generatedAt": "2026-07-04T23:13:04.164Z",
   "baseUrl": "/",
   "topics": [
     {
@@ -85,6 +85,15 @@
       "lead": "Using CustomItemInfo",
       "appUrl": "/docs/advanced-item/",
       "machineUrl": "/api/topics/advanced-item.json"
+    },
+    {
+      "id": "custom-item-scripts",
+      "label": "Creating Custom Item Scripts",
+      "crumb": "Items / Liquids",
+      "title": "Creating Custom Item Scripts",
+      "lead": "Attach MonoBehaviours to custom items, read custom item metadata, and structure wearable runtime logic.",
+      "appUrl": "/docs/custom-item-scripts/",
+      "machineUrl": "/api/topics/custom-item-scripts.json"
     },
     {
       "id": "recipe",

@@ -588,6 +588,7 @@ export function currentCode(nextPage: PageId, nextItemState: ItemState, nextReci
   if (currentPage === "tools") return toolsCode();
   if (currentPage === "item") return itemCode();
   if (currentPage === "advanced-item") return advancedItemCode();
+  if (currentPage === "custom-item-scripts") return customItemScriptsCode();
   if (currentPage === "liquids") return liquidCode();
   if (currentPage === "player") return playerCode();
   if (currentPage === "statuses") return statusesCode();
@@ -621,6 +622,7 @@ export function codeTitle(currentPage: PageId): string {
   if (currentPage === "tools") return "CustomItemTool.cs";
   if (currentPage === "item") return "RegisterItems.cs";
   if (currentPage === "advanced-item") return "RegisterAdvancedItems.cs";
+  if (currentPage === "custom-item-scripts") return "StormMantleScript.cs";
   if (currentPage === "liquids") return "RegisterLiquids.cs";
   if (currentPage === "player") return "PlayerHelpers.cs";
   if (currentPage === "statuses") return "StatusesExample.cs";
@@ -1594,6 +1596,80 @@ function toolsCode(): string {
   return `// Custom item tool page
 //  working on it~
 `;
+}
+
+function customItemScriptsCode(): string {
+  return `using BepInEx;
+using CUCoreLib.Data;
+using CUCoreLib.Helpers;
+using CUCoreLib.Registries;
+using UnityEngine;
+
+[BepInPlugin("com.example.stormmantle", "Storm Mantle Example", "1.0.0")]
+[BepInDependency("net.cucorelib", BepInDependency.DependencyFlags.HardDependency)]
+public sealed class Plugin : BaseUnityPlugin
+{
+    private void Awake()
+    {
+        RegisterStormMantle();
+    }
+
+    private void RegisterStormMantle()
+    {
+        ItemRegistry.Register(
+            "stormmantle",
+            new CustomItemInfo
+            {
+                fullName = "Storm Mantle",
+                description = "A lined mantle that steadies the body in cold weather.",
+                category = "tool",
+                wearable = true,
+                wearableCanBeHeld = true,
+                desiredWearLimb = "UpTorso",
+                wearSlotId = "outertorso",
+                wearableIsolation = 0.16f,
+                wearableArmor = 0.08f,
+                weight = 1.3f,
+                value = 24,
+                tags = "cangetwet",
+                rec = new Recognition(5),
+                CustomData =
+                {
+                    ["warmthBonus"] = 0.35f
+                }
+            }
+            .AddSpawnComponent<StormMantleScript>(),
+            AssetLoader.LoadEmbeddedSprite("Images.stormmantle.png")
+        );
+    }
+}
+
+public sealed class StormMantleScript : MonoBehaviour
+{
+    private Item item;
+    private float warmthBonus = 0.25f;
+
+    private void Awake()
+    {
+        item = GetComponent<Item>();
+
+        if (item != null && ItemRegistry.TryGetCustomData<float>(item, "warmthBonus", out float configuredWarmth))
+            warmthBonus = configuredWarmth;
+    }
+
+    private void Update()
+    {
+        Limb wornLimb = item != null && item.transform.parent != null
+            ? item.transform.parent.GetComponent<Limb>()
+            : null;
+        if (wornLimb == null) return;
+
+        Body body = wornLimb.body;
+        if (body == null) return;
+
+        body.clothingTemperature += warmthBonus * Time.deltaTime;
+    }
+}`;
 }
 
 function liquidCode(): string {

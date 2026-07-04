@@ -41,6 +41,7 @@ const navGroups: Array<{ label: string; pages: PageId[] }> = [
       "audio",
       "item",
       "advanced-item",
+      "custom-item-scripts",
       "recipe",
       "liquids",
       "guns"

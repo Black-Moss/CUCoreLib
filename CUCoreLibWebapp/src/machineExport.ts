@@ -10,6 +10,7 @@ export const machineExportEnabledPageIds = [
   "audio",
   "item",
   "advanced-item",
+  "custom-item-scripts",
   "recipe",
   "liquids",
   "player",
