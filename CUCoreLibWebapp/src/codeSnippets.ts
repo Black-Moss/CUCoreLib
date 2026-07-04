@@ -1773,6 +1773,8 @@ private void RegisterAdvancedItems()
                 Color = Color.white,
                 PointLightOuterRadius = 7.5f,
                 PointLightInnerRadius = 0f,
+                PointLightOuterAngle = 360f,
+                PointLightInnerAngle = 360f,
                 LightType = CustomLightType.Point
             },
             SpawnFrequency = 1

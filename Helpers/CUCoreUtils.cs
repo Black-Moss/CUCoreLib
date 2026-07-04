@@ -87,8 +87,11 @@ namespace CUCoreLib.Helpers
         private static readonly Dictionary<KeyCode, Sprite> KeySpriteCache = new Dictionary<KeyCode, Sprite>();
         private static readonly Dictionary<string, FriendlyKeybindEntry> FriendlyKeybindsByActionId =
             new Dictionary<string, FriendlyKeybindEntry>(StringComparer.Ordinal);
+        private static readonly int ItemLayerMask = LayerMask.GetMask("Item");
 
         private static Talker ElectronicTalkerProxy;
+        private static FieldInfo KrokMpChatFocusedField;
+        private static bool KrokMpChatFocusFieldResolved;
 
         // TODO allow for keybind support with FriendyKeyNames as a relay
         private static readonly Dictionary<KeyCode, string> FriendlyKeyNames = new Dictionary<KeyCode, string>
@@ -334,10 +337,13 @@ namespace CUCoreLib.Helpers
             item = null;
             if (!TryGetBody(out var body)) return false;
 
-            foreach (var uiCast in UIUtil.GetEventSystemRaycastResults()
-                         .Where(uiCast => uiCast.gameObject != null))
+            var uiCasts = UIUtil.GetEventSystemRaycastResults();
+            for (var i = 0; i < uiCasts.Count; i++)
             {
-                if (!uiCast.gameObject.TryGetComponent(out ItemLabel label) || label == null ||
+                var gameObject = uiCasts[i].gameObject;
+                if (gameObject == null) continue;
+
+                if (!gameObject.TryGetComponent(out ItemLabel label) || label == null ||
                     label.refItem == null) continue;
                 item = label.refItem;
                 return true;
@@ -346,7 +352,7 @@ namespace CUCoreLib.Helpers
             // maybe System.NullReferenceException
             var collider = Physics2D.OverlapPoint(
                 Camera.main.ScreenToWorldPoint(Input.mousePosition),    // maybe null
-                LayerMask.GetMask("Item"));
+                ItemLayerMask);
 
             if (collider == null) return false;
 
@@ -938,29 +944,41 @@ namespace CUCoreLib.Helpers
 
         private static bool IsKrokMpChatFocused()
         {
-            var chatType = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(assembly =>
-                {
-                    try
-                    {
-                        return assembly.GetTypes();
-                    }
-                    catch (ReflectionTypeLoadException ex)
-                    {
-                        return ex.Types.Where(type => type != null);
-                    }
-                })
-                .FirstOrDefault(type => type != null &&
-                                        string.Equals(type.Name, "Chat", StringComparison.Ordinal) &&
-                                        string.Equals(type.Namespace, "KrokoshaCasualtiesMP", StringComparison.Ordinal));
-
-            if (chatType == null) return false;
-
-            var focusedField = chatType.GetField("CHAT_textbox_input_focused",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            if (focusedField == null || focusedField.FieldType != typeof(bool)) return false;
+            var focusedField = GetKrokMpChatFocusedField();
+            if (focusedField == null) return false;
 
             return (bool)focusedField.GetValue(null);
+        }
+
+        private static FieldInfo GetKrokMpChatFocusedField()
+        {
+            if (KrokMpChatFocusFieldResolved) return KrokMpChatFocusedField;
+
+            KrokMpChatFocusFieldResolved = true;
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type chatType;
+                try
+                {
+                    chatType = assembly.GetType("KrokoshaCasualtiesMP.Chat", false);
+                }
+                catch
+                {
+                    chatType = null;
+                }
+
+                if (chatType == null) continue;
+
+                var focusedField = chatType.GetField("CHAT_textbox_input_focused",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                if (focusedField == null || focusedField.FieldType != typeof(bool)) return null;
+
+                KrokMpChatFocusedField = focusedField;
+                return KrokMpChatFocusedField;
+            }
+
+            return null;
         }
 
         private static string BuildFriendlyKeybindActionId(string friendlyKeybindName)

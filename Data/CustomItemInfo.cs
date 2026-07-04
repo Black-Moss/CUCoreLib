@@ -270,6 +270,16 @@ namespace CUCoreLib.Data
         /// Encumbrance multiplier applied to contained items. 1.0 = normal, 0.5 = half, 2.0 = double.
         /// </summary>
         public float EncumbranceReduction = 1.0f;
+
+        /// <summary>
+        /// Whether contained items remain visually visible while inside the container.
+        /// </summary>
+        public bool ItemsVisible = false;
+
+        /// <summary>
+        /// Optional item-tag restriction list for what the container accepts.
+        /// </summary>
+        public string[] TagRestriction = new string[0];
     }
 
     /// <summary>
@@ -329,6 +339,16 @@ namespace CUCoreLib.Data
         /// Inner radius for point/2D light falloff.
         /// </summary>
         public float PointLightInnerRadius;
+
+        /// <summary>
+        /// Outer cone angle for point lights.
+        /// </summary>
+        public float PointLightOuterAngle = 360f;
+
+        /// <summary>
+        /// Inner cone angle for point lights.
+        /// </summary>
+        public float PointLightInnerAngle = 360f;
 
         /// <summary>
         /// Underlying Unity light shape used for the spawned light.

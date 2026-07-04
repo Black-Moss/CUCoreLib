@@ -43,6 +43,9 @@ namespace CUCoreLib.Registries
         private static readonly HashSet<string> WarnedMissingIconIds =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly HashSet<string> WarnedMissingCustomIconIds =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         public static void Register(string id, ItemInfo info, Sprite icon, int spawnFrequency = 1)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -77,7 +80,9 @@ namespace CUCoreLib.Registries
 
             id = id.Trim();
             info.ID = id;
-            WarnedMissingIconIds.Remove(SpawnIdHelpers.NormalizeSpawnId(id));
+            var normalizedId = SpawnIdHelpers.NormalizeSpawnId(id);
+            WarnedMissingIconIds.Remove(normalizedId);
+            WarnedMissingCustomIconIds.Remove(normalizedId);
 
             if (string.IsNullOrWhiteSpace(info.category)) info.category = "nospawn";
 
@@ -89,6 +94,8 @@ namespace CUCoreLib.Registries
 
             if (!string.IsNullOrEmpty(info.description))
                 info.description = LocaleRegistry.Get("item", id + "dsc", info.description);
+
+            WarnMissingCustomIcon(id, info);
 
             // Store or replace the registry entry, apply defaults and inject into runtime tables.
             var replacingExisting = RegisteredItems.ContainsKey(id);
@@ -232,6 +239,8 @@ namespace CUCoreLib.Registries
                         ["color"] = NetworkSnapshotSerialization.WriteColor(info.Light.Color),
                         ["pointLightOuterRadius"] = info.Light.PointLightOuterRadius,
                         ["pointLightInnerRadius"] = info.Light.PointLightInnerRadius,
+                        ["pointLightOuterAngle"] = info.Light.PointLightOuterAngle,
+                        ["pointLightInnerAngle"] = info.Light.PointLightInnerAngle,
                         ["lightType"] = (int)info.Light.LightType,
                         ["offsetX"] = info.Light.Offset.x,
                         ["offsetY"] = info.Light.Offset.y,
@@ -347,6 +356,8 @@ namespace CUCoreLib.Registries
                         Color = NetworkSnapshotSerialization.ReadColor(light["color"], Color.white),
                         PointLightOuterRadius = light.Value<float?>("pointLightOuterRadius") ?? 0f,
                         PointLightInnerRadius = light.Value<float?>("pointLightInnerRadius") ?? 0f,
+                        PointLightOuterAngle = light.Value<float?>("pointLightOuterAngle") ?? 360f,
+                        PointLightInnerAngle = light.Value<float?>("pointLightInnerAngle") ?? 360f,
                         LightType = (CustomLightType)(light.Value<int?>("lightType") ?? 3),
                         Offset =
                             new Vector2(light.Value<float?>("offsetX") ?? 0f, light.Value<float?>("offsetY") ?? 0f),
@@ -483,6 +494,8 @@ namespace CUCoreLib.Registries
                 return true;
             }
 
+            WarnMissingCustomIcon(normalizedId, info);
+
             var customTemplate = CustomInstantiate.GetOrCreateTemplate(normalizedId);
             if (customTemplate != null && customTemplate.TryGetComponent<SpriteRenderer>(out var customRenderer) &&
                 customRenderer != null && customRenderer.sprite != null)
@@ -528,6 +541,8 @@ namespace CUCoreLib.Registries
 
             if (info.Icon != null) AssetLoader.CacheSprite(id, info.Icon);
             if (info.WornSprite != null) AssetLoader.CacheSprite(id + "_worn", info.WornSprite);
+
+            WarnMissingCustomIcon(id, info);
         }
 
         internal static void InjectSingleItem(CustomItemInfo info, bool replaceExisting = false)
@@ -549,6 +564,18 @@ namespace CUCoreLib.Registries
             return clone;
         }
 
+        private static void WarnMissingCustomIcon(string id, CustomItemInfo info)
+        {
+            var normalizedId = SpawnIdHelpers.NormalizeSpawnId(id);
+            if (string.IsNullOrWhiteSpace(normalizedId) || info == null || info.Icon != null) return;
+            if (IgnoredMissingIconIds.Contains(normalizedId)) return;
+            if (!WarnedMissingCustomIconIds.Add(normalizedId)) return;
+
+            CUCoreLibPlugin.Log?.LogWarning(
+                "Custom item '" + normalizedId +
+                "' has no icon sprite. Runtime will fall back to the base template sprite until you assign one.");
+        }
+
         private static IEnumerable<FieldInfo> GetPublicInstanceFields(Type type)
         {
             var seen = new HashSet<string>();
@@ -566,6 +593,7 @@ namespace CUCoreLib.Registries
             if (info == null) return;
 
             ApplyDestroyAtZeroConditionDefault(info);
+            ApplyWearableDefaults(info);
             ApplyUsableDefaults(info);
         }
 
@@ -599,6 +627,17 @@ namespace CUCoreLib.Registries
 
             if (info.Tool != null && !info.WasExplicitlySet(CustomItemExplicitField.UsableWithLmb))
                 info.SetDefault(CustomItemExplicitField.UsableWithLmb, true);
+        }
+
+        private static void ApplyWearableDefaults(CustomItemInfo info)
+        {
+            if (info == null || !info.wearable || info.useAction != null) return;
+
+            info.useAction = (body, item) =>
+            {
+                if (body == null || item == null) return;
+                body.WearWearable(item);
+            };
         }
 
         private static bool IsStandardLiquidContainer(ItemInfo info)

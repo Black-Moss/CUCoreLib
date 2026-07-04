@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using BepInEx.Logging;
 using CUCoreLib.ContentReload;
 using UnityEngine;
@@ -38,23 +39,12 @@ namespace CUCoreLib.Helpers
             int heightMultiplier)
         {
             var pluginPath = ResolvePluginDirectory();
-            var imagePath = Path.Combine(pluginPath, "Images", filename);
-
-            if (!File.Exists(imagePath))
+            var imagePath = TryResolveSpriteFilePath(pluginPath, filename, out var attemptedPaths);
+            if (string.IsNullOrWhiteSpace(imagePath))
             {
-                imagePath = Path.Combine(pluginPath, filename);
-                if (!File.Exists(imagePath))
-                {
-                    imagePath = Path.Combine(pluginPath, "Images", "Images", filename);
-                    if (!File.Exists(imagePath))
-                    {
-                        // Debug.LogError($"You didn't download the image: {filename}");
-                        Debug.LogError($"Image file not found: {filename}");
-                        return null;
-                    }
-                }
+                Logger?.LogWarning(BuildMissingSpriteMessage(filename, attemptedPaths));
+                return null;
             }
-
 
             var fileData = File.ReadAllBytes(imagePath);
 
@@ -127,6 +117,32 @@ namespace CUCoreLib.Helpers
             return !string.IsNullOrWhiteSpace(overrideDirectory)
                 ? overrideDirectory
                 : Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        }
+
+        private static string TryResolveSpriteFilePath(string pluginPath, string filename, out string[] attemptedPaths)
+        {
+            attemptedPaths = new[]
+            {
+                Path.Combine(pluginPath, "Images", filename),
+                Path.Combine(pluginPath, filename),
+                Path.Combine(pluginPath, "Images", "Images", filename)
+            };
+
+            return attemptedPaths.FirstOrDefault(File.Exists);
+        }
+
+        private static string BuildMissingSpriteMessage(string filename, string[] attemptedPaths)
+        {
+            var builder = new StringBuilder();
+            builder.Append("Image file not found: '").Append(filename)
+                .Append("'. Checked paths: ");
+
+            if (attemptedPaths == null || attemptedPaths.Length == 0)
+                builder.Append("(none)");
+            else
+                builder.Append(string.Join(", ", attemptedPaths.Select(path => "'" + path + "'")));
+
+            return builder.ToString();
         }
     }
 }

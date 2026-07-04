@@ -231,6 +231,8 @@ namespace CUCoreLib.Helpers
             light.color = properties.Color;
             light.pointLightOuterRadius = properties.PointLightOuterRadius;
             light.pointLightInnerRadius = properties.PointLightInnerRadius;
+            light.pointLightOuterAngle = properties.PointLightOuterAngle;
+            light.pointLightInnerAngle = properties.PointLightInnerAngle;
 
             if (lightItem == null) return;
             lightItem.light = light;

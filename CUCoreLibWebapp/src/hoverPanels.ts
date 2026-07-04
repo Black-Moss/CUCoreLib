@@ -55,12 +55,12 @@ export const hoverPanels: Record<string, HoverPanel> = {
   EnableHotReload: {
     title: "EnableHotReload",
     signature: "ContentReloadManager.EnableHotReload(string modGuid, HotReloadOptions options = null)",
-    body: "Single-line hot reload opt-in. The default mode is flexible guarded replay: CUCoreLib reruns broad post-marker code, blocks known startup-only APIs during reload with warnings, and keeps strict mode available through options when a mod author wants tighter validation."
+    body: "Single-line hot reload opt-in. Place before any functions that you want to be hot reloadable."
   },
   CCLBase: {
     title: "CCLBase",
     signature: "abstract class CCLBase",
-    body: "Optional helper base for reusable content objects. It can still hold a plugin reference, but it is no longer required for hot reload setup."
+    body: "Optional helper base for reusable content objects. Very experimental."
   },
   ConsoleCheckForWorld: {
     title: "ConsoleCheckForWorld",
@@ -307,6 +307,14 @@ export const hoverPanels: Record<string, HoverPanel> = {
   EncumbranceReduction: {
     title: "EncumbranceReduction",
     body: "ContainerProperties value mapped to Container.encumberanceMult. 1 is normal; lower values reduce carried-content burden."
+  },
+  ItemsVisible: {
+    title: "ItemsVisible",
+    body: "ContainerProperties value mapped to Container.itemsVisible. When true, contained item sprites remain visible inside the container."
+  },
+  TagRestriction: {
+    title: "TagRestriction",
+    body: "ContainerProperties value mapped to Container.tagRestriction. Leave the array empty to accept items with any tags; otherwise at least one item tag must match."
   },
   StartCharge: {
     title: "StartCharge",

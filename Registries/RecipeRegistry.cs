@@ -23,6 +23,9 @@ namespace CUCoreLib.Registries
         private static readonly HashSet<string> InjectedRecipeKeys =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly HashSet<string> WarnedInvalidRecipeIngredientKeys =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         private static string ActiveOwnerId;
         private static int PendingHotReloadInjectedRecipeCount;
 
@@ -73,6 +76,7 @@ namespace CUCoreLib.Registries
             if (Recipes.recipes == null || recipe?.result == null) return false;
             EnsureCurrentRecipeList();
             NormalizeRecipeIngredients(recipe);
+            ValidateRecipeReferences(recipe, deferVanillaValidation: false);
 
             var recipeKey = BuildRecipeKey(recipe);
             if (InjectedRecipeKeys.Contains(recipeKey)) return false;
@@ -182,6 +186,7 @@ namespace CUCoreLib.Registries
                 RegisteredRecipeKeys.Remove(key);
                 RecipeOwners.Remove(key);
                 InjectedRecipeKeys.Remove(key);
+                WarnedInvalidRecipeIngredientKeys.Remove(key);
                 var key1 = key;
                 Recipes.recipes?.RemoveAll(recipe =>
                     string.Equals(BuildRecipeKey(recipe), key1, StringComparison.OrdinalIgnoreCase));
@@ -217,9 +222,11 @@ namespace CUCoreLib.Registries
             InjectedRecipeKeys.Clear();
         }
 
-        private static void ValidateRecipeReferences(Recipe recipe)
+        private static void ValidateRecipeReferences(Recipe recipe, bool deferVanillaValidation = true)
         {
             if (recipe?.items == null) return;
+
+            var recipeKey = BuildRecipeKey(recipe);
 
             for (var i = 0; i < recipe.items.Count; i++)
             {
@@ -239,13 +246,17 @@ namespace CUCoreLib.Registries
                 }
 
                 var normalizedId = item.specificId.Trim();
-                if (!TryResolveRecipeItemId(normalizedId, item.isLiquid))
-                    CUCoreLibPlugin.Log?.LogWarning(
-                        $"Recipe '{recipe.result.id}' references unknown {(item.isLiquid ? "liquid" : "item")} '{normalizedId}' at ingredient index {i}.");
+                if (TryResolveRecipeItemId(normalizedId, item.isLiquid, deferVanillaValidation)) continue;
+
+                var warningKey = BuildInvalidIngredientWarningKey(recipeKey, i, item.isLiquid, normalizedId);
+                if (!WarnedInvalidRecipeIngredientKeys.Add(warningKey)) continue;
+
+                CUCoreLibPlugin.Log?.LogWarning(
+                    $"Recipe '{recipe.result.id}' references unknown {(item.isLiquid ? "liquid" : "item")} '{normalizedId}' at ingredient index {i}.");
             }
         }
 
-        private static bool TryResolveRecipeItemId(string id, bool isLiquid)
+        private static bool TryResolveRecipeItemId(string id, bool isLiquid, bool deferVanillaValidation)
         {
             if (string.IsNullOrWhiteSpace(id)) return false;
 
@@ -256,9 +267,14 @@ namespace CUCoreLib.Registries
             if (Item.GlobalItems == null)
                 // Recipe registration commonly runs during plugin Awake, before vanilla item tables exist.
                 // Defer vanilla-item validation until runtime instead of warning on valid base-game IDs.
-                return true;
+                return deferVanillaValidation;
 
             return Item.GlobalItems.ContainsKey(id) || Resources.Load<GameObject>(id) != null;
+        }
+
+        private static string BuildInvalidIngredientWarningKey(string recipeKey, int index, bool isLiquid, string id)
+        {
+            return recipeKey + "|" + index + "|" + isLiquid + "|" + id;
         }
 
         private static string BuildIngredientKey(List<RecipeItem> items)

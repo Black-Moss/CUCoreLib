@@ -171,6 +171,7 @@ namespace CUCoreLib.Registries
             }
 
             if (world == null || RegisteredDefinitions.Count == 0) yield break;
+            if (IsTutorialWorld(world)) yield break;
 
             LogRegisteredStructureSummaryIfNeeded();
             StructureSeededRandom.InitializeForStructures();
@@ -178,12 +179,14 @@ namespace CUCoreLib.Registries
             var currentDepth = world.biomeDepth;
             var occupiedRects = new List<StructurePlacementRect>();
             var totalRequestedSpawnCount = 0;
+            var limitDebugWorldSpawns = IsDebugWorld(world);
             foreach (var definition in RegisteredDefinitions.Values.OrderBy(entry => entry.ID, StringComparer.OrdinalIgnoreCase))
             {
                 if (definition.SpawnCounts == null || currentDepth < 0 || currentDepth >= definition.SpawnCounts.Length)
                     continue;
 
                 var countToSpawn = Mathf.Max(0, definition.SpawnCounts[currentDepth]);
+                if (limitDebugWorldSpawns) countToSpawn = Mathf.Min(countToSpawn, 1);
                 if (countToSpawn <= 0) continue;
 
                 totalRequestedSpawnCount += countToSpawn;
@@ -207,6 +210,25 @@ namespace CUCoreLib.Registries
                                                  (i + 1) + "/" + countToSpawn + ")\n\n");
                     yield return null;
                 }
+            }
+        }
+
+        private static bool IsTutorialWorld(WorldGeneration world)
+        {
+            return world != null && world.biomeOverride == WorldGeneration.OverrideSceneType.Tutorial;
+        }
+
+        private static bool IsDebugWorld(WorldGeneration world)
+        {
+            if (world == null || WorldGeneration.runSettings == null) return false;
+
+            try
+            {
+                return WorldGeneration.GetRunSettingBool("debugworld");
+            }
+            catch
+            {
+                return false;
             }
         }
 

@@ -11,18 +11,30 @@ namespace CUCoreLib.Patches
     {
         [HarmonyPatch(typeof(Body), "WearWearable")]
         [HarmonyPrefix]
-        private static void ApplyWornSpriteBeforeWear(Item item)
+        private static void ApplyWornSpriteBeforeWear(Item item, out bool __state)
         {
+            __state = false;
             if (item == null || !ItemRegistry.TryGetCustomInfo(item, out var def) || def.WornSprite == null) return;
 
             ApplySprite(item, def.WornSprite);
+            __state = true;
         }
 
         [HarmonyPatch(typeof(Body), "WearWearable")]
         [HarmonyPostfix]
-        private static void ApplyWornSpriteOffsetAfterWear(Item item)
+        private static void ApplyWornSpriteOffsetAfterWear(Item item, bool __state)
         {
-            if (item == null || !ItemRegistry.TryGetCustomInfo(item, out var def) || def.WornSprite == null) return;
+            if (!__state || item == null || !ItemRegistry.TryGetCustomInfo(item, out var def) || def.WornSprite == null)
+                return;
+
+            if (!IsWorn(item))
+            {
+                if (def.Icon != null)
+                    ApplySprite(item, def.Icon);
+
+                ItemRegistryPatches.ApplyCustomItemRuntime(item);
+                return;
+            }
 
             item.transform.localPosition = new Vector3(def.WornSpriteOffset.x, def.WornSpriteOffset.y,
                 item.transform.localPosition.z);
@@ -69,6 +81,12 @@ namespace CUCoreLib.Patches
             if (ItemRegistry.TryGetCustomInfo(item, out var def) &&
                 !string.IsNullOrWhiteSpace(def.WornSpriteAnimationId))
                 AssetLoader.TryApplyAnimation(sr, def.WornSpriteAnimationId);
+        }
+
+        private static bool IsWorn(Item item)
+        {
+            var parent = item != null ? item.transform.parent : null;
+            return parent != null && parent.GetComponent<Limb>() != null;
         }
     }
 }

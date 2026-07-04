@@ -2309,7 +2309,7 @@ function advancedItemPage(): string {
   return `
     <section class="lesson-card">
       <h2>When to use this page</h2>
-      <p>The basic Item API page uses vanilla <span class="inline-code">ItemInfo</span> to mimic the base game. Advanced items can use <span class="inline-code">CustomItemInfo</span>, which includes normal <span class="inline-code">ItemInfo</span> fields, vanilla <span class="inline-code">LiquidItemInfo</span> fields, and CUCoreLib-only fields like <span class="inline-code">Container</span>, <span class="inline-code">Battery</span>, <span class="inline-code">Light</span>, <span class="inline-code">Tool</span>, <span class="inline-code">WornSprite</span>, <span class="inline-code">WornSpriteOffset</span>, <span class="inline-code">SpriteScaleDimensions</span>, <span class="inline-code">SpawnFrequency</span>, and <span class="inline-code">CustomData</span>.</p>
+      <p>The basic Item API page uses vanilla <span class="inline-code">ItemInfo</span> to mimic the base game. Advanced items can use <span class="inline-code">CustomItemInfo</span>, which includes normal <span class="inline-code">ItemInfo</span> fields, vanilla <span class="inline-code">LiquidItemInfo</span> fields, and CUCoreLib-only fields like <span class="inline-code">Container</span>, <span class="inline-code">Battery</span>, <span class="inline-code">Light</span>, <span class="inline-code">Tool</span>, <span class="inline-code">WornSprite</span>, <span class="inline-code">WornSpriteOffset</span>, <span class="inline-code">LiquidMask</span>, <span class="inline-code">SpriteScaleDimensions</span>, <span class="inline-code">SpawnFrequency</span>, and <span class="inline-code">CustomData</span>.</p>
       <p>Why is the mod doing it this way? Traditonally, the game sets these settings via the Unity prefab editor, and as such does not appear in the game's default item code.</p>
       <pre><code>// Replace new ItemInfo{ ... } with 
       new CustomItemInfo{ ... }</code></pre>
@@ -2332,6 +2332,7 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">Icon</span></td><td><span class="inline-code">Sprite</span></td><td>Inventory/world sprite used by custom templates and cached under the item ID. Passing the sprite as the third register argument sets this for you.</td></tr>
             <tr><td><span class="inline-code">WornSprite</span></td><td><span class="inline-code">Sprite</span></td><td>Optional sprite applied while a wearable custom item is worn, then restored to <span class="inline-code">Icon</span> when dropped.</td></tr>
             <tr><td><span class="inline-code">WornSpriteOffset</span></td><td><span class="inline-code">Vector2</span></td><td>Optional local-space offset applied to the worn item sprite after vanilla attaches it to <span class="inline-code">desiredWearLimb</span>.</td></tr>
+            <tr><td><span class="inline-code">LiquidMask</span></td><td><span class="inline-code">Sprite</span></td><td>Optional liquid-fill overlay mask for custom <span class="inline-code">WaterContainerItem</span> containers. Use a white or neutral grayscale sprite with transparency shaping the visible fill area so the game can tint it to the current liquid color.</td></tr>
             <tr><td><span class="inline-code">SpriteScale</span></td><td><span class="inline-code">float</span></td><td>Scale applied to the generated runtime template. Keep this near <span class="inline-code">1f</span> unless your art was made at a different size.</td></tr>
             <tr><td><span class="inline-code">InventoryIconScale</span></td><td><span class="inline-code">float</span></td><td>Extra multiplier applied only to the inventory icon UI size after the normal sprite scale has been resolved. Leave it at <span class="inline-code">1f</span> unless you want the inventory icon smaller or larger than the in-world sprite.</td></tr>
             <tr><td><span class="inline-code">SpriteScaleDimensions</span></td><td><span class="inline-code">SpriteScaleDimensions</span></td><td>Scales the sprite toward a target pixel size like <span class="inline-code">(14f, 14f)</span>. Add <span class="inline-code">true</span> as the third tuple value to stop once either axis reaches the requested size instead of forcing both axes to meet it.</td></tr>
@@ -2350,6 +2351,7 @@ function advancedItemPage(): string {
 
       <h3>LiquidItemInfo fields</h3>
       <p>Use these direct fields for normal liquid containers like bottles, cans, canteens, pouches, and drinkable items. Use <span class="inline-code">SyringeProperties</span> only when you want the syringe minigame and injection action.</p>
+      <p>If you want the container to render a vanilla-style colored fill overlay, pair those fields with <span class="inline-code">LiquidMask</span> on <span class="inline-code">CustomItemInfo</span>. The mask should usually be white or neutral grayscale, with transparency defining where the liquid can appear.</p>
       <div class="table-wrap">
         <table class="field-table">
           <thead><tr><th>Field</th><th>Type</th><th>What it does</th></tr></thead>
@@ -2369,6 +2371,8 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">Capacity</span></td><td><span class="inline-code">float</span></td><td>Maximum total held weight for the vanilla <span class="inline-code">Container</span>.</td></tr>
             <tr><td><span class="inline-code">MaxWeightPerItem</span></td><td><span class="inline-code">float</span></td><td>Maximum weight any one contained item may have.</td></tr>
             <tr><td><span class="inline-code">EncumbranceReduction</span></td><td><span class="inline-code">float</span></td><td>Multiplier for how much contained weight counts against the player. <span class="inline-code">1f</span> is normal; <span class="inline-code">0.5f</span> feels half as heavy.</td></tr>
+            <tr><td><span class="inline-code">ItemsVisible</span></td><td><span class="inline-code">bool</span></td><td>Controls the vanilla <span class="inline-code">Container.itemsVisible</span> flag. When true, contained item sprites remain visible inside the container.</td></tr>
+            <tr><td><span class="inline-code">TagRestriction</span></td><td><span class="inline-code">string[]</span></td><td>Optional whitelist of item tags accepted by the container. Leave empty to allow any tag.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2454,6 +2458,8 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">Color</span></td><td><span class="inline-code">Color</span></td><td>Light tint. Defaults to white.</td></tr>
             <tr><td><span class="inline-code">PointLightOuterRadius</span></td><td><span class="inline-code">float</span></td><td>Outer radius for point lights.</td></tr>
             <tr><td><span class="inline-code">PointLightInnerRadius</span></td><td><span class="inline-code">float</span></td><td>Inner radius for point lights.</td></tr>
+            <tr><td><span class="inline-code">PointLightOuterAngle</span></td><td><span class="inline-code">float</span></td><td>Outer cone angle for point lights. Defaults to <span class="inline-code">360f</span>.</td></tr>
+            <tr><td><span class="inline-code">PointLightInnerAngle</span></td><td><span class="inline-code">float</span></td><td>Inner cone angle for point lights. Defaults to <span class="inline-code">360f</span>.</td></tr>
             <tr><td><span class="inline-code">LightType</span></td><td><span class="inline-code">CustomLightType</span></td><td>CUCoreLib light type mapped internally to URP <span class="inline-code">Light2D.LightType</span>. Use <span class="inline-code">CustomLightType.Point</span> for lantern-style item light.</td></tr>
             <tr><td><span class="inline-code">Offset</span></td><td><span class="inline-code">Vector2</span></td><td>Local offset for the light object relative to the item.</td></tr>
             <tr><td><span class="inline-code">AddLightItem</span></td><td><span class="inline-code">bool</span></td><td>If true, CUCoreLib wires the light through vanilla <span class="inline-code">LightItem</span> so container/on-off behavior can apply.</td></tr>
@@ -2605,6 +2611,8 @@ function advancedItemPage(): string {
             Color = Color.white,
             PointLightOuterRadius = 7.5f,
             PointLightInnerRadius = 0f,
+            PointLightOuterAngle = 360f,
+            PointLightInnerAngle = 360f,
             LightType = CustomLightType.Point
         },
         SpawnFrequency = 1
@@ -3029,17 +3037,11 @@ function debugTestingPage(): string {
       <h2>Automatic discovery rules</h2>
       <ul>
         <li>Supported reload surfaces are asset loading, locale/text, liquids, items, basic building entities, and recipes.</li>
-        <li>Method names do not control replay order. CUCoreLib infers stages from the registration APIs each discovered branch calls, then replays assets before locale, liquids, items, buildings, and recipes.</li>
-        <li>CUCoreLib prefers parameterless <span class="inline-code">void</span> helper methods as replay leaves, but flexible mode can walk through broader wrapper methods when they fan out into eligible local helpers.</li>
-        <li>Known startup-only APIs such as Harmony patch setup, console command registration, save hooks, mod options, multiplayer hooks, tiles, structures, and live scene mutation are blocked during flexible replay with a warning once per replay root and API.</li>
-        <li>If CUCoreLib still cannot discover a replayable supported content branch, the reload summary tells you which method could not be used and why.</li>
+        <li>Harmony patch setup, console command registration, save hooks, mod options, multiplayer hooks, tiles, structures, and live scene mutation currently do not work and are blocked.</li>
       </ul>
 
        <h2>Limitations</h2>
       <p>CUCoreLib's built-in DLL reload path is still <strong>singleplayer only</strong> and only restores reloadable content owned by that mod after clearing the old registered entries.</p>
-      <p>Supported content is locale/text, liquids, items, recipes, and only <strong>basic/scriptless</strong> building definitions. Tiles, multi-block structures, save providers, moodles, statuses, and runtime scene mutation are still not replayed, even though flexible mode can now step around those APIs more gracefully.</p>
-      <p>If a replayed method throws, CUCoreLib rolls that mod back to its previous successful content snapshot. Flexible mode warns and continues for known blocked APIs, while strict mode fails fast.</p>
-      <p>The old attribute-based workflow using <span class="inline-code">[CCLContentHost]</span>, <span class="inline-code">[ContentReloadEntry]</span>, and <span class="inline-code">[CCLReloadIgnore]</span> is no longer supported.</p>
       </section>
 
     <section class="lesson-card">

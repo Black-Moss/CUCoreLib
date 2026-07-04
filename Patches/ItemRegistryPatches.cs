@@ -240,6 +240,8 @@ namespace CUCoreLib.Patches
                 cont.maxWeight = def.Container.Capacity;
                 cont.maxWeightPerItem = def.Container.MaxWeightPerItem;
                 cont.encumberanceMult = def.Container.EncumbranceReduction;
+                cont.itemsVisible = def.Container.ItemsVisible;
+                cont.tagRestriction = def.Container.TagRestriction ?? new string[0];
             }
 
             // Batteries
@@ -336,6 +338,8 @@ namespace CUCoreLib.Patches
             light.color = properties.Color;
             light.pointLightOuterRadius = properties.PointLightOuterRadius;
             light.pointLightInnerRadius = properties.PointLightInnerRadius;
+            light.pointLightOuterAngle = properties.PointLightOuterAngle;
+            light.pointLightInnerAngle = properties.PointLightInnerAngle;
 
             if (lightItem == null) return;
             lightItem.light = light;
@@ -492,6 +496,18 @@ namespace CUCoreLib.Patches
 
             __instance.light = __instance.GetComponentInChildren<Light2D>();
             if (__instance.light != null) NextLightLookupFrameByInstance.Remove(__instance.GetInstanceID());
+        }
+
+        [HarmonyPatch(typeof(LightItem), "Update")]
+        [HarmonyPrefix]
+        private static void SyncCustomBatteryLightState(LightItem __instance)
+        {
+            if (__instance == null) return;
+            if (!ItemRegistry.TryGetCustomInfo(__instance.GetComponent<Item>(), out var def) || def?.Light == null) return;
+
+            var battery = __instance.GetComponent<BatteryItem>();
+            if (battery != null)
+                __instance.shouldEnable = battery.hasCharge;
         }
 
         private static void ApplyCustomSpawnComponents(Item item, CustomItemInfo def)
