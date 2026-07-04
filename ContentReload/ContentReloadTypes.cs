@@ -16,6 +16,28 @@ namespace CUCoreLib.ContentReload
         AllAllowed = Items | Liquids | Recipes | Locale | Buildings
     }
 
+    internal enum ContentReloadEntryStage
+    {
+        LoadAssets = 0,
+        RegisterText = 100,
+        RegisterLocale = 200,
+        RegisterLiquids = 300,
+        RegisterItems = 400,
+        RegisterBuildings = 450,
+        RegisterRecipes = 500
+    }
+
+    public enum HotReloadMode
+    {
+        FlexibleGuarded = 0,
+        Strict = 1
+    }
+
+    public sealed class HotReloadOptions
+    {
+        public HotReloadMode Mode { get; set; } = HotReloadMode.FlexibleGuarded;
+    }
+
     public sealed class ContentReloadResult
     {
         private readonly List<string> errors = new List<string>();
@@ -76,7 +98,6 @@ namespace CUCoreLib.ContentReload
 
     internal sealed class ContentReloadModConfig
     {
-        public string OverrideDllPath { get; set; }
         public bool WatchEnabled { get; set; }
     }
 
@@ -102,6 +123,7 @@ namespace CUCoreLib.ContentReload
         public string SelectedSourceLabel { get; set; }
         public string PluginTypeFullName { get; set; }
         public string UnsupportedReason { get; set; }
+        public bool UsesEnableHotReloadContract { get; set; }
         public List<DiscoveredReloadMethod> Methods { get; } = new List<DiscoveredReloadMethod>();
         public List<SkippedReloadMethod> SkippedMethods { get; } = new List<SkippedReloadMethod>();
         public List<string> Notes { get; } = new List<string>();
@@ -145,6 +167,7 @@ namespace CUCoreLib.ContentReload
         public string LastSuccessfulSourcePath { get; set; }
         public ContentReloadResult LastResult { get; set; }
         public ContentCompatibilityReport LastReport { get; set; }
+        public HotReloadMode Mode { get; set; } = HotReloadMode.FlexibleGuarded;
         public string PendingHash { get; set; }
         public string PendingSourcePath { get; set; }
         public DateTime PendingSinceUtc { get; set; } = DateTime.MinValue;

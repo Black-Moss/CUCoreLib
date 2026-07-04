@@ -1,6 +1,18 @@
 # Changelog
 I figured that this would be nice to have, as to easily take a look at everything that's been done and why your mod might not work with the new update (sorry!)
 
+## v1.0.3
+
+### New Stuff!
+- Hotloading is a lot more mod-author friendly, so that you don't have to wrangle your code around it (as much)
+- Check out the new docs for information! ^^
+### Changes
+- Locale recursive directory search was accidentally removed and now re-added
+### Fixes 
+- Battery 0% condition issue...
+- Fix keycode optimization (Thanks, @Jacbo1)!
+
+
 ## v1.0.2
 
 ### New Stuff!

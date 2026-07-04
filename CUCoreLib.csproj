@@ -206,9 +206,6 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Data\CustomBuildingEntityDefinition.cs"/>
-        <Compile Include="Data\CCLContentHostAttribute.cs"/>
-        <Compile Include="Data\CCLReloadIgnoreAttribute.cs"/>
-        <Compile Include="Data\ContentReloadEntryAttribute.cs"/>
         <Compile Include="Data\CustomItemInfo.cs"/>
         <Compile Include="Data\CustomLiquidInfo.cs"/>
         <Compile Include="Data\ModOptionDefinition.cs"/>

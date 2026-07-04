@@ -11,9 +11,7 @@ namespace CUCoreLib.ContentReload
 {
     internal static class ContentCompatibilityScanner
     {
-        private const string ContentReloadEntryAttributeFullName = "CUCoreLib.Data.ContentReloadEntryAttribute";
-        private const string CclContentHostAttributeFullName = "CUCoreLib.Data.CCLContentHostAttribute";
-        private const string CclReloadIgnoreAttributeFullName = "CUCoreLib.Data.CCLReloadIgnoreAttribute";
+        private const string ContentReloadManagerTypeFullName = "CUCoreLib.ContentReload.ContentReloadManager";
 
         private static readonly string[] AllowedBuildingDefinitionMembers =
         {
@@ -102,9 +100,7 @@ namespace CUCoreLib.ContentReload
                     report.PluginTypeFullName = pluginType.FullName;
 
                     var discoveryIndex = 0;
-                    DiscoverExplicitPluginMethods(pluginType, report, ref discoveryIndex);
-                    DiscoverContentHostMethods(assembly, report, ref discoveryIndex);
-                    AddIgnoredMethodNotes(pluginType, report);
+                    DiscoverEnableHotReloadMethods(pluginType, report, ref discoveryIndex);
 
                     report.Methods.Sort((left, right) =>
                     {
@@ -127,7 +123,7 @@ namespace CUCoreLib.ContentReload
                                 "No supported content reload entry methods were found. All discovered candidates were skipped.";
                         else
                             report.UnsupportedReason =
-                                "No supported content reload entry methods were found. Add one or more [ContentReloadEntry(...)] methods or mark a content class with [CCLContentHost].";
+                                "No supported content reload entry methods were found after EnableHotReload(GUID). CUCoreLib could not discover any replayable supported content registrations.";
                     }
                 }
             }
@@ -213,84 +209,66 @@ namespace CUCoreLib.ContentReload
             }
         }
 
-        private static void DiscoverExplicitPluginMethods(TypeDefinition pluginType, ContentCompatibilityReport report,
+        private static void DiscoverEnableHotReloadMethods(TypeDefinition pluginType, ContentCompatibilityReport report,
             ref int discoveryIndex)
         {
-            if (pluginType == null) return;
-
-            foreach (var method in pluginType.Methods)
+            if (pluginType == null)
             {
-                var attribute = GetReloadEntryAttribute(method);
-                if (attribute == null) continue;
-
-                AddMethodFromAttribute(method, attribute, report, true, ref discoveryIndex);
+                report.UnsupportedReason = "Plugin type was null.";
+                return;
             }
-        }
 
-        private static void DiscoverContentHostMethods(AssemblyDefinition assembly, ContentCompatibilityReport report,
-            ref int discoveryIndex)
-        {
-            foreach (var hostType in EnumerateTypes(assembly.MainModule.Types).Where(IsContentHost))
+            var replayMode = ContentReloadManager.GetReloadMode(report.ModGuid);
+
+            var awakeMethod = pluginType.Methods.FirstOrDefault(method =>
+                string.Equals(method.Name, "Awake", StringComparison.Ordinal) &&
+                !method.HasParameters);
+            if (awakeMethod == null || !awakeMethod.HasBody)
             {
-                foreach (var method in hostType.Methods)
+                report.UnsupportedReason =
+                    "Plugin '" + pluginType.FullName +
+                    "' must define an Awake() method with a ContentReloadManager.EnableHotReload(GUID) call.";
+                return;
+            }
+
+            if (!TryFindEnableHotReloadMarker(awakeMethod, report.ModGuid, out var markerIndex, out var markerReason))
+            {
+                report.UnsupportedReason = markerReason;
+                return;
+            }
+
+            report.UsesEnableHotReloadContract = true;
+
+            var discoveredAny = false;
+            var visitedReplayMethods = new HashSet<string>(StringComparer.Ordinal);
+            var afterMarker = awakeMethod.Body.Instructions.Skip(markerIndex + 1).ToList();
+            foreach (var instruction in afterMarker)
+            {
+                if (!IsDirectMethodCall(instruction, out var calledMethod)) continue;
+                if (calledMethod == null) continue;
+
+                MethodDefinition resolvedMethod;
+                try
                 {
-                    if (!IsEligibleHostMethod(method)) continue;
-
-                    if (HasReloadIgnoreAttribute(method)) continue;
-
-                    var attribute = GetReloadEntryAttribute(method);
-                    if (attribute != null)
-                    {
-                        AddMethodFromAttribute(method, attribute, report, false, ref discoveryIndex);
-                        continue;
-                    }
-
-                    InferAndAddHostMethod(method, report, ref discoveryIndex);
+                    resolvedMethod = calledMethod.Resolve();
                 }
-            }
-        }
+                catch
+                {
+                    resolvedMethod = null;
+                }
 
-        private static void AddMethodFromAttribute(MethodDefinition method, CustomAttribute attribute,
-            ContentCompatibilityReport report, bool isPluginMethod, ref int discoveryIndex)
-        {
-            if (method.HasParameters)
-            {
-                var usage = isPluginMethod ? "[ContentReloadEntry]" : "[ContentReloadEntry] on content host";
-                AddSkippedMethod(report, method,
-                    "Method '" + BuildMethodDisplayName(method) + "' uses " + usage +
-                    " but is not parameterless. Strict content reload entry methods must not take parameters.");
-                return;
+                if (resolvedMethod == null || resolvedMethod.Module != pluginType.Module) continue;
+                if (!IsEligibleReplayRootMethod(resolvedMethod)) continue;
+
+                if (DiscoverReplayRootsFromMethod(pluginType, resolvedMethod, report, replayMode, ref discoveryIndex,
+                        visitedReplayMethods))
+                    discoveredAny = true;
             }
 
-            if (!TryReadAttributeStage(attribute, out var stageOrder))
-            {
-                AddSkippedMethod(report, method,
-                    "Method '" + BuildMethodDisplayName(method) +
-                    "' uses [ContentReloadEntry] with an unsupported stage value.");
-                return;
-            }
-
-            var validationIssue = ValidateMethodForStage(method, (ContentReloadEntryStage)stageOrder, false);
-            if (!string.IsNullOrWhiteSpace(validationIssue))
-            {
-                AddSkippedMethod(report, method, validationIssue);
-                return;
-            }
-
-            AddRecognizedMethod(report, method, (ContentReloadEntryStage)stageOrder, ReadAttributeOrder(attribute),
-                isPluginMethod, discoveryIndex++);
-        }
-
-        private static void InferAndAddHostMethod(MethodDefinition method, ContentCompatibilityReport report,
-            ref int discoveryIndex)
-        {
-            if (!TryInferStage(method, out var stage, out var reason))
-            {
-                AddSkippedMethod(report, method, reason);
-                return;
-            }
-
-            AddRecognizedMethod(report, method, stage, 0, false, discoveryIndex++);
+            if (!discoveredAny)
+                report.UnsupportedReason =
+                    "Awake() called EnableHotReload('" + report.ModGuid +
+                    "') but CUCoreLib could not discover any replayable supported content registrations after the marker.";
         }
 
         private static bool TryInferStage(MethodDefinition method, out ContentReloadEntryStage stage, out string reason)
@@ -322,20 +300,91 @@ namespace CUCoreLib.ContentReload
                 }
 
                 reason = "Method '" + BuildMethodDisplayName(method) +
-                         "' did not call a supported content registration API. Add [ContentReloadEntry(...)] if you need an explicit stage.";
+                         "' did not call a supported content registration API. Replay roots must directly register supported content or call helper methods that do.";
                 return false;
             }
 
             if (surfaceUsages.Surfaces.Count > 1)
             {
                 reason = "Method '" + BuildMethodDisplayName(method) +
-                         "' touches multiple supported registration surfaces. Split the method or add explicit [ContentReloadEntry(...)] methods for each stage.";
+                         "' touches multiple supported registration surfaces. CUCoreLib can often recover by replaying deeper helper methods, but this method itself is not a direct replay leaf.";
                 return false;
             }
 
             var surface = surfaceUsages.Surfaces.First();
             stage = SurfaceToStage(surface);
             return true;
+        }
+
+        private static bool TryFindEnableHotReloadMarker(MethodDefinition awakeMethod, string modGuid,
+            out int markerIndex, out string reason)
+        {
+            markerIndex = -1;
+            reason = "Awake() must call ContentReloadManager.EnableHotReload(\"" + modGuid + "\").";
+
+            if (awakeMethod == null || !awakeMethod.HasBody) return false;
+
+            var instructions = awakeMethod.Body.Instructions;
+            for (var i = 0; i < instructions.Count; i++)
+            {
+                if (!IsDirectMethodCall(instructions[i], out var calledMethod) || calledMethod == null) continue;
+                if (!string.Equals(calledMethod.Name, "EnableHotReload", StringComparison.Ordinal)) continue;
+                if (!string.Equals(calledMethod.DeclaringType?.FullName, ContentReloadManagerTypeFullName,
+                        StringComparison.Ordinal)) continue;
+
+                if (!TryReadPreviousStringArgument(instructions, i, out var argumentGuid))
+                {
+                    reason = "Awake() must call ContentReloadManager.EnableHotReload(GUID) with a literal GUID argument.";
+                    return false;
+                }
+
+                if (!string.Equals(argumentGuid, modGuid, StringComparison.Ordinal))
+                {
+                    reason = "Awake() called ContentReloadManager.EnableHotReload(\"" + argumentGuid +
+                             "\") but the plugin GUID is \"" + modGuid + "\".";
+                    return false;
+                }
+
+                markerIndex = i;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool DiscoverReplayRootsFromMethod(TypeDefinition pluginType, MethodDefinition method,
+            ContentCompatibilityReport report, HotReloadMode replayMode, ref int discoveryIndex,
+            HashSet<string> visitedReplayMethods)
+        {
+            if (method == null) return false;
+
+            var methodKey = method.FullName ?? method.Name;
+            if (!visitedReplayMethods.Add(methodKey)) return false;
+
+            if (ShouldIgnoreStartupOnlyMethod(method))
+                return false;
+
+            if (TryInferStage(method, out var stage, out var reason))
+            {
+                AddRecognizedMethod(report, method, stage, 0, IsPluginMethod(pluginType, method), discoveryIndex++);
+                return true;
+            }
+
+            if (replayMode == HotReloadMode.FlexibleGuarded && MethodOnlyCallsLocalHelpers(method))
+            {
+                var discoveredAny = false;
+                foreach (var nestedMethod in ResolveLocalCalledMethods(method))
+                    if (DiscoverReplayRootsFromMethod(pluginType, nestedMethod, report, replayMode, ref discoveryIndex,
+                            visitedReplayMethods))
+                        discoveredAny = true;
+
+                if (discoveredAny) return true;
+            }
+
+            if (!ShouldSuppressReplaySkip(method, reason))
+                AddSkippedMethod(report, method, reason);
+
+            return false;
         }
 
         private static SurfaceUsageAnalysis AnalyzeMethodSurfaceUsage(MethodDefinition method,
@@ -424,7 +473,7 @@ namespace CUCoreLib.ContentReload
 
             if (analysis.Surfaces.Count > 1)
                 return "Method '" + BuildMethodDisplayName(method) +
-                       "' touches multiple supported registration surfaces. Split the method or add explicit [ContentReloadEntry(...)] methods for each stage.";
+                       "' touches multiple supported registration surfaces. CUCoreLib can often recover by replaying deeper helper methods, but this method itself is not a direct replay leaf.";
 
             var requiredSurface = StageToSurface(stage);
             if (requiredSurface == ContentReloadSurface.None) return null;
@@ -636,78 +685,6 @@ namespace CUCoreLib.ContentReload
                        StringComparison.Ordinal);
         }
 
-        private static CustomAttribute GetReloadEntryAttribute(MethodDefinition method)
-        {
-            return method?.CustomAttributes.FirstOrDefault(entry =>
-                string.Equals(entry.AttributeType.FullName, ContentReloadEntryAttributeFullName,
-                    StringComparison.Ordinal));
-        }
-
-        private static bool HasReloadIgnoreAttribute(MethodDefinition method)
-        {
-            return method != null && method.CustomAttributes.Any(entry =>
-                string.Equals(entry.AttributeType.FullName, CclReloadIgnoreAttributeFullName, StringComparison.Ordinal));
-        }
-
-        private static bool IsContentHost(TypeDefinition type)
-        {
-            return type != null && type.CustomAttributes.Any(entry =>
-                string.Equals(entry.AttributeType.FullName, CclContentHostAttributeFullName, StringComparison.Ordinal));
-        }
-
-        private static bool IsEligibleHostMethod(MethodDefinition method)
-        {
-            if (method == null) return false;
-            if (method.IsConstructor || method.IsGetter || method.IsSetter || method.IsAddOn || method.IsRemoveOn)
-                return false;
-            if (method.HasParameters) return false;
-            if (method.ReturnType != null && method.ReturnType.FullName != "System.Void") return false;
-            if ((method.Attributes & Mono.Cecil.MethodAttributes.SpecialName) != 0) return false;
-            if (method.Name.StartsWith("<", StringComparison.Ordinal)) return false;
-
-            return true;
-        }
-
-        private static bool TryReadAttributeStage(CustomAttribute attribute, out int stageOrder)
-        {
-            stageOrder = -1;
-            if (attribute == null || attribute.ConstructorArguments.Count < 1) return false;
-
-            var rawValue = attribute.ConstructorArguments[0].Value;
-            if (rawValue == null) return false;
-
-            try
-            {
-                stageOrder = Convert.ToInt32(rawValue);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static int ReadAttributeOrder(CustomAttribute attribute)
-        {
-            if (attribute == null) return 0;
-
-            foreach (var property in attribute.Properties)
-            {
-                if (!string.Equals(property.Name, "Order", StringComparison.Ordinal)) continue;
-
-                try
-                {
-                    return Convert.ToInt32(property.Argument.Value);
-                }
-                catch
-                {
-                    return 0;
-                }
-            }
-
-            return 0;
-        }
-
         private static TypeDefinition FindPluginType(AssemblyDefinition assembly, string modGuid)
         {
             if (assembly == null) return null;
@@ -742,28 +719,6 @@ namespace CUCoreLib.ContentReload
                 yield return type;
                 foreach (var nested in EnumerateTypes(type.NestedTypes)) yield return nested;
             }
-        }
-
-        private static void AddIgnoredMethodNotes(TypeDefinition pluginType, ContentCompatibilityReport report)
-        {
-            string[] ignoredMethodNames =
-            {
-                "RegisterBuildings",
-                "RegisterBuildingEntities",
-                "RegisterStatuses",
-                "RegisterMoodles",
-                "RegisterOptions",
-                "RegisterSettings",
-                "RegisterTiles",
-                "RegisterSave",
-                "RegisterSaveProviders"
-            };
-
-            foreach (var ignoredMethodName in ignoredMethodNames)
-                if (pluginType.Methods.Any(method =>
-                        string.Equals(method.Name, ignoredMethodName, StringComparison.Ordinal)))
-                    report.Notes.Add("Ignored unsupported method '" + ignoredMethodName +
-                                     "' during strict content scan.");
         }
 
         private static void AddRecognizedMethod(ContentCompatibilityReport report, MethodDefinition method,
@@ -838,6 +793,130 @@ namespace CUCoreLib.ContentReload
             }
 
             return null;
+        }
+
+        private static bool IsDirectMethodCall(Instruction instruction, out MethodReference calledMethod)
+        {
+            calledMethod = instruction?.Operand as MethodReference;
+            if (calledMethod == null || instruction == null) return false;
+
+            return instruction.OpCode == OpCodes.Call || instruction.OpCode == OpCodes.Callvirt;
+        }
+
+        private static bool TryReadPreviousStringArgument(IList<Instruction> instructions, int callIndex,
+            out string value)
+        {
+            value = null;
+            if (instructions == null || callIndex <= 0) return false;
+
+            for (var i = callIndex - 1; i >= 0; i--)
+            {
+                var instruction = instructions[i];
+                if (instruction.OpCode == OpCodes.Ldstr)
+                {
+                    value = instruction.Operand as string;
+                    return !string.IsNullOrWhiteSpace(value);
+                }
+
+                if (instruction.OpCode.FlowControl == FlowControl.Call ||
+                    instruction.OpCode.FlowControl == FlowControl.Branch ||
+                    instruction.OpCode.FlowControl == FlowControl.Cond_Branch)
+                    break;
+            }
+
+            return false;
+        }
+
+        private static bool IsEligibleReplayRootMethod(MethodDefinition method)
+        {
+            if (method == null) return false;
+            if (method.IsConstructor || method.IsGetter || method.IsSetter || method.IsAddOn || method.IsRemoveOn)
+                return false;
+            if (method.HasParameters) return false;
+            if (method.ReturnType != null && method.ReturnType.FullName != "System.Void") return false;
+            if ((method.Attributes & Mono.Cecil.MethodAttributes.SpecialName) != 0) return false;
+            if (method.Name.StartsWith("<", StringComparison.Ordinal)) return false;
+
+            return true;
+        }
+
+        private static bool ShouldIgnoreStartupOnlyMethod(MethodDefinition method)
+        {
+            if (method == null) return false;
+
+            var declaringType = method.DeclaringType?.FullName ?? string.Empty;
+            if (string.Equals(declaringType, "HarmonyLib.Harmony", StringComparison.Ordinal)) return true;
+            if (string.Equals(declaringType, "FantasyMod.FantasyGameplayHooks", StringComparison.Ordinal) &&
+                string.Equals(method.Name, "PatchAll", StringComparison.Ordinal)) return true;
+
+            return false;
+        }
+
+        private static bool MethodOnlyCallsLocalHelpers(MethodDefinition method)
+        {
+            if (method == null || !method.HasBody) return false;
+
+            var hasLocalCall = false;
+            foreach (var instruction in method.Body.Instructions)
+            {
+                if (!IsDirectMethodCall(instruction, out var calledMethod) || calledMethod == null) continue;
+
+                MethodDefinition resolvedMethod;
+                try
+                {
+                    resolvedMethod = calledMethod.Resolve();
+                }
+                catch
+                {
+                    resolvedMethod = null;
+                }
+
+                if (resolvedMethod == null || resolvedMethod.Module != method.Module) return false;
+                if (!IsEligibleReplayRootMethod(resolvedMethod)) return false;
+                hasLocalCall = true;
+            }
+
+            return hasLocalCall;
+        }
+
+        private static IEnumerable<MethodDefinition> ResolveLocalCalledMethods(MethodDefinition method)
+        {
+            if (method == null || !method.HasBody) yield break;
+
+            foreach (var instruction in method.Body.Instructions)
+            {
+                if (!IsDirectMethodCall(instruction, out var calledMethod) || calledMethod == null) continue;
+
+                MethodDefinition resolvedMethod;
+                try
+                {
+                    resolvedMethod = calledMethod.Resolve();
+                }
+                catch
+                {
+                    resolvedMethod = null;
+                }
+
+                if (resolvedMethod == null || resolvedMethod.Module != method.Module) continue;
+                if (!IsEligibleReplayRootMethod(resolvedMethod)) continue;
+                yield return resolvedMethod;
+            }
+        }
+
+        private static bool ShouldSuppressReplaySkip(MethodDefinition method, string reason)
+        {
+            if (method == null) return false;
+            if (string.IsNullOrWhiteSpace(reason)) return true;
+
+            return reason.IndexOf("did not call a supported content registration API", StringComparison.Ordinal) >= 0 &&
+                   MethodOnlyCallsLocalHelpers(method);
+        }
+
+        private static bool IsPluginMethod(TypeDefinition pluginType, MethodDefinition method)
+        {
+            return pluginType != null &&
+                   method != null &&
+                   string.Equals(pluginType.FullName, method.DeclaringType?.FullName, StringComparison.Ordinal);
         }
 
         private static string ValidateBuildingDefinitionInitialization(IList<Instruction> instructions, int startIndex,

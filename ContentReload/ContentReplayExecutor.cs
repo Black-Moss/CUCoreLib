@@ -65,9 +65,10 @@ namespace CUCoreLib.ContentReload
             var existingContent = CaptureExistingContent(report.ModGuid);
             AssetLoader.InvalidateEmbeddedCachesForModGuid(report.ModGuid);
             ClearExistingContent(report.ModGuid, result);
+            var reloadMode = ContentReloadManager.GetReloadMode(report.ModGuid);
 
             using (ContentReloadSession.Begin(report.ModGuid, assembly, report.SelectedPath,
-                       ContentReloadSurface.AllAllowed))
+                       ContentReloadSurface.AllAllowed, reloadMode))
             using (ItemRegistry.BeginOwnerRegistration(report.ModGuid))
             using (LiquidRegistry.BeginOwnerRegistration(report.ModGuid))
             using (RecipeRegistry.BeginOwnerRegistration(report.ModGuid))

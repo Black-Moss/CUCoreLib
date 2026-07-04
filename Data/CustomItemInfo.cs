@@ -279,24 +279,14 @@ namespace CUCoreLib.Data
     public class BatteryProperties
     {
         /// <summary>
-        /// Maximum battery charge.
+        /// Initial battery charge when the item spawns. Leave below zero to use the preset's full default charge.
         /// </summary>
-        public float MaxCharge = 100f;
-
-        /// <summary>
-        /// Initial battery charge when the item spawns. Note that the 'spawn' command will always spawn batteries items at full charge.
-        /// </summary>
-        public float StartCharge = 100f;
+        public float StartCharge = -1f;
 
         /// <summary>
         /// Battery preset used to configure the item.
         /// </summary>
         public BatteryItem.BatteryPreset Preset = BatteryItem.BatteryPreset.Medium;
-
-        /// <summary>
-        /// Battery item id assigned to the spawned battery slot.
-        /// </summary>
-        public string BatteryType = "mediumbattery";
 
         /// <summary>
         /// Whether the item should spawn with a battery inserted.

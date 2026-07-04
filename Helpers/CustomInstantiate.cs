@@ -128,7 +128,7 @@ namespace CUCoreLib.Helpers
                 var createdBattery = batteryItem == null;   // not use
                 if (batteryItem == null) batteryItem = obj.AddComponent<BatteryItem>();
 
-                ItemRegistryPatches.ApplyBatteryProperties(item, batteryItem, info, true, true);
+                ItemRegistryPatches.ApplyBatteryProperties(item, batteryItem, info, true);
             }
 
             ItemRegistryPatches.ApplyCustomScale(item, info);

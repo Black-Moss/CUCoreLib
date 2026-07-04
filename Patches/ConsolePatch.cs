@@ -15,6 +15,7 @@ namespace CUCoreLib.Patches
         internal static void RefreshRuntimeAutofill()
         {
             RefreshSpawnAutofill();
+            RefreshSpawnCategoryAutofill();
             RefreshCustomSpawnAutofill();
             RefreshAddLiquidAutofill();
             RefreshReloadContentAutofill();
@@ -26,8 +27,42 @@ namespace CUCoreLib.Patches
         {
             var existingCustomSpawn = ConsoleScript.Commands.FirstOrDefault(c => c.name == "cuspawn");
             if (existingCustomSpawn != null) ConsoleScript.Commands.Remove(existingCustomSpawn);
+            var existingSpawnCategory = ConsoleScript.Commands.FirstOrDefault(c => c.name == "spawncategory");
+            if (existingSpawnCategory != null) ConsoleScript.Commands.Remove(existingSpawnCategory);
             var existingSetTile = ConsoleScript.Commands.FirstOrDefault(c => c.name == "settile");
             if (existingSetTile != null) ConsoleScript.Commands.Remove(existingSetTile);
+
+            ConsoleScript.Commands.Add(new Command("spawncategory",
+                "Spawns all items from a given loot pool with zero gravity.",
+                delegate(string[] args)
+                {
+                    CUCoreUtils.ConsoleCheckForWorld(__instance);
+                    EnsureArgumentCount(__instance, args, 2);
+
+                    var category = args[1];
+                    var position = ParsePositionOrThrow(__instance, args[2]);
+                    var items = string.Equals(category, "modded", StringComparison.OrdinalIgnoreCase)
+                        ? GetModdedSpawnCategoryIds()
+                        : (ItemLootPool.AllItemsFromPool(category) ??
+                           throw new Exception("Invalid item category \"" + category + "\"."))
+                        .Select(entry => entry.Item1)
+                        .Where(id => !string.IsNullOrWhiteSpace(id))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    foreach (var itemId in items)
+                    {
+                        var obj = Utils.Create(itemId,
+                            (Vector2)Camera.main.ScreenToWorldPoint(Input.mousePosition) +
+                            UnityEngine.Random.insideUnitCircle * 3f, 0f);
+                        var body = obj != null ? obj.GetComponent<Rigidbody2D>() : null;
+                        if (body != null) body.gravityScale = 0f;
+                    }
+
+                    CUCoreUtils.ConsoleLog(__instance,
+                        $"Spawned all items from category \"{category}\" at {position}.");
+                }, BuildSpawnCategoryAutofill(), ("string id", "The ID of the category to spawn from"),
+                ("position", "Where to spawn the item")));
 
             ConsoleScript.Commands.Add(new Command("cuspawn",
                 "Spawns a vanilla prefab or CUCoreLib-registered item/building.",
@@ -158,6 +193,29 @@ namespace CUCoreLib.Patches
                 spawnIds.Add(id);
         }
 
+        private static Dictionary<int, List<string>> BuildSpawnCategoryAutofill()
+        {
+            var categories = ItemLootPool.pool != null
+                ? ItemLootPool.pool.Keys.ToList()
+                : new List<string>();
+
+            if (!categories.Contains("modded", StringComparer.OrdinalIgnoreCase))
+                categories.Add("modded");
+
+            return new Dictionary<int, List<string>>
+            {
+                { 0, categories }
+            };
+        }
+
+        private static void RefreshSpawnCategoryAutofill()
+        {
+            var spawnCategoryCommand = ConsoleScript.SearchExact("spawncategory");
+            if (spawnCategoryCommand == null) return;
+
+            spawnCategoryCommand.argAutofill = BuildSpawnCategoryAutofill();
+        }
+
         private static bool HasRegisteredSpawnEntities(ConsoleScript console)
         {
             if (console == null) return false;
@@ -278,6 +336,43 @@ namespace CUCoreLib.Patches
             {
                 return false;
             }
+        }
+
+        private static Vector2 ParsePositionOrThrow(ConsoleScript console, string value)
+        {
+            var parsePosition = AccessTools.Method(typeof(ConsoleScript), "ParsePosition", new[] { typeof(string) });
+            if (console == null || parsePosition == null)
+                throw new Exception("Could not access ConsoleScript.ParsePosition().");
+
+            return (Vector2)parsePosition.Invoke(console, new object[] { value });
+        }
+
+        private static void EnsureArgumentCount(ConsoleScript console, string[] args, int desired)
+        {
+            var checkArgumentCount = AccessTools.Method(typeof(ConsoleScript), "CheckArgumentCount",
+                new[] { typeof(string[]), typeof(int) });
+            if (console == null || checkArgumentCount == null)
+                throw new Exception("Could not access ConsoleScript.CheckArgumentCount().");
+
+            checkArgumentCount.Invoke(console, new object[] { args, desired });
+        }
+
+        private static List<string> GetModdedSpawnCategoryIds()
+        {
+            var moddedIds = new List<string>();
+
+            if (Item.GlobalItems != null)
+                foreach (var id in Item.GlobalItems.Keys)
+                    if (CUCoreUtils.IsModdedItem(id) &&
+                        !moddedIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+                        moddedIds.Add(id);
+
+            foreach (var id in ItemRegistry.GetRegisteredItemIds())
+                if (CUCoreUtils.IsModdedItem(id) &&
+                    !moddedIds.Contains(id, StringComparer.OrdinalIgnoreCase))
+                    moddedIds.Add(id);
+
+            return moddedIds;
         }
 
         private static string FindClosestMatch(string query, List<string> candidates)

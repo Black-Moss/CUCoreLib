@@ -554,27 +554,8 @@ namespace CUCoreLib.Registries
         {
             if (info == null) return;
 
-            ApplyBatteryDefaults(info);
             ApplyDestroyAtZeroConditionDefault(info);
             ApplyUsableDefaults(info);
-        }
-
-        private static void ApplyBatteryDefaults(CustomItemInfo info)
-        {
-            if (info?.Battery == null || !string.IsNullOrWhiteSpace(info.Battery.BatteryType)) return;
-
-            switch (info.Battery.Preset)
-            {
-                case BatteryItem.BatteryPreset.Small:
-                    info.Battery.BatteryType = "smallbattery";
-                    break;
-                case BatteryItem.BatteryPreset.Large:
-                    info.Battery.BatteryType = "largebattery";
-                    break;
-                default:
-                    info.Battery.BatteryType = "mediumbattery";
-                    break;
-            }
         }
 
         private static void ApplyDestroyAtZeroConditionDefault(CustomItemInfo info)

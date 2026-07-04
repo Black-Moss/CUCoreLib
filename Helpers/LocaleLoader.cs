@@ -115,20 +115,13 @@ namespace CUCoreLib.Helpers
 
                 AddIfExists(results, visitedPaths, Path.Combine(pluginDirectory, fileName));
                 AddIfExists(results, visitedPaths, Path.Combine(pluginDirectory, "Locales", fileName));
+                AddRangeIfExists(results, visitedPaths, EnumerateMatchingFiles(pluginDirectory, fileName));
             }
 
             var pluginRoot = Path.Combine(Path.GetDirectoryName(Paths.ConfigPath) ?? string.Empty, "plugins");
             if (!Directory.Exists(pluginRoot)) return results;
 
-            var pluginMatches = Directory.EnumerateFiles(pluginRoot, fileName, SearchOption.AllDirectories)
-                .Where(path =>
-                    path.IndexOf(Path.DirectorySeparatorChar + "Locales" + Path.DirectorySeparatorChar,
-                        StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf(Path.AltDirectorySeparatorChar + "Locales" + Path.AltDirectorySeparatorChar,
-                        StringComparison.OrdinalIgnoreCase) >= 0);
-
-            foreach (var match in pluginMatches)
-                AddIfExists(results, visitedPaths, match);
+            AddRangeIfExists(results, visitedPaths, EnumerateMatchingFiles(pluginRoot, fileName));
 
             return results;
         }
@@ -298,6 +291,32 @@ namespace CUCoreLib.Helpers
             if (string.IsNullOrWhiteSpace(normalizedPath) || !visitedPaths.Add(normalizedPath)) return;
 
             results.Add(normalizedPath);
+        }
+
+        private static void AddRangeIfExists(ICollection<string> results, ISet<string> visitedPaths,
+            IEnumerable<string> paths)
+        {
+            if (paths == null) return;
+
+            foreach (var path in paths)
+                AddIfExists(results, visitedPaths, path);
+        }
+
+        private static IEnumerable<string> EnumerateMatchingFiles(string rootPath, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(rootPath) || string.IsNullOrWhiteSpace(fileName) ||
+                !Directory.Exists(rootPath))
+                return Enumerable.Empty<string>();
+
+            try
+            {
+                return Directory.EnumerateFiles(rootPath, fileName, SearchOption.AllDirectories);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning($"Failed to scan locale overlays under '{rootPath}': {ex.Message}");
+                return Enumerable.Empty<string>();
+            }
         }
 
         private sealed class EmbeddedLocaleResource

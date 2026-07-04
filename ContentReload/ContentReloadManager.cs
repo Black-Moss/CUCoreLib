@@ -2,21 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using BepInEx;
 using BepInEx.Bootstrap;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
-using Mono.Cecil;
 using UnityEngine;
 
 namespace CUCoreLib.ContentReload
 {
     public static class ContentReloadManager
     {
-        private const string AutoHotReloadPathKeyPrefix = "CUCoreLib.AutoHotReload.Path.";
         private const string AutoHotReloadEnabledKeyPrefix = "CUCoreLib.AutoHotReload.Enabled.";
 
         private static readonly Dictionary<string, ContentReloadState> StateByModGuid =
             new Dictionary<string, ContentReloadState>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> EnabledModGuids =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static bool initialized;
         private static readonly ContentReloadConfig config = new ContentReloadConfig();
@@ -45,6 +46,13 @@ namespace CUCoreLib.ContentReload
                 return result;
             }
 
+            if (!IsEnabled(modGuid))
+            {
+                result.AddError("Hot reload is not enabled for '" + modGuid.Trim() +
+                                "'. Call ContentReloadManager.EnableHotReload(GUID) from Awake() first.");
+                return result;
+            }
+
             if (IsMultiplayerActive())
             {
                 result.AddError("Strict content DLL reload is singleplayer-only.");
@@ -69,6 +77,28 @@ namespace CUCoreLib.ContentReload
             return result;
         }
 
+        public static void EnableHotReload(string modGuid)
+        {
+            EnableHotReload(modGuid, null);
+        }
+
+        public static void EnableHotReload(string modGuid, HotReloadOptions options)
+        {
+            Initialize();
+
+            var normalizedModGuid = (modGuid ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedModGuid))
+                throw new ArgumentException("Mod GUID was empty.", nameof(modGuid));
+
+            if (!TryFindCallingPluginType(normalizedModGuid, out var pluginType, out var reason))
+                throw new InvalidOperationException(reason);
+
+            EnabledModGuids.Add(normalizedModGuid);
+            var normalizedOptions = options ?? new HotReloadOptions();
+            GetOrCreateState(normalizedModGuid).Mode = normalizedOptions.Mode;
+            PersistAutoHotReloadSetting(normalizedModGuid, true);
+        }
+
         public static string[] GetLoadedModGuids()
         {
             return Chainloader.PluginInfos.Keys
@@ -83,45 +113,47 @@ namespace CUCoreLib.ContentReload
             return config != null && config.PollIntervalSeconds > 0 ? config.PollIntervalSeconds : 2;
         }
 
-        public static bool ConfigureAutoHotRefresh(string dllPath, bool enabled, out string message)
+        public static bool ConfigureAutoHotRefresh(string modGuid, bool enabled, out string message)
         {
             Initialize();
 
-            var normalizedPath = NormalizeExistingOrTargetPath(dllPath);
-            if (string.IsNullOrWhiteSpace(normalizedPath))
+            var normalizedModGuid = (modGuid ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedModGuid))
             {
-                message = "DLL path was invalid.";
+                message = "Mod GUID was invalid.";
                 return false;
             }
 
-            if (!File.Exists(normalizedPath))
+            if (!Chainloader.PluginInfos.TryGetValue(normalizedModGuid, out var pluginInfo) || pluginInfo == null)
             {
-                message = "DLL path does not exist: " + normalizedPath;
+                message = "Loaded plugin GUID was not found: " + normalizedModGuid;
                 return false;
             }
 
-            if (!TryResolvePluginGuidFromDll(normalizedPath, out var modGuid, out var modName, out var reason))
+            if (!EnabledModGuids.Contains(normalizedModGuid))
             {
-                message = reason;
+                message = "Hot reload is not enabled for '" + normalizedModGuid +
+                          "'. Call ContentReloadManager.EnableHotReload(GUID) from Awake() first.";
                 return false;
             }
 
             if (config.Mods == null)
                 config.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
 
-            if (!config.Mods.TryGetValue(modGuid, out var modConfig) || modConfig == null)
+            if (!config.Mods.TryGetValue(normalizedModGuid, out var modConfig) || modConfig == null)
             {
                 modConfig = new ContentReloadModConfig();
-                config.Mods[modGuid] = modConfig;
+                config.Mods[normalizedModGuid] = modConfig;
             }
 
-            modConfig.OverrideDllPath = normalizedPath;
             modConfig.WatchEnabled = enabled;
-            PersistAutoHotReloadSetting(modGuid, normalizedPath, enabled);
+            PersistAutoHotReloadSetting(normalizedModGuid, enabled);
 
+            var modName = pluginInfo.Metadata != null && !string.IsNullOrWhiteSpace(pluginInfo.Metadata.Name)
+                ? pluginInfo.Metadata.Name
+                : normalizedModGuid;
             var label = string.IsNullOrWhiteSpace(modName) ? modGuid : modName + " (" + modGuid + ")";
-            message = (enabled ? "Enabled" : "Disabled") + " automatic hot reload for " + label + " using " +
-                      normalizedPath + ".";
+            message = (enabled ? "Enabled" : "Disabled") + " automatic hot reload for " + label + ".";
             return true;
         }
 
@@ -171,7 +203,7 @@ namespace CUCoreLib.ContentReload
             if (result != null && result.Succeeded)
             {
                 var reloadLabel = GetReloadedFileName(result.SourcePath);
-                if (console != null) CUCoreUtils.ConsoleLog(console, "Reloaded " + reloadLabel + "!");
+                WriteMessages(console, new[] { "Reloaded " + reloadLabel + "!" });
                 WriteMessages(console, result.Skipped);
 
                 return;
@@ -200,9 +232,8 @@ namespace CUCoreLib.ContentReload
                 var normalizedModGuid = (modGuid ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(normalizedModGuid)) continue;
 
-                var persistedPath = CUCoreUtils.GetString(GetAutoHotReloadPathKey(normalizedModGuid), string.Empty);
                 var watchEnabled = CUCoreUtils.GetBool(GetAutoHotReloadEnabledKey(normalizedModGuid));
-                if (string.IsNullOrWhiteSpace(persistedPath) && !watchEnabled) continue;
+                if (!watchEnabled) continue;
 
                 if (config.Mods == null)
                     config.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
@@ -213,24 +244,17 @@ namespace CUCoreLib.ContentReload
                     config.Mods[normalizedModGuid] = modConfig;
                 }
 
-                modConfig.OverrideDllPath = NormalizeExistingOrTargetPath(persistedPath);
                 modConfig.WatchEnabled = watchEnabled;
             }
         }
 
-        private static void PersistAutoHotReloadSetting(string modGuid, string dllPath, bool enabled)
+        private static void PersistAutoHotReloadSetting(string modGuid, bool enabled)
         {
             var normalizedModGuid = (modGuid ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(normalizedModGuid)) return;
 
-            CUCoreUtils.SetString(GetAutoHotReloadPathKey(normalizedModGuid), dllPath ?? string.Empty);
             CUCoreUtils.SetBool(GetAutoHotReloadEnabledKey(normalizedModGuid), enabled);
             PlayerPrefs.Save();
-        }
-
-        private static string GetAutoHotReloadPathKey(string modGuid)
-        {
-            return AutoHotReloadPathKeyPrefix + modGuid;
         }
 
         private static string GetAutoHotReloadEnabledKey(string modGuid)
@@ -243,70 +267,59 @@ namespace CUCoreLib.ContentReload
             return MultiplayerBridge.IsAvailable && MultiplayerBridge.IsRunning;
         }
 
-        private static string NormalizeExistingOrTargetPath(string path)
+        internal static bool IsEnabled(string modGuid)
         {
-            if (string.IsNullOrWhiteSpace(path)) return null;
-
-            try
-            {
-                return Path.GetFullPath(path.Trim().Trim('"'));
-            }
-            catch
-            {
-                return null;
-            }
+            return !string.IsNullOrWhiteSpace(modGuid) && EnabledModGuids.Contains(modGuid.Trim());
         }
 
-        private static bool TryResolvePluginGuidFromDll(string dllPath, out string modGuid, out string modName,
-            out string reason)
+        internal static HotReloadMode GetReloadMode(string modGuid)
         {
-            modGuid = null;
-            modName = null;
-            reason = null;
+            if (string.IsNullOrWhiteSpace(modGuid)) return HotReloadMode.FlexibleGuarded;
 
-            try
+            return GetOrCreateState(modGuid).Mode;
+        }
+
+        private static bool TryFindCallingPluginType(string modGuid, out Type pluginType, out string reason)
+        {
+            pluginType = null;
+            reason = "ContentReloadManager.EnableHotReload() must be called from the owning plugin Awake().";
+
+            var frames = new System.Diagnostics.StackTrace().GetFrames();
+            if (frames == null || frames.Length == 0) return false;
+
+            foreach (var frame in frames)
             {
-                using (var assembly = AssemblyDefinition.ReadAssembly(dllPath))
+                var method = frame.GetMethod();
+                var declaringType = method?.DeclaringType;
+                if (declaringType == null) continue;
+
+                if (!typeof(BaseUnityPlugin).IsAssignableFrom(declaringType)) continue;
+                if (!string.Equals(method.Name, "Awake", StringComparison.Ordinal)) continue;
+
+                var candidateGuid = TryGetPluginGuidFromType(declaringType);
+                if (!string.Equals(candidateGuid, modGuid, StringComparison.Ordinal))
                 {
-                    foreach (var type in EnumerateTypes(assembly.MainModule.Types))
-                    {
-                        if (type == null || !type.HasCustomAttributes) continue;
-
-                        foreach (var attribute in type.CustomAttributes.Where(attribute => string.Equals(attribute.AttributeType.FullName, "BepInEx.BepInPlugin",
-                                     StringComparison.Ordinal)))
-                        {
-                            if (attribute.ConstructorArguments.Count > 0)
-                                modGuid = attribute.ConstructorArguments[0].Value as string;
-
-                            if (attribute.ConstructorArguments.Count > 1)
-                                modName = attribute.ConstructorArguments[1].Value as string;
-
-                            if (!string.IsNullOrWhiteSpace(modGuid)) return true;
-                        }
-                    }
+                    reason = "EnableHotReload('" + modGuid + "') was called from '" +
+                             (candidateGuid ?? declaringType.FullName) +
+                             "'. The GUID must match the owning plugin's [BepInPlugin] GUID.";
+                    return false;
                 }
 
-                reason = "No [BepInPlugin] GUID was found in " + dllPath + ".";
-                return false;
+                pluginType = declaringType;
+                return true;
             }
-            catch (Exception ex)
-            {
-                reason = "Failed to inspect DLL '" + dllPath + "': " + ex.Message;
-                return false;
-            }
+
+            return false;
         }
 
-        private static IEnumerable<TypeDefinition> EnumerateTypes(IEnumerable<TypeDefinition> roots)
+        private static string TryGetPluginGuidFromType(Type pluginType)
         {
-            if (roots == null) yield break;
+            if (pluginType == null) return null;
 
-            foreach (var type in roots)
-            {
-                if (type == null) continue;
-
-                yield return type;
-                foreach (var nested in EnumerateTypes(type.NestedTypes)) yield return nested;
-            }
+            var attribute = pluginType.GetCustomAttributes(typeof(BepInPlugin), true)
+                .OfType<BepInPlugin>()
+                .FirstOrDefault();
+            return attribute?.GUID;
         }
 
         // not use BuildResultHeadline
@@ -350,7 +363,7 @@ namespace CUCoreLib.ContentReload
             {
                 if (string.IsNullOrWhiteSpace(message)) continue;
 
-                // CUCoreLibPlugin.Log?.LogInfo(message);
+                CUCoreLibPlugin.Log?.LogInfo(message);
                 if (console != null) CUCoreUtils.ConsoleLog(console, message);
             }
         }

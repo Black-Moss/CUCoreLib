@@ -211,10 +211,9 @@ namespace CUCoreLib.Patches
                 if (bat == null) bat = item.gameObject.AddComponent<BatteryItem>();
 
                 var initializeBatteryState = createdBattery || ConsumePendingBatteryInitialization(item.gameObject);
-                ApplyBatteryProperties(item, bat, def, initializeBatteryState,
-                    createdBattery || initializeBatteryState);
+                ApplyBatteryProperties(item, bat, def, initializeBatteryState);
 
-                if (def.decayInfo == 0) def.decayInfo = (byte)ItemInfo.DecayType.BatteryDecay;
+                def.decayInfo |= (byte)ItemInfo.DecayType.BatteryDecay;
             }
 
             if (def.Light != null) ApplyLight(item, def.Light);
@@ -323,22 +322,18 @@ namespace CUCoreLib.Patches
             }
         }
 
-        private static string ResolveConfiguredBatteryType(BatteryProperties battery)
+        private static float PresetToMaxCharge(BatteryItem.BatteryPreset preset)
         {
-            if (battery == null) return null;
-
-            var configuredBatteryType = string.IsNullOrWhiteSpace(battery.BatteryType)
-                ? PresetToBatteryId(battery.Preset)
-                : battery.BatteryType.Trim();
-
-            if (string.Equals(configuredBatteryType, "smallbattery", StringComparison.OrdinalIgnoreCase))
-                return "smallbattery";
-            if (string.Equals(configuredBatteryType, "mediumbattery", StringComparison.OrdinalIgnoreCase))
-                return "mediumbattery";
-            if (string.Equals(configuredBatteryType, "largebattery", StringComparison.OrdinalIgnoreCase))
-                return "largebattery";
-
-            return configuredBatteryType;
+            switch (preset)
+            {
+                case BatteryItem.BatteryPreset.Small:
+                    return 50f;
+                case BatteryItem.BatteryPreset.Large:
+                    return 300f;
+                case BatteryItem.BatteryPreset.Medium:
+                default:
+                    return 100f;
+            }
         }
 
         internal static void MarkPendingBatteryInitialization(GameObject obj)
@@ -360,20 +355,14 @@ namespace CUCoreLib.Patches
         }
 
         internal static void ApplyBatteryProperties(Item item, BatteryItem bat, CustomItemInfo def,
-            bool initializeState, bool forceBatteryType)
+            bool initializeState)
         {
             if (item == null || bat == null || def?.Battery == null) return;
 
+            var maxCharge = PresetToMaxCharge(def.Battery.Preset);
             bat.preset = def.Battery.Preset;
-            bat.maxCharge = def.Battery.MaxCharge;
-            bat.maxAllowedCharge = def.Battery.MaxCharge;
+            bat.maxAllowedCharge = maxCharge;
             if (NotSpawnWithBatteryField != null) NotSpawnWithBatteryField.SetValue(bat, !def.Battery.SpawnWithBattery);
-
-            var configuredBatteryType = ResolveConfiguredBatteryType(def.Battery);
-            var shouldAssignBatteryType = def.Battery.SpawnWithBattery &&
-                                          (forceBatteryType || string.IsNullOrEmpty(bat.batteryType));
-            if (shouldAssignBatteryType && !string.IsNullOrWhiteSpace(configuredBatteryType))
-                bat.batteryType = configuredBatteryType;
 
             if (!initializeState) return;
 
@@ -386,8 +375,13 @@ namespace CUCoreLib.Patches
                 return;
             }
 
-            if (def.Battery.StartCharge > 0f)
-                item.condition = Mathf.Clamp01(def.Battery.StartCharge / Mathf.Max(1f, def.Battery.MaxCharge));
+            bat.batteryType = PresetToBatteryId(def.Battery.Preset);
+            bat.maxCharge = maxCharge;
+
+            var startCharge = def.Battery.StartCharge >= 0f
+                ? Mathf.Min(def.Battery.StartCharge, maxCharge)
+                : maxCharge;
+            item.condition = Mathf.Clamp01(startCharge / Mathf.Max(1f, maxCharge));
         }
 
         [HarmonyPatch(typeof(Body), "PickUpItem")]

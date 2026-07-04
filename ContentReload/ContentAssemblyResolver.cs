@@ -28,33 +28,17 @@ namespace CUCoreLib.ContentReload
             }
 
             var modConfig = GetModConfig(config, normalizedModGuid);
-            candidate.OverridePath =
-                NormalizeExistingPath(ResolveConfiguredPath(modConfig?.OverrideDllPath));
-
             var loadedHash = GetFileHash(candidate.LoadedPluginPath, state);
-            var overrideHash = GetFileHash(candidate.OverridePath, state);
-
             var loadedChanged = !string.IsNullOrWhiteSpace(loadedHash) &&
                                 !string.Equals(loadedHash, state?.LastSuccessfulHash,
                                     StringComparison.OrdinalIgnoreCase);
-            var overrideChanged = !string.IsNullOrWhiteSpace(overrideHash) &&
-                                  !string.Equals(overrideHash, state?.LastSuccessfulHash,
-                                      StringComparison.OrdinalIgnoreCase);
 
             if (!string.IsNullOrWhiteSpace(candidate.LoadedPluginPath) &&
-                (loadedChanged || string.IsNullOrWhiteSpace(candidate.OverridePath)))
+                loadedChanged)
             {
                 candidate.SelectedPath = candidate.LoadedPluginPath;
                 candidate.SelectedHash = loadedHash;
                 candidate.SelectedSourceLabel = "loaded plugin";
-                return candidate;
-            }
-
-            if (!string.IsNullOrWhiteSpace(candidate.OverridePath) && overrideChanged)
-            {
-                candidate.SelectedPath = candidate.OverridePath;
-                candidate.SelectedHash = overrideHash;
-                candidate.SelectedSourceLabel = "override path";
                 return candidate;
             }
 
@@ -64,13 +48,6 @@ namespace CUCoreLib.ContentReload
                 candidate.SelectedHash = loadedHash;
                 candidate.SelectedSourceLabel = "loaded plugin";
                 return candidate;
-            }
-
-            if (!string.IsNullOrWhiteSpace(candidate.OverridePath))
-            {
-                candidate.SelectedPath = candidate.OverridePath;
-                candidate.SelectedHash = overrideHash;
-                candidate.SelectedSourceLabel = "override path";
             }
 
             return candidate;
@@ -110,7 +87,7 @@ namespace CUCoreLib.ContentReload
 
         internal static string[] GetCandidatePaths(ContentReloadCandidate candidate)
         {
-            return new[] { candidate.LoadedPluginPath, candidate.OverridePath }
+            return new[] { candidate.LoadedPluginPath }
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -122,11 +99,6 @@ namespace CUCoreLib.ContentReload
 
             config.Mods.TryGetValue(modGuid.Trim(), out var modConfig);
             return modConfig;
-        }
-
-        private static string ResolveConfiguredPath(string path)
-        {
-            return string.IsNullOrWhiteSpace(path) ? null : path;
         }
 
         private static string NormalizeExistingPath(string path)

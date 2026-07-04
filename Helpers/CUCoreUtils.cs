@@ -851,6 +851,9 @@ namespace CUCoreLib.Helpers
             if (liveSetting != null)
                 entry.CurrentKey = liveSetting.value;
 
+            if (ShouldDisableFriendlyKeybind(entry))
+                return KeyCode.None;
+
             return entry.CurrentKey;
         }
 
@@ -905,7 +908,7 @@ namespace CUCoreLib.Helpers
                 return true;
 
             var inputField = EventSystem.current?.currentSelectedGameObject?.GetComponent<TMP_InputField>();
-		    return inputField != null && inputField.isFocused;
+            return inputField != null && inputField.isFocused;
         }
 
         private static bool IsKrokMpChatFocused()

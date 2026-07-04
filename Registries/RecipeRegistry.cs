@@ -33,6 +33,7 @@ namespace CUCoreLib.Registries
                 return;
             }
 
+            NormalizeRecipeIngredients(recipe);
             ValidateRecipeReferences(recipe);
 
             var key = BuildRecipeKey(recipe);
@@ -70,6 +71,7 @@ namespace CUCoreLib.Registries
         {
             if (Recipes.recipes == null || recipe?.result == null) return false;
             EnsureCurrentRecipeList();
+            NormalizeRecipeIngredients(recipe);
 
             var recipeKey = BuildRecipeKey(recipe);
             if (InjectedRecipeKeys.Contains(recipeKey)) return false;
@@ -171,6 +173,19 @@ namespace CUCoreLib.Registries
             if (item == null || item.specific) return;
 
             if (Mathf.Approximately(item.minimumCondition, 0.9f)) item.minimumCondition = 0f;
+        }
+
+        private static void NormalizeRecipeIngredients(Recipe recipe)
+        {
+            if (recipe?.items == null) return;
+
+            foreach (var item in recipe.items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.specificId)) continue;
+
+                NormalizeSpecificIngredientDefaults(item);
+                item.specific = true;
+            }
         }
 
         private static void EnsureCurrentRecipeList()

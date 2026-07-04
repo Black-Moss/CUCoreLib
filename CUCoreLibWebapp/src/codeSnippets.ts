@@ -1459,87 +1459,63 @@ namespace AcidShroomTutorial
         private const string ModName = "Acid Shroom Tutorial";
         private const string ModVersion = "1.0.0";
 
-        private FantasyContent content;
+        private Sprite acidShroomSprite;
 
         private void Awake()
         {
-            // Awake stays startup-only. Content lives in the host class.
-            CCLBase.Initialize(this);
-            content = new FantasyContent(this);
-            content.RegisterEverything();
+            // Startup-only setup goes before EnableHotReload.
+            acidShroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidshroom.png");
+            ContentReloadManager.EnableHotReload(ModGuid);
+            RegisterReloadable();
+            FantasyGameplayHooks.PatchAll(new Harmony(ModGuid), Logger);
         }
 
-        [CCLContentHost]
-        private sealed class FantasyContent : CCLBase
+        private void RegisterReloadable()
         {
-            private Sprite acidShroomSprite;
-
-            public FantasyContent(BaseUnityPlugin plugin) : base(plugin)
-            {
-            }
-
-            [CCLReloadIgnore]
-            public void RegisterEverything()
-            {
-                CacheMyAssets();
-                AddMyItems();
-                AddLateRecipes();
-            }
-
-            public void CacheMyAssets()
-            {
-                acidShroomSprite = AssetLoader.LoadEmbeddedSprite("Images.acidshroom.png");
-            }
-
-            public void AddMyItems()
-            {
-                ItemRegistry.Register("acidshroom", new ItemInfo
-                {
-                    fullName = "Acid shroom",
-                    description = "A caustic mushroom that tingles in all the wrong ways.",
-                    category = "food",
-                    usable = true,
-                    useAction = (body, item) =>
-                    {
-                        body.Eat(6f, 0.4f);
-                        item.condition -= 1f;
-                        Sound.Play("eatCrunch", body.transform.position);
-                    }
-                }, acidShroomSprite, 1);
-            }
-
-            [ContentReloadEntry(ContentReloadEntryStage.RegisterRecipes, Order = 10)]
-            public void AddLateRecipes()
-            {
-                RecipeRegistry.Register(new Recipe
-                {
-                    INT = 0,
-                    category = Recipes.RecipeCategory.Materials,
-                    result = new RecipeResult
-                    {
-                        id = "biochem",
-                        amount = 40,
-                        isLiquid = false,
-                        resultCondition = 1f
-                    },
-                    items = new()
-                    {
-                        new RecipeItem(1f)
-                        {
-                            specific = true,
-                            specificId = "acidshroom"
-                        }
-                    }
-                });
-            }
-
-            [CCLReloadIgnore]
-            public void DebugSpawnItem()
-            {
-                Logger.LogInfo("Keep debug or scene-side helpers out of strict reload.");
-            }
+            RegisterItems();
+            RegisterRecipes();
         }
 
+        private void RegisterItems()
+        {
+            ItemRegistry.Register("acidshroom", new ItemInfo
+            {
+                fullName = "Acid shroom",
+                description = "A caustic mushroom that tingles in all the wrong ways.",
+                category = "food",
+                usable = true,
+                useAction = (body, item) =>
+                {
+                    body.Eat(6f, 0.4f);
+                    item.condition -= 1f;
+                    Sound.Play("eatCrunch", body.transform.position);
+                }
+            }, acidShroomSprite, 1);
+        }
+
+        private void RegisterRecipes()
+        {
+            RecipeRegistry.Register(new Recipe
+            {
+                INT = 0,
+                category = Recipes.RecipeCategory.Materials,
+                result = new RecipeResult
+                {
+                    id = "biochem",
+                    amount = 40,
+                    isLiquid = false,
+                    resultCondition = 1f
+                },
+                items = new()
+                {
+                    new RecipeItem(1f)
+                    {
+                        specific = true,
+                        specificId = "acidshroom"
+                    }
+                }
+            });
+        }
     }
 }`;
 }
@@ -1788,10 +1764,8 @@ private void RegisterAdvancedItems()
             rec = new Recognition(5),
             Battery = new BatteryProperties
             {
-                MaxCharge = 100f,
                 StartCharge = 35f,
-                Preset = BatteryItem.BatteryPreset.Medium,
-                BatteryType = "mediumbattery"
+                Preset = BatteryItem.BatteryPreset.Medium
             },
             Light = new LightProperties
             {

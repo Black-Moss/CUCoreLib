@@ -2377,11 +2377,9 @@ function advancedItemPage(): string {
         <table class="field-table">
           <thead><tr><th>Field</th><th>Type</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><span class="inline-code">MaxCharge</span></td><td><span class="inline-code">float</span></td><td>Maximum charge stored by the item once a battery is loaded.</td></tr>
-            <tr><td><span class="inline-code">StartCharge</span></td><td><span class="inline-code">float</span></td><td>Starting charge amount used to initialize item condition on fresh custom items.</td></tr>
+            <tr><td><span class="inline-code">StartCharge</span></td><td><span class="inline-code">float</span></td><td>Starting charge amount for fresh spawned items. Leave it below zero to spawn with a full preset-sized battery.</td></tr>
             <tr><td><span class="inline-code">Preset</span></td><td><span class="inline-code">BatteryItem.BatteryPreset</span></td><td>Vanilla preset for accepted battery size: <span class="inline-code">Small</span>, <span class="inline-code">Medium</span>, or <span class="inline-code">Large</span>.</td></tr>
-            <tr><td><span class="inline-code">BatteryType</span></td><td><span class="inline-code">string</span></td><td>Item ID for the battery installed by default, such as <span class="inline-code">smallbattery</span>, <span class="inline-code">mediumbattery</span>, or <span class="inline-code">largebattery</span>.</td></tr>
-            <tr><td><span class="inline-code">SpawnWithBattery</span></td><td><span class="inline-code">bool</span></td><td>If true, fresh items start with <span class="inline-code">BatteryType</span> already loaded. If false, the item starts empty.</td></tr>
+            <tr><td><span class="inline-code">SpawnWithBattery</span></td><td><span class="inline-code">bool</span></td><td>If true, fresh items start with the preset-sized vanilla battery already loaded. If false, the item starts empty.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2580,7 +2578,8 @@ function advancedItemPage(): string {
 
     <section class="lesson-card">
       <h2>Battery-powered items</h2>
-      <p>Battery-powered tools use the vanilla <span class="inline-code">BatteryItem</span> component. CUCoreLib's battery module adds one and sets its maximum charge. Use this when the item itself stores charge or accepts battery behavior; use vanilla <span class="inline-code">BatteryInfo</span> when you are registering an actual battery item.</p>
+      <p>Battery-powered tools use the vanilla <span class="inline-code">BatteryItem</span> component. CUCoreLib's battery module adds one, chooses the vanilla battery size from <span class="inline-code">Preset</span>, and uses <span class="inline-code">StartCharge</span> only for the initial fill amount. Use this when the item itself stores charge or accepts battery behavior; use vanilla <span class="inline-code">BatteryInfo</span> when you are registering an actual battery item.</p>
+      <p>Battery items automatically gain <span class="inline-code">BatteryDecay</span>, so you usually just set <span class="inline-code">decayMinutes</span> to control how quickly charge drains.</p>
       <pre><code>ItemRegistry.Register(
     "portablelamp",
     new CustomItemInfo
@@ -2594,13 +2593,10 @@ function advancedItemPage(): string {
         weight = 0.8f,
         rec = new Recognition(5),
         decayMinutes = 180f,
-        decayInfo = (byte)ItemInfo.DecayType.BatteryDecay,
         Battery = new BatteryProperties
         {
-            MaxCharge = 100f,
             StartCharge = 35f,
-            Preset = BatteryItem.BatteryPreset.Medium,
-            BatteryType = "mediumbattery"
+            Preset = BatteryItem.BatteryPreset.Medium
         },
         Light = new LightProperties
         {
@@ -2995,7 +2991,7 @@ function debugTestingPage(): string {
     <section class="lesson-card">
       <h2>Fast mod-testing loop</h2>
       <p>Most CUCoreLib iteration gets faster when you separate startup-only work from content registration. Keep console commands, Harmony patches, and other one-time setup in <span class="inline-code">Awake()</span>, but move reloadable content into a dedicated host class or explicit replay methods.</p>
-      <p>That split helps even before hot reload enters the picture. However, hot reload makes this much much faster. Let's learn how to use it.</p>
+      <p>That split still helps, but the default hot reload mode is now more forgiving. CUCoreLib reruns broad post-marker code, blocks known startup-only APIs during reload with warnings, and only asks you to restructure when replay still cannot safely discover the content work.</p>
     </section>
 
     <section class="lesson-card">
@@ -3003,47 +2999,46 @@ function debugTestingPage(): string {
       
       <h2>Usage</h2>
       
-      <p>The preferred entrypoint contract is a class-level opt-in on a content host:</p>
-      <pre><code>[CCLContentHost]
-internal sealed class FantasyContent : CCLBase
+      <p>The preferred entrypoint contract is a single marker call inside your plugin <span class="inline-code">Awake()</span>:</p>
+      <pre><code>private void Awake()
 {
-    public void CacheMyAssets() { ... }
-    public void AddMyItems() { ... }
-
-    [ContentReloadEntry(ContentReloadEntryStage.RegisterRecipes, Order = 10)]
-    public void AddLateRecipes() { ... }
-
-    [CCLReloadIgnore]
-    public void DebugSpawnItem() { ... }
+    CacheMyAssets(); // startup-only work
+    ContentReloadManager.EnableHotReload(GUID);
+    RegisterReloadable();
+    FantasyGameplayHooks.PatchAll(harmony, Logger);
 }</code></pre>
-      <p>Inside a <span class="inline-code">[CCLContentHost]</span> class, CUCoreLib scans parameterless methods, infers the reload stage from the registry calls it finds, and replays supported methods in stage order. Use <span class="inline-code">[ContentReloadEntry(...)]</span> only when you need an explicit stage or custom ordering, and <span class="inline-code">[CCLReloadIgnore]</span> to opt a helper out.</p>
-      <p>Static host classes work too, which means existing <span class="inline-code">FantasyContent</span>-style files can opt in with a single class attribute. If you prefer an instance-backed host, derive from <span class="inline-code">CCLBase</span> and call <span class="inline-code">CCLBase.Initialize(this)</span> from your plugin <span class="inline-code">Awake()</span>.</p>
+      <p>Everything before <span class="inline-code">EnableHotReload(GUID)</span> is startup-only and never replayed. The marker call must use the plugin's literal GUID string constant so the scanner can verify it against <span class="inline-code">[BepInPlugin]</span>.</p>
+      <p>In the default flexible guarded mode, CUCoreLib scans calls that appear after the marker, follows local helper-to-helper chains, discovers replayable registration leaves, and suppresses known startup-only APIs such as Harmony setup during replay with a warning instead of failing the whole reload.</p>
+      <p>If you want stricter behavior, use the options overload and opt into <span class="inline-code">HotReloadMode.Strict</span>. Strict mode preserves the old fail-fast behavior for unsupported startup-only APIs.</p>
       ${docsVideo(externalVideoUrls.hotReload, "/videos/hot-reload.mp4", "screenshot docs-video")}
 
       <h2>Commands</h2>
       <pre><code>
       reloadcontent com.example.mymod
-      autohotreload C:/Users/you/source/MyMod/bin/Debug/net48/MyMod.dll true
-      autohotreload C:/Users/you/source/MyMod/bin/Debug/net48/MyMod.dll false
+      autohotreload com.example.mymod true
+      autohotreload com.example.mymod false
       </code></pre>
       <ul>
-        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> loads the rebuilt DLL, clears the previous content, and replays only recognized content methods.</li>
-        <li><span class="inline-code">autohotreload &lt;filepath&gt; true</span> enables persistent watch mode for that DLL, which automatically hot reloads if it detects a file hash change.</li>
-        <li><span class="inline-code">autohotreload &lt;filepath&gt; false</span> disables the saved watch mode for that DLL.</li>
+        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> re-reads the currently deployed plugin DLL on disk, clears the mod's previously registered reloadable content, and replays only recognized content methods from that rebuilt assembly.</li>
+        <li><span class="inline-code">autohotreload &lt;modGuid&gt; true</span> enables persistent watch mode for the deployed plugin DLL of a mod that previously called <span class="inline-code">EnableHotReload(GUID)</span>.</li>
+        <li><span class="inline-code">autohotreload &lt;modGuid&gt; false</span> disables the saved watch mode for that mod.</li>
       </ul>
+      <p>Watch mode polls the deployed DLL every few seconds, waits for the file hash to settle, then runs the same reload flow automatically. In practice that means your build or copy step still needs to overwrite the DLL that BepInEx loaded.</p>
 
       <h2>Automatic discovery rules</h2>
       <ul>
-        <li>Supported v1 surfaces are locale/text, liquids, items, basic building entities, and recipes.</li>
-        <li>Method names do not matter. CUCoreLib classifies host methods by what they register.</li>
-        <li>Asset loading can stay inline with registration, or live in a host method that only loads assets.</li>
-        <li>If a method mixes multiple supported registration surfaces, CUCoreLib skips it and tells you to split it.</li>
-        <li>If a method mixes registration with unsupported side effects such as scene spawning, tiles, structures, save hooks, or Harmony setup, CUCoreLib skips it with a diagnostic instead of replaying it.</li>
+        <li>Supported reload surfaces are asset loading, locale/text, liquids, items, basic building entities, and recipes.</li>
+        <li>Method names do not control replay order. CUCoreLib infers stages from the registration APIs each discovered branch calls, then replays assets before locale, liquids, items, buildings, and recipes.</li>
+        <li>CUCoreLib prefers parameterless <span class="inline-code">void</span> helper methods as replay leaves, but flexible mode can walk through broader wrapper methods when they fan out into eligible local helpers.</li>
+        <li>Known startup-only APIs such as Harmony patch setup, console command registration, save hooks, mod options, multiplayer hooks, tiles, structures, and live scene mutation are blocked during flexible replay with a warning once per replay root and API.</li>
+        <li>If CUCoreLib still cannot discover a replayable supported content branch, the reload summary tells you which method could not be used and why.</li>
       </ul>
 
        <h2>Limitations</h2>
-      <p>CUCoreLib's built-in DLL reload path is intentionally narrow. It is <strong>singleplayer only</strong> and only reloads locale/text, liquid, item, basic building, and recipe content. It does not rerun <span class="inline-code">Awake()</span>, and it does not support tiles, structures, save providers, moodles, Harmony patches, mod options, console command registration, or multiplayer registration just yet.</p>
-      <p>When strict reload skips a discovered method, the reload summary reports the exact method and why it was skipped.</p>
+      <p>CUCoreLib's built-in DLL reload path is still <strong>singleplayer only</strong> and only restores reloadable content owned by that mod after clearing the old registered entries.</p>
+      <p>Supported content is locale/text, liquids, items, recipes, and only <strong>basic/scriptless</strong> building definitions. Tiles, multi-block structures, save providers, moodles, statuses, and runtime scene mutation are still not replayed, even though flexible mode can now step around those APIs more gracefully.</p>
+      <p>If a replayed method throws, CUCoreLib rolls that mod back to its previous successful content snapshot. Flexible mode warns and continues for known blocked APIs, while strict mode fails fast.</p>
+      <p>The old attribute-based workflow using <span class="inline-code">[CCLContentHost]</span>, <span class="inline-code">[ContentReloadEntry]</span>, and <span class="inline-code">[CCLReloadIgnore]</span> is no longer supported.</p>
       </section>
 
     <section class="lesson-card">

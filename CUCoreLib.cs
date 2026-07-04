@@ -110,21 +110,20 @@ namespace CUCoreLib
                 }, ("modGuid", "BepInEx plugin GUID to strictly reload from a rebuilt DLL."));
 
             ConsoleCommandRegistry.Register("autohotreload",
-                "Enables automatic hot reloading after detecting a .dll file change.",
+                "Enables automatic hot reloading after detecting a loaded mod DLL file change.",
                 delegate(string[] args)
                 {
-                    if (args.Length < 3) throw new Exception("Usage: autohotreload [pathToDllFile] [enable]");
+                    if (args.Length < 3) throw new Exception("Usage: autohotreload [modGuid] [enable]");
 
-                    var dllPath = args[1];
                     if (!bool.TryParse(args[2], out var enabled))
                         throw new Exception("Enable must be 'true' or 'false'.");
 
-                    var success = ContentReloadManager.ConfigureAutoHotRefresh(dllPath, enabled, out var message);
+                    var success = ContentReloadManager.ConfigureAutoHotRefresh(args[1], enabled, out var message);
                     if (!success) throw new Exception(message);
 
                     CUCoreUtils.ConsoleLog(ConsoleScript.instance, message);
                 }, null,
-                ("pathToDllFile", "Path to the rebuilt DLL that should be watched."),
+                ("modGuid", "BepInEx plugin GUID that previously called ContentReloadManager.EnableHotReload(GUID)."),
                 ("enable", "true to enable watch mode for that DLL, false to disable it."));
         }
     }

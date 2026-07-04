@@ -52,25 +52,15 @@ export const hoverPanels: Record<string, HoverPanel> = {
     title: "ConsoleCommandRegistry",
     body: "CUCoreLib wrapper for adding commands to ConsoleScript.Commands without writing your own Harmony postfix."
   },
-  ContentReloadEntry: {
-    title: "ContentReloadEntry",
-    signature: "[ContentReloadEntry(ContentReloadEntryStage stage, Order = 0)]",
-    body: "Attribute that opts a parameterless method into strict content reload. Use it on plugin methods or inside a CCLContentHost class when you need an explicit stage or ordering override."
-  },
-  CCLContentHost: {
-    title: "CCLContentHost",
-    signature: "[CCLContentHost]",
-    body: "Class-level hot reload opt-in. Mark a static or instance content class with this attribute and CUCoreLib will scan its parameterless methods, infer supported registration stages, and replay them during strict reload."
-  },
-  CCLReloadIgnore: {
-    title: "CCLReloadIgnore",
-    signature: "[CCLReloadIgnore]",
-    body: "Method-level opt-out for CCLContentHost classes. Use it when a parameterless helper would otherwise be discovered by the strict reload scanner."
+  EnableHotReload: {
+    title: "EnableHotReload",
+    signature: "ContentReloadManager.EnableHotReload(string modGuid, HotReloadOptions options = null)",
+    body: "Single-line hot reload opt-in. The default mode is flexible guarded replay: CUCoreLib reruns broad post-marker code, blocks known startup-only APIs during reload with warnings, and keeps strict mode available through options when a mod author wants tighter validation."
   },
   CCLBase: {
     title: "CCLBase",
     signature: "abstract class CCLBase",
-    body: "Optional helper base for instance-backed content hosts. Derive from it when you want a reusable content object, then call CCLBase.Initialize(this) from your plugin Awake so the host can access the live plugin instance during startup."
+    body: "Optional helper base for reusable content objects. It can still hold a plugin reference, but it is no longer required for hot reload setup."
   },
   ConsoleCheckForWorld: {
     title: "ConsoleCheckForWorld",
@@ -318,13 +308,17 @@ export const hoverPanels: Record<string, HoverPanel> = {
     title: "EncumbranceReduction",
     body: "ContainerProperties value mapped to Container.encumberanceMult. 1 is normal; lower values reduce carried-content burden."
   },
-  MaxCharge: {
-    title: "MaxCharge",
-    body: "BatteryProperties maximum charge used by the vanilla BatteryItem component."
-  },
   StartCharge: {
     title: "StartCharge",
-    body: "BatteryProperties initial charge applied on fresh spawned BatteryItem components when possible."
+    body: "BatteryProperties initial charge for fresh spawned items. Leave it below zero to start with a full preset-sized battery."
+  },
+  Preset: {
+    title: "Preset",
+    body: "BatteryProperties vanilla battery-size preset. This decides which battery item gets inserted and how much total charge it can hold."
+  },
+  SpawnWithBattery: {
+    title: "SpawnWithBattery",
+    body: "BatteryProperties toggle for whether the item starts with a preset-sized battery already inserted or starts empty."
   },
   Effectiveness: {
     title: "Effectiveness",
