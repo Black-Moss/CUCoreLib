@@ -116,6 +116,13 @@ jobs:
           make_latest: false
           generate_release_notes: false
           body: |
-            Latest automated nightly build from `main`.
+            Automated nightly build from `main`! 
+            This is the latest cutting-edge build of CUCoreLib, and may be unstable. That is, every single commit to `main` will update this. 
+
+            For the changelogs, please refer to [CHANGELOG.md](https://github.com/jimmyking9999999/CUCoreLib/blob/main/CHANGELOG.md).
+
+            For most users, it is recommended to use the latest stable release below.
+            Thanks for testing and reporting issues!
+            
           files: |
-            ${{ runner.temp }}\cu-nightly.zip
+            ${{ runner.temp }}\CUCoreLib-nightly-prerelease.zip

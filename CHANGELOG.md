@@ -6,6 +6,7 @@ I figured that this would be nice to have, as to easily take a look at everythin
 ### New Stuff!
 - Hotloading is a lot more mod-author friendly, so that you don't have to wrangle your code around it (as much)
 - Check out the new docs for information! ^^
+- Nightly/on-commit releases for CUCoreLib!
 
 ### Changes
 - Locale recursive directory search was accidentally removed and now re-added
