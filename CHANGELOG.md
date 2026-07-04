@@ -6,11 +6,17 @@ I figured that this would be nice to have, as to easily take a look at everythin
 ### New Stuff!
 - Hotloading is a lot more mod-author friendly, so that you don't have to wrangle your code around it (as much)
 - Check out the new docs for information! ^^
+
 ### Changes
 - Locale recursive directory search was accidentally removed and now re-added
+- Slimmed down batteryProperties, as I was overcomplicating it. Your mods will work still, but you may face some slight changes
+
 ### Fixes 
 - Battery 0% condition issue...
 - Fix keycode optimization (Thanks, @Jacbo1)!
+- Crafting qualities now work and are added to the locale 
+- `spawncategory` now can spawn all modded items
+- 
 
 
 ## v1.0.2

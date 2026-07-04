@@ -62,7 +62,7 @@ jobs:
       - name: Restore
         shell: powershell
         run: |
-          nuget restore 'CUCoreLib.sln'
+          nuget restore 'CUCoreLib.sln' -PackagesDirectory packages -NonInteractive -Verbosity detailed
 
       - name: Build
         shell: powershell
