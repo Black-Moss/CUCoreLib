@@ -17,6 +17,8 @@ namespace CUCoreLib.ContentReload
     {
         internal static ContentReloadResult Execute(ContentCompatibilityReport report)
         {
+            RecipeRegistry.ResetHotReloadInjectionSummary();
+
             var result = new ContentReloadResult
             {
                 ModGuid = report?.ModGuid,
@@ -196,6 +198,7 @@ namespace CUCoreLib.ContentReload
 
         private static void Rollback(string modGuid, ContentOwnerSnapshot snapshot, ContentReloadResult result)
         {
+            RecipeRegistry.ResetHotReloadInjectionSummary();
             ClearExistingContent(modGuid, null);
 
             using (ItemRegistry.BeginOwnerRegistration(modGuid))
@@ -222,6 +225,7 @@ namespace CUCoreLib.ContentReload
             {
                 LiquidRegistry.InjectRegisteredLiquids();
                 RecipeRegistry.InjectRegisteredRecipes();
+                RecipeRegistry.FlushHotReloadInjectionSummary();
             }
 
             try

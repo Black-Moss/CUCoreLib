@@ -24,6 +24,7 @@ namespace CUCoreLib.Registries
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static string ActiveOwnerId;
+        private static int PendingHotReloadInjectedRecipeCount;
 
         public static void Register(Recipe recipe)
         {
@@ -109,9 +110,30 @@ namespace CUCoreLib.Registries
 
             var added = RegisteredRecipes.Count(InjectSingleRecipe);
 
-            if (added > 0) CUCoreLibPlugin.Log.LogInfo($"Recipes: Added {added} recipes.");
+            if (added <= 0) return 0;
+
+            if (ContentReloadSession.IsActive)
+            {
+                PendingHotReloadInjectedRecipeCount += added;
+                return added;
+            }
+
+            CUCoreLibPlugin.Log.LogInfo($"Recipes: Added {added} recipes.");
 
             return added;
+        }
+
+        internal static void FlushHotReloadInjectionSummary()
+        {
+            if (PendingHotReloadInjectedRecipeCount <= 0) return;
+
+            CUCoreLibPlugin.Log.LogInfo($"Recipes: Added {PendingHotReloadInjectedRecipeCount} recipes.");
+            PendingHotReloadInjectedRecipeCount = 0;
+        }
+
+        internal static void ResetHotReloadInjectionSummary()
+        {
+            PendingHotReloadInjectedRecipeCount = 0;
         }
 
         internal static List<Recipe> CaptureOwnerEntries(string ownerId)

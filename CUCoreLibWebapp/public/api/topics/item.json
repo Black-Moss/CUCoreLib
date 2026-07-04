@@ -10,5 +10,78 @@
   "bodyText": "It's finally time to make the first modded thing! What better way to start than by adding a new item to the game? We'll be adding a Sunpear, in honor of the mushpear having its name changed. ItemRegistry.Register CUCoreLib's item API wraps the game's normal ItemInfo . Give the item a stable lowercase ID, fill the vanilla stat block, then pass a sprite loaded through AssetLoader . The item ID is the value that recipes, console spawning, save/load fallback, and locale lookup will use. Changing it later is a breaking change for saves and dependent recipes. Sprite sunpearSprite = AssetLoader.LoadEmbeddedSprite(\"Images.sunpear.png\"); ItemRegistry.Register( \"sunpear\", new ItemInfo { fullName = \"Sunpear\", description = \"A pale yellow fruit. Probably edible.\", category = \"food\", weight = 0.4f, value = 4, tags = \"cangetwet\", decayMinutes = 180f, rec = new Recognition(2) }, sunpearSprite ); Arguments and overloads The short function is the one most mods should start with: ItemRegistry.Register(string id, ItemInfo info, Sprite icon, int spawnFrequency = 1); Argument Type What it needs id string Stable item ID, usually lowercase with no spaces. Recipes, console spawn, save/load fallback, locale keys, and sprite cache lookup use this value. info ItemInfo The vanilla stat block. Fill fields like fullName , description , category , weight , value , tags , and use actions here. icon Sprite Inventory/item icon. Load it with AssetLoader.LoadEmbeddedSprite or LoadSpriteFromPluginFolder . spawnFrequency int Optional. Loot pool weight for this item. CUCoreLib adds the item ID to its category loot pool this many times. 0 means craft-only/no loot injection. Default is 1 , so most items can omit it. When you need CUCoreLib-only fields, keep the same register call and swap ItemInfo for CustomItemInfo . This avoids a second \"definition\" object while still giving you extras like worn sprites, custom data, containers, batteries, sprite sizing controls, and spawn weight. ItemRegistry.Register( \"sunpear\", new CustomItemInfo { // CustomItemInfo still has every normal ItemInfo field. fullName = \"Sunpear\", description = \"A pale yellow fruit. Probably edible.\", category = \"food\", weight = 0.4f, value = 4, tags = \"cangetwet\", decayMinutes = 180f, rec = new Recognition(2), // CUCoreLib-only extras live next to the vanilla fields. SpriteScale = 1.0f, SpriteScaleDimensions = (14f, 14f, true), SpawnFrequency = 1, CustomData = { [\"sourceMod\"] = \"My First Mod\" } }, sunpearSprite ); Fields A field is a named value stored on an object. When you write new ItemInfo { weight = 0.4f } , you are setting the weight field on that ItemInfo instance before CUCoreLib registers it. In the decompiled game, Item.cs builds Item.GlobalItems from ItemInfo objects. The table below is based on the decompiled ItemInfo.cs fields that those vanilla items use. For more context, recall the DnSpyEX guide a few sections back to decompile the game. Field Type What it controls fullName string Display name before wet/condition formatting. description string Inventory/tooltip description text. category string Broad item grouping used by game systems and UI/category logic. slotRotation float Rotation used when displaying or slotting the item. usable bool Whether the item can be used directly. usableOnLimb bool Whether the item can target a body limb. rotSpeed float Rotation speed behavior for usable/active items. useAction ItemInfo.Use Delegate called when the item is used on the body. useLimbAction ItemInfo.UseLimb Delegate called when the item is used on a limb. destroyAtZeroCondition bool Whether the item should be destroyed when condition reaches zero. weight float Inventory/container weight contribution. scaleWeightWithCondition bool Whether weight scales down as condition decreases. onlyHoldInHands bool Restricts handling/equipping behavior to hands. autoAttack bool Whether held use/attack behavior repeats automatically. usableWithLMB bool Whether left mouse button can use the item. wearable bool Whether the item can be worn. wearableCanBeHeld bool Whether a wearable can also be held like a normal item. desiredWearLimb string Preferred limb/body area for wearable placement. wearSlotId string Wear slot identifier used by equipment logic. wearableArmor float Armor/protection value when worn. wearableIsolation float Isolation/insulation-style stat when worn. wearableHitDurabilityLossMultiplier float Multiplier for condition loss when the wearable takes hits. jumpHeightMultChange float Jump-height multiplier change from worn/active item effects. combineable bool Whether the item participates in combine-style interactions. ignoreDepression bool Whether use behavior ignores depression-related restrictions/effects. value int Base value used by item value calculations. wearableVisualOffset int Visual offset for wearable rendering. Defaults to 5 . tags string Comma-separated vanilla tags. See mouseover text for more information. decayInfo byte Bit flags from ItemInfo.DecayType for decay rules. 16 is BatteryDecay , which drains battery charge instead of normal condition decay. decayMinutes float Minutes used by condition decay logic. rec Recognition Recognition/identification data. Defaults to new Recognition(2) . qualities List<CraftingQuality> Crafting qualities this item can satisfy in recipes. Use CUCoreUtils.CreateCraftingQuality(...) when you want to attach a fallback display name for a custom quality ID. Tip: hover field names in the generated code for quick notes on common fields like category , decayMinutes , and tags . Use actions Items have two main use paths. useAction runs when the item is used normally and receives the player's Body . useLimbAction runs when the item is used on a specific Limb , but only if usableOnLimb is true. Use useAction for whole-body effects like eating, drinking, playing a sound, changing happiness, or running a simple tool action. Use useLimbAction for targeted medical effects, limb temperature changes, limb components, wound treatment, or anything that needs to know which limb was clicked. When you want vanilla limb interactions without copying the game's logic, call a CUCoreLib helper such as CUCoreUtils.DoAmputate(item, limb) inside useLimbAction . That keeps your item registration readable while still following the base game's amputation rules and minigame flow. usable = true, useAction = (body, item) => { Sound.Play(\"useItem\", item.transform.position); body.Drink(-5f); body.Eat(4f); body.temperature += 1.5f; item.condition -= 1f; body.talker.Talk(\"So spicy!\"); } usableOnLimb = true, useLimbAction = (limb, item) => { CUCoreUtils.DoAmputate(item, limb); } Spawning registered items After an item is registered, CUCoreLib can spawn it through CustomInstantiate.InstantiateReturn . This helper first checks vanilla/cached prefabs, then falls back to registered CUCoreLib items and builds a runtime item template when needed. Use this when a console command, event, recipe side effect, or debug tool needs a real in-world GameObject for your custom item. The returned object can be inspected for its Item component, dropped into the world, or force-picked into a body slot. GameObject obj = CustomInstantiate.InstantiateReturn( \"sunpear\", PlayerCamera.main.body.transform.position, Quaternion.identity, 1f ); Item item = obj ? obj.GetComponent<Item>() : null; if (item != null) { PlayerCamera.main.body.PickUpItem(item, 0, force: true); } Woah, that's a lot of info. Don't worry about memorizing every field. You can always come back to this page as a reference when you want to try new things with your items. Let's cool down with some sliders and buttons. Mess around with the toggles below to see how the item's ItemInfo changes based on what you want. Identity Item ID Lowercase IDs are easiest. No spaces. Display Name Description A pale yellow fruit. Probably edible. Category food tool weapon medicine nospawn trash Embedded Sprite File Embed this PNG in your mod project. Stats Weight 0.4 Value 4 Spawn Frequency 1 0 means craft-only. Decay Minutes 180 Recognition 2 Vanilla items usually set this explicitly. Tags Comma-separated vanilla tags. Use actions Item can be used Item can be used on limbs Eat Amount 12 Drink Amount 4 Happiness 1 Sickness 0 Sound eatCrunch eatFlesh drink combine none Want to mess around more with creating custom items? Check out the dedicated page tool.",
   "codeTitle": "RegisterItems.cs",
   "codeLanguage": "csharp",
-  "code": "Sprite sunpearSprite = AssetLoader.LoadEmbeddedSprite(\"sunpear.png\");\n\nItemRegistry.Register(\"sunpear\", new ItemInfo\n{\n    fullName = \"Sunpear\",\n    description = \"A pale yellow fruit. Probably edible.\",\n    category = \"food\",\n    weight = 0.4f,\n    value = 4,\n    usable = true,\n    decayMinutes = 180f,\n    tags = \"cangetwet\",\n    rec = new Recognition(2),\n       useAction = (body, item) =>\n       {\n            body.Eat(12f, 0.5f);\n            body.Drink(4f);\n            body.happiness += 1f;\n            item.condition -= 1f;\n            Sound.Play(\"eatCrunch\", body.transform.position);\n        }\n}, sunpearSprite);"
+  "code": "Sprite sunpearSprite = AssetLoader.LoadEmbeddedSprite(\"sunpear.png\");\n\nItemRegistry.Register(\"sunpear\", new ItemInfo\n{\n    fullName = \"Sunpear\",\n    description = \"A pale yellow fruit. Probably edible.\",\n    category = \"food\",\n    weight = 0.4f,\n    value = 4,\n    usable = true,\n    decayMinutes = 180f,\n    tags = \"cangetwet\",\n    rec = new Recognition(2),\n       useAction = (body, item) =>\n       {\n            body.Eat(12f, 0.5f);\n            body.Drink(4f);\n            body.happiness += 1f;\n            item.condition -= 1f;\n            Sound.Play(\"eatCrunch\", body.transform.position);\n        }\n}, sunpearSprite);",
+  "interactiveDefaults": {
+    "item": {
+      "id": "sunpear",
+      "name": "Sunpear",
+      "description": "A pale yellow fruit. Probably edible.",
+      "category": "food",
+      "sprite": "sunpear.png",
+      "weight": "0.4",
+      "value": "4",
+      "spawnFrequency": "1",
+      "decayMinutes": "180",
+      "recognition": "2",
+      "tags": "cangetwet",
+      "usable": true,
+      "usableOnLimb": false,
+      "sickness": "0",
+      "limbSkinHealth": "0",
+      "limbMuscleHealth": "0",
+      "limbPain": "0",
+      "limbTemperature": "-1",
+      "limbChillSeconds": "100",
+      "eat": "12",
+      "drink": "4",
+      "happiness": "1",
+      "sound": "eatCrunch",
+      "imagePath": "/images/sunpear.png"
+    },
+    "recipe": {
+      "resultId": "conicalFlask",
+      "category": "Tools",
+      "intRequirement": "2",
+      "resultAmount": "1",
+      "resultCondition": "1",
+      "isLiquidResult": false
+    },
+    "ingredients": [
+      {
+        "mode": "specific",
+        "id": "glass",
+        "amount": "1",
+        "isLiquid": false,
+        "destroyItem": true
+      },
+      {
+        "mode": "specific",
+        "id": "glass",
+        "amount": "1",
+        "isLiquid": false,
+        "destroyItem": true
+      },
+      {
+        "mode": "specific",
+        "id": "glass",
+        "amount": "1",
+        "isLiquid": false,
+        "destroyItem": true
+      },
+      {
+        "mode": "quality",
+        "id": "heatsource",
+        "amount": "10",
+        "isLiquid": false,
+        "destroyItem": false
+      },
+      {
+        "mode": "quality",
+        "id": "water",
+        "amount": "50",
+        "isLiquid": true,
+        "destroyItem": true
+      }
+    ]
+  }
 }

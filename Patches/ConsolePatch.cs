@@ -15,7 +15,6 @@ namespace CUCoreLib.Patches
         internal static void RefreshRuntimeAutofill()
         {
             RefreshSpawnAutofill();
-            RefreshSpawnCategoryAutofill();
             RefreshCustomSpawnAutofill();
             RefreshAddLiquidAutofill();
             RefreshReloadContentAutofill();
@@ -37,10 +36,13 @@ namespace CUCoreLib.Patches
                 delegate(string[] args)
                 {
                     CUCoreUtils.ConsoleCheckForWorld(__instance);
-                    EnsureArgumentCount(__instance, args, 2);
+                    if (args == null || args.Length < 2)
+                        throw new Exception("Usage: spawncategory [category] [position]");
 
                     var category = args[1];
-                    var position = ParsePositionOrThrow(__instance, args[2]);
+                    Vector2 position = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                    if (args.Length > 2)
+                        position = ParsePositionOrThrow(__instance, args[2]);
                     var items = string.Equals(category, "modded", StringComparison.OrdinalIgnoreCase)
                         ? GetModdedSpawnCategoryIds()
                         : (ItemLootPool.AllItemsFromPool(category) ??
@@ -53,15 +55,14 @@ namespace CUCoreLib.Patches
                     foreach (var itemId in items)
                     {
                         var obj = Utils.Create(itemId,
-                            (Vector2)Camera.main.ScreenToWorldPoint(Input.mousePosition) +
-                            UnityEngine.Random.insideUnitCircle * 3f, 0f);
+                            position + UnityEngine.Random.insideUnitCircle * 3f, 0f);
                         var body = obj != null ? obj.GetComponent<Rigidbody2D>() : null;
                         if (body != null) body.gravityScale = 0f;
                     }
 
                     CUCoreUtils.ConsoleLog(__instance,
                         $"Spawned all items from category \"{category}\" at {position}.");
-                }, BuildSpawnCategoryAutofill(), ("string id", "The ID of the category to spawn from"),
+                }, null, ("string id", "The ID of the category to spawn from"),
                 ("position", "Where to spawn the item")));
 
             ConsoleScript.Commands.Add(new Command("cuspawn",
@@ -179,7 +180,6 @@ namespace CUCoreLib.Patches
         {
             var spawnCommand = ConsoleScript.SearchExact("spawn");
             if (spawnCommand == null) return;
-            if (!HasRegisteredSpawnEntities(ConsoleScript.instance)) return;
 
             if (spawnCommand.argAutofill == null) spawnCommand.argAutofill = new Dictionary<int, List<string>>();
 
@@ -213,7 +213,19 @@ namespace CUCoreLib.Patches
             var spawnCategoryCommand = ConsoleScript.SearchExact("spawncategory");
             if (spawnCategoryCommand == null) return;
 
-            spawnCategoryCommand.argAutofill = BuildSpawnCategoryAutofill();
+            var categoryAutofill = BuildSpawnCategoryAutofill()[0];
+            if (spawnCategoryCommand.argAutofill == null)
+                spawnCategoryCommand.argAutofill = new Dictionary<int, List<string>>();
+
+            if (!spawnCategoryCommand.argAutofill.TryGetValue(0, out var categories))
+            {
+                spawnCategoryCommand.argAutofill[0] = categoryAutofill;
+                return;
+            }
+
+            foreach (var category in categoryAutofill.Where(category =>
+                         !categories.Contains(category, StringComparer.OrdinalIgnoreCase)))
+                categories.Add(category);
         }
 
         private static bool HasRegisteredSpawnEntities(ConsoleScript console)
@@ -440,6 +452,16 @@ namespace CUCoreLib.Patches
             }
 
             return d[n, m];
+        }
+
+        [HarmonyPatch(typeof(ConsoleScript), "RegisterPlayerDetails")]
+        internal static class SpawnCategoryAutofillPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix()
+            {
+                RefreshSpawnCategoryAutofill();
+            }
         }
 
         [HarmonyPatch(typeof(ConsoleScript), "RegisterAllCommands")]

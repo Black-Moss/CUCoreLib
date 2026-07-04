@@ -22,6 +22,7 @@ const enabledPageIds = machineExportModule.machineExportEnabledPageIds;
 const itemState = structuredClone(machineExportModule.machineExportDefaultItemState);
 const recipeState = structuredClone(machineExportModule.machineExportDefaultRecipeState);
 const ingredients = structuredClone(machineExportModule.machineExportDefaultIngredients);
+const interactiveDefaults = buildInteractiveDefaults(itemState, recipeState, ingredients);
 
 await rm(path.join(publicDir, "docs"), { recursive: true, force: true });
 await rm(topicsDir, { recursive: true, force: true });
@@ -51,7 +52,8 @@ const topicEntries = enabledPageIds
       bodyText,
       codeTitle: codeTitle(page.id),
       codeLanguage: inferCodeLanguage(codeTitle(page.id)),
-      code
+      code,
+      interactiveDefaults: getInteractiveDefaultsForPage(page.id)
     };
   })
   .filter((entry) => entry !== null);
@@ -108,6 +110,45 @@ function htmlToText(value) {
 function inferCodeLanguage(filename) {
   if (filename.endsWith(".json")) return "json";
   return "csharp";
+}
+
+function buildInteractiveDefaults(itemState, recipeState, ingredients) {
+  return {
+    item: {
+      ...itemState,
+      imagePath: normalizeImagePath(itemState.sprite)
+    },
+    recipe: {
+      ...recipeState
+    },
+    ingredients: ingredients.map((ingredient) => ({ ...ingredient }))
+  };
+}
+
+function getInteractiveDefaultsForPage(pageId) {
+  if (pageId === "item" || pageId === "advanced-item" || pageId === "tools") {
+    return interactiveDefaults;
+  }
+
+  if (pageId === "recipe") {
+    return {
+      recipe: interactiveDefaults.recipe,
+      ingredients: interactiveDefaults.ingredients
+    };
+  }
+
+  return null;
+}
+
+function normalizeImagePath(sprite) {
+  const trimmed = String(sprite ?? "").trim();
+  if (!trimmed) return null;
+
+  if (/^(?:https?:)?\/\//i.test(trimmed) || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  return `/images/${trimmed.replace(/^\.?\/+/, "")}`;
 }
 
 function renderRobots() {
