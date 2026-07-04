@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using BepInEx;
 using CUCoreLib.ContentReload;
 using CUCoreLib.Helpers;
@@ -126,6 +127,35 @@ namespace CUCoreLib.Registries
             Register(category, normalizedKey, optionalFallbackIfLocaleValueNullOrWhitespace);
             var value = LocaleLoader.GetLocalizedText(category, normalizedKey, optionalFallbackIfLocaleValueNullOrWhitespace);
             return string.IsNullOrWhiteSpace(value) ? optionalFallbackIfLocaleValueNullOrWhitespace : value;
+        }
+
+        public static void RegisterCraftingQuality(string id, string displayName = null)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+
+            var normalizedId = id.Trim();
+            var key = "cq" + normalizedId;
+            var fallbackName = string.IsNullOrWhiteSpace(displayName)
+                ? HumanizeCraftingQualityId(normalizedId)
+                : displayName.Trim();
+
+            if (CustomLocales.TryGetValue((int)LocaleCategory.Other, out var otherLocales) &&
+                otherLocales.TryGetValue(key, out var existingValue) &&
+                !string.IsNullOrWhiteSpace(existingValue))
+                return;
+
+            Register("other", key, fallbackName);
+        }
+
+        public static void RegisterCraftingQualities(IEnumerable<CraftingQuality> qualities)
+        {
+            if (qualities == null) return;
+
+            foreach (var quality in qualities)
+            {
+                if (quality == null || string.IsNullOrWhiteSpace(quality.id)) continue;
+                RegisterCraftingQuality(quality.id);
+            }
         }
 
         public static JObject BuildLocaleJson(JObject existing = null)
@@ -322,6 +352,37 @@ namespace CUCoreLib.Registries
                         return null;
                 }
             }
+        }
+
+        private static string HumanizeCraftingQualityId(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return string.Empty;
+
+            var trimmed = id.Trim().Replace('_', ' ').Replace('-', ' ');
+            var builder = new StringBuilder(trimmed.Length + 4);
+
+            for (var i = 0; i < trimmed.Length; i++)
+            {
+                var current = trimmed[i];
+                if (i > 0 && char.IsUpper(current))
+                {
+                    var previous = trimmed[i - 1];
+                    var hasNext = i + 1 < trimmed.Length;
+                    var next = hasNext ? trimmed[i + 1] : '\0';
+                    if ((char.IsLower(previous) || char.IsDigit(previous)) ||
+                        (char.IsUpper(previous) && hasNext && char.IsLower(next)))
+                        builder.Append(' ');
+                }
+
+                builder.Append(current);
+            }
+
+            var words = builder.ToString()
+                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1))
+                .ToArray();
+
+            return words.Length == 0 ? trimmed : string.Join(" ", words);
         }
 
         private sealed class OwnerScope : IDisposable

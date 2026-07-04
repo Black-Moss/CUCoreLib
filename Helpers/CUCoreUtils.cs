@@ -262,6 +262,31 @@ namespace CUCoreLib.Helpers
             SetString(key, value);
         }
 
+        /// <summary>
+        /// Creates a vanilla <see cref="CraftingQuality"/> and optionally registers a fallback locale label for the quality ID.
+        /// Only one fallbackname is needed per ID, all other fallbacknames for this function are disregarded.
+        /// </summary>
+        /// <param name="id">Stable crafting-quality id used for recipe matching and locale lookup.</param>
+        /// <param name="amount">Minimum quality amount required.</param>
+        /// <param name="fallbackName">Optional fallback label used when no locale entry exists for this quality id.</param>
+        public static CraftingQuality CreateCraftingQuality(string id, float amount = 1f, string fallbackName = null)
+        {
+            LocaleRegistry.RegisterCraftingQuality(id, fallbackName);
+            return new CraftingQuality(id, amount);
+        }
+
+        /// <summary>
+        /// Creates a vanilla <see cref="CraftingQuality"/> with an amount of <c>1f</c> and optionally registers a fallback locale label for the quality ID.
+        /// Only one fallbackname is needed per ID, all other fallbacknames for this function are disregarded.
+        /// </summary>
+        /// <param name="id">Stable crafting-quality id used for recipe matching and locale lookup.</param>
+        /// <param name="fallbackName">Optional fallback label used when no locale entry exists for this quality id.</param>
+        public static CraftingQuality CreateCraftingQuality(string id, string fallbackName)
+        {
+            LocaleRegistry.RegisterCraftingQuality(id, fallbackName);
+            return new CraftingQuality(id);
+        }
+
         public static bool IsInWorld()
         {
             return IsWorldGenerationReady() && PlayerCamera.main != null && PlayerCamera.main.body != null;

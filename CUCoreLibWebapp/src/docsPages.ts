@@ -1666,7 +1666,7 @@ ItemRegistry.Register(
             <tr><td><span class="inline-code">decayInfo</span></td><td><span class="inline-code">byte</span></td><td>Bit flags from <span class="inline-code">ItemInfo.DecayType</span> for decay rules. <span class="inline-code">16</span> is <span class="inline-code">BatteryDecay</span>, which drains battery charge instead of normal condition decay.</td></tr>
             <tr><td><span class="inline-code">decayMinutes</span></td><td><span class="inline-code">float</span></td><td>Minutes used by condition decay logic.</td></tr>
             <tr><td><span class="inline-code">rec</span></td><td><span class="inline-code">Recognition</span></td><td>Recognition/identification data. Defaults to <span class="inline-code">new Recognition(2)</span>.</td></tr>
-            <tr><td><span class="inline-code">qualities</span></td><td><span class="inline-code">List&lt;CraftingQuality&gt;</span></td><td>Crafting qualities this item can satisfy in recipes.</td></tr>
+            <tr><td><span class="inline-code">qualities</span></td><td><span class="inline-code">List&lt;CraftingQuality&gt;</span></td><td>Crafting qualities this item can satisfy in recipes. Use <span class="inline-code">CUCoreUtils.CreateCraftingQuality(...)</span> when you want to attach a fallback display name for a custom quality ID.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1803,7 +1803,7 @@ function liquidsPage(): string {
             <tr><td><span class="inline-code">injectable</span></td><td><span class="inline-code">bool</span></td><td>Allows <span class="inline-code">Inject</span> to call <span class="inline-code">onHealthUse</span>. Injection sickness can still apply even when this is false.</td></tr>
             <tr><td><span class="inline-code">injectionSickness</span></td><td><span class="inline-code">float</span></td><td>Multiplier for sickness and blood-viscosity changes during injection. Defaults to <span class="inline-code">1f</span>.</td></tr>
             <tr><td><span class="inline-code">localeFromItem</span></td><td><span class="inline-code">bool</span></td><td>If true, tooltip names/descriptions come from item locale keys using the liquid ID.</td></tr>
-            <tr><td><span class="inline-code">qualities</span></td><td><span class="inline-code">List&lt;CraftingQuality&gt;</span></td><td>Liquid qualities used by recipe matching. Amounts scale by mL through <span class="inline-code">GetScaledQualities</span>.</td></tr>
+            <tr><td><span class="inline-code">qualities</span></td><td><span class="inline-code">List&lt;CraftingQuality&gt;</span></td><td>Liquid qualities used by recipe matching. Amounts scale by mL through <span class="inline-code">GetScaledQualities</span>. Use <span class="inline-code">CUCoreUtils.CreateCraftingQuality(...)</span> when you want to attach a fallback display name for a custom quality ID.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1918,12 +1918,13 @@ function localePage(): string {
             <tr><td><span class="inline-code">ItemRegistry.Register("clothpatch", ...)</span></td><td><span class="inline-code">item.clothpatchdsc</span></td><td><span class="inline-code">description</span></td></tr>
             <tr><td><span class="inline-code">BuildingEntityRegistry.Register("glassworkscentrifuge", ...)</span></td><td><span class="inline-code">building.glassworkscentrifuge</span></td><td><span class="inline-code">Name</span></td></tr>
             <tr><td><span class="inline-code">BuildingEntityRegistry.Register("glassworkscentrifuge", ...)</span></td><td><span class="inline-code">building.glassworkscentrifugedsc</span></td><td><span class="inline-code">Description</span></td></tr>
-            <tr><td><span class="inline-code">LiquidRegistry.Register("pineapplejuice", ...)</span></td><td><span class="inline-code">other.pineapplejuice</span></td><td><span class="inline-code">name</span></td></tr>
-            <tr><td><span class="inline-code">LiquidRegistry.Register("pineapplejuice", ...)</span></td><td><span class="inline-code">other.pineapplejuicedsc</span></td><td><span class="inline-code">description</span></td></tr>
-            <tr><td><span class="inline-code">LocaleRegistry.Get("glassworks.menu.title", "Glassworks")</span></td><td><span class="inline-code">other.glassworks.menu.title</span></td><td><span class="inline-code">fallback string</span></td></tr>
-          </tbody>
-        </table>
-      </div>
+              <tr><td><span class="inline-code">LiquidRegistry.Register("pineapplejuice", ...)</span></td><td><span class="inline-code">other.pineapplejuice</span></td><td><span class="inline-code">name</span></td></tr>
+              <tr><td><span class="inline-code">LiquidRegistry.Register("pineapplejuice", ...)</span></td><td><span class="inline-code">other.pineapplejuicedsc</span></td><td><span class="inline-code">description</span></td></tr>
+              <tr><td><span class="inline-code">qualities = new List&lt;CraftingQuality&gt; { CUCoreUtils.CreateCraftingQuality("brewingKit", "Brewing Kit") }</span></td><td><span class="inline-code">other.cqbrewingKit</span></td><td>Readable fallback label such as <span class="inline-code">Brewing Kit</span></td></tr>
+              <tr><td><span class="inline-code">LocaleRegistry.Get("glassworks.menu.title", "Glassworks")</span></td><td><span class="inline-code">other.glassworks.menu.title</span></td><td><span class="inline-code">fallback string</span></td></tr>
+            </tbody>
+          </table>
+        </div>
     </section>
 
     <section class="lesson-card">

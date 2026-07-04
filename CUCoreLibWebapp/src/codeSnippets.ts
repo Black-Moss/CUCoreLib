@@ -150,7 +150,7 @@ namespace AcidShroomTutorial
                 // Crafting qualties for the liquid
                 qualities = new List<CraftingQuality>
                 {
-                    new CraftingQuality("water", 0.5f)
+                    CUCoreUtils.CreateCraftingQuality("water", 0.5f)
                 }
             });
         }
@@ -373,7 +373,7 @@ function ingredientCode(ingredient: Ingredient): string {
     props.push("specific = true");
     props.push(`specificId = "${escapeCsharp(ingredient.id)}"`);
   } else {
-    props.push(`quality = new CraftingQuality("${escapeCsharp(ingredient.id)}", ${amount})`);
+    props.push(`quality = CUCoreUtils.CreateCraftingQuality("${escapeCsharp(ingredient.id)}", ${amount})`);
   }
 
   if (ingredient.isLiquid) props.push("isLiquid = true");
@@ -1635,7 +1635,7 @@ private void RegisterPineappleJuiceContent()
         },
         qualities = new List<CraftingQuality>
         {
-            new CraftingQuality("water", 0.5f)
+            CUCoreUtils.CreateCraftingQuality("water", 0.5f)
         }
     });
 

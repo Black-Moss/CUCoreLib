@@ -83,6 +83,7 @@ namespace CUCoreLib.Registries
 
             ApplyMedicalActions(info);
             ApplyDefaultOverrides(info);
+            LocaleRegistry.RegisterCraftingQualities(info.qualities);
 
             if (!string.IsNullOrEmpty(info.fullName)) info.fullName = LocaleRegistry.Get("item", id, info.fullName);
 

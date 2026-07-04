@@ -78,6 +78,8 @@ namespace CUCoreLib.Registries
 
             if (info.onHealthUse == null) info.onHealthUse = (amount, limb) => { };
 
+            LocaleRegistry.RegisterCraftingQualities(info.qualities);
+
             var wasPresent = Liquids.Registry.ContainsKey(id);
             Liquids.Registry[id] = new LiquidType
             {
