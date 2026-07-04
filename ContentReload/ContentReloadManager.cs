@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using BepInEx;
 using BepInEx.Bootstrap;
-using BepInEx.Configuration;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
 using UnityEngine;
@@ -19,19 +18,21 @@ namespace CUCoreLib.ContentReload
             new Dictionary<string, ContentReloadState>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> EnabledModGuids =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Dictionary<string, ConfigEntry<string>> OverridePathEntriesByModGuid =
-            new Dictionary<string, ConfigEntry<string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, BepInEx.Configuration.ConfigEntry<string>> OverridePathEntriesByModGuid =
+            new Dictionary<string, BepInEx.Configuration.ConfigEntry<string>>(StringComparer.OrdinalIgnoreCase);
 
         private static bool initialized;
         private static readonly ContentReloadConfig config = new ContentReloadConfig();
-        private static ConfigFile configFile;
+        private static BepInEx.Configuration.ConfigFile configFile;
 
         internal static void Initialize()
         {
             if (initialized) return;
 
             initialized = true;
-            InitializeConfigFile();
+            configFile = CUCoreLibPlugin.Instance?.Config;
+            if (configFile == null)
+                throw new InvalidOperationException("CUCoreLib shared config file was not available during ContentReloadManager initialization.");
             BindLoadedModConfigEntries();
             RestorePersistedAutoHotReloadSettings();
             ContentWatchService.Initialize();
@@ -273,14 +274,6 @@ namespace CUCoreLib.ContentReload
         private static string GetAutoHotReloadEnabledKey(string modGuid)
         {
             return AutoHotReloadEnabledKeyPrefix + modGuid;
-        }
-
-        private static void InitializeConfigFile()
-        {
-            if (configFile != null) return;
-
-            var configPath = Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg");
-            configFile = new ConfigFile(configPath, true);
         }
 
         private static void BindLoadedModConfigEntries()
