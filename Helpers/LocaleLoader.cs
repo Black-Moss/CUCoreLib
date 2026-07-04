@@ -49,7 +49,7 @@ namespace CUCoreLib.Helpers
                 catch (Exception ex)
                 {
                     Logger?.LogWarning(
-                        $"Failed to load embedded locale overlay '{resource.DisplayName}': {ex.Message}");
+                        $"Failed to load embedded locale overlay '{resource.DisplayName}' while applying locale '{localeName}': {ex.Message}");
                 }
 
             var overlayFiles = FindOverlayFiles(localeName);
@@ -63,7 +63,8 @@ namespace CUCoreLib.Helpers
                 }
                 catch (Exception ex)
                 {
-                    Logger?.LogWarning($"Failed to load locale overlay '{path}': {ex.Message}");
+                    Logger?.LogWarning(
+                        $"Failed to load locale overlay '{path}' while applying locale '{localeName}'. Owning plugin: {ResolveOverlayOwner(path)}. {ex.Message}");
                 }
         }
 
@@ -317,6 +318,37 @@ namespace CUCoreLib.Helpers
                 Logger?.LogWarning($"Failed to scan locale overlays under '{rootPath}': {ex.Message}");
                 return Enumerable.Empty<string>();
             }
+        }
+
+        private static string ResolveOverlayOwner(string path)
+        {
+            var normalizedPath = NormalizeExistingPath(path);
+            if (string.IsNullOrWhiteSpace(normalizedPath)) return "<unknown>";
+
+            foreach (var pluginInfo in Chainloader.PluginInfos.Values.Where(info => info != null))
+            {
+                var pluginLocation = NormalizeExistingPath(pluginInfo.Location);
+                if (string.IsNullOrWhiteSpace(pluginLocation)) continue;
+
+                var pluginDirectory = Path.GetDirectoryName(pluginLocation);
+                if (string.IsNullOrWhiteSpace(pluginDirectory)) continue;
+
+                if (!normalizedPath.StartsWith(pluginDirectory, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!string.IsNullOrWhiteSpace(pluginInfo.Metadata?.GUID))
+                    return pluginInfo.Metadata.GUID.Trim();
+
+                var assembly = ResolvePluginAssembly(pluginInfo);
+                if (assembly != null) return assembly.GetName().Name;
+
+                return pluginDirectory;
+            }
+
+            var configLocaleRoot = Path.Combine(Paths.ConfigPath, "CUCoreLib", "Locales");
+            if (normalizedPath.StartsWith(configLocaleRoot, StringComparison.OrdinalIgnoreCase))
+                return "CUCoreLib config locale folder";
+
+            return Path.GetDirectoryName(normalizedPath) ?? "<unknown>";
         }
 
         private sealed class EmbeddedLocaleResource

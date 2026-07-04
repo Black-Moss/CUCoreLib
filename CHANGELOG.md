@@ -7,17 +7,25 @@ I figured that this would be nice to have, as to easily take a look at everythin
 - Hotloading is a lot more mod-author friendly, so that you don't have to wrangle your code around it (as much)
 - Check out the new docs for information! ^^
 - Nightly/on-commit releases for CUCoreLib!
+- Added itemsVisible and tagRestriction (tags only, no crafting quality)
+- Added more verbose warnings
+- Runtime debugger for variables was introduced, under the console command `debugwatch`
 
 ### Changes
 - Locale recursive directory search was accidentally removed and now re-added
 - Slimmed down batteryProperties, as I was overcomplicating it. Your mods will work still, but you may face some slight changes
+- Custom structures now no longer spawn in the tutorial, and spawn up to only once in the debug world
 
 ### Fixes 
 - Battery 0% condition issue...
 - Fix keycode optimization (Thanks, @Jacbo1)!
 - Crafting qualities now work and are added to the locale 
 - `spawncategory` now can spawn all modded items
-- 
+- Fixed lighting module pointLightOuterAngle/pointLightInnerAngle
+- Fixed equippables teleporting when trying to equip on top on another, as well as console error logs whilst equipping for the first time
+- Minor optimization changes
+- Documentation is a neverending battle :)
+- Fixed QoL image integration again
 
 
 ## v1.0.2

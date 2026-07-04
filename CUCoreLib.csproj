@@ -155,6 +155,10 @@
             <HintPath>$(GameManagedDir)\UnityEngine.GridModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>$(GameManagedDir)\UnityEngine.IMGUIModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="UnityEngine.InputLegacyModule">
             <HintPath>$(GameManagedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
             <Private>False</Private>
@@ -230,6 +234,8 @@
         <Compile Include="Helpers\CCLBase.cs"/>
         <Compile Include="Helpers\CUCoreUtils.cs"/>
         <Compile Include="Helpers\CustomBuildingRuntime.cs"/>
+        <Compile Include="Helpers\DebugWatchConsoleCommands.cs"/>
+        <Compile Include="Helpers\DebugWatchService.cs"/>
         <Compile Include="Helpers\MinigameHelpers.cs"/>
         <Compile Include="Helpers\ExtensionData.cs"/>
         <Compile Include="Helpers\SpawnIdHelpers.cs"/>

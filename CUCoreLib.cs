@@ -39,6 +39,7 @@ namespace CUCoreLib
             FileLoader.Initialize(Logger);
             LocaleLoader.Initialize(Logger);
             LaunchOverrideManager.Initialize();
+            DebugWatchService.Initialize();
             ContentReloadManager.Initialize();
             SaveRegistry.RegisterBuiltIns();
             MultiplayerApi.RegisterBuiltIns();
@@ -125,6 +126,15 @@ namespace CUCoreLib
                 }, null,
                 ("modGuid", "BepInEx plugin GUID that previously called ContentReloadManager.EnableHotReload(GUID)."),
                 ("enable", "true to enable watch mode for that DLL, false to disable it."));
+
+            ConsoleCommandRegistry.Register("debugwatch",
+                "Manages a live top-right overlay of watched static fields for runtime debugging.",
+                delegate(string[] args)
+                {
+                    DebugWatchConsoleCommands.Run(ConsoleScript.instance, args);
+                }, null,
+                ("action", "add, remove, list, clear, show, or hide."),
+                ("Type.member", "Reflected static field to watch, such as Namespace.Plugin.healthRate."));
         }
     }
 }

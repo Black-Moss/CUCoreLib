@@ -17,6 +17,7 @@ namespace CUCoreLib.Patches
             RefreshSpawnAutofill();
             RefreshCustomSpawnAutofill();
             RefreshAddLiquidAutofill();
+            RefreshDebugWatchAutofill();
             RefreshReloadContentAutofill();
             RefreshSetTileAutofill();
         }
@@ -308,12 +309,29 @@ namespace CUCoreLib.Patches
             };
         }
 
+        private static Dictionary<int, List<string>> BuildDebugWatchAutofill()
+        {
+            return new Dictionary<int, List<string>>
+            {
+                { 0, DebugWatchService.GetRootAutofill().ToList() },
+                { 1, DebugWatchService.GetAvailableWatchNames().ToList() }
+            };
+        }
+
         private static void RefreshReloadContentAutofill()
         {
             var reloadContentCommand = ConsoleScript.SearchExact("reloadcontent");
             if (reloadContentCommand == null) return;
 
             reloadContentCommand.argAutofill = BuildReloadContentAutofill();
+        }
+
+        private static void RefreshDebugWatchAutofill()
+        {
+            var debugWatchCommand = ConsoleScript.SearchExact("debugwatch");
+            if (debugWatchCommand == null) return;
+
+            debugWatchCommand.argAutofill = BuildDebugWatchAutofill();
         }
 
         private static string FindBestMatch(string query)

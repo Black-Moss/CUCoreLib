@@ -2992,6 +2992,19 @@ function consolePage(): string {
         <p>Because the second argument description starts with <span class="inline-code">bool</span>, vanilla adds <span class="inline-code">true</span> and <span class="inline-code">false</span> suggestions automatically. Descriptions beginning with <span class="inline-code">position</span> get <span class="inline-code">cursor</span>, <span class="inline-code">player</span>, <span class="inline-code">random</span>, and <span class="inline-code">#.#</span>.</p>
       </div>
     </details>
+    <section class="lesson-card">
+      <h2>Built-in debugwatch overlay</h2>
+      <p>CUCoreLib now includes a built-in <span class="inline-code">debugwatch</span> command for runtime value watching. It is aimed at mod authors who want a quick live overlay without writing their own UI.</p>
+      <p>The command resolves supported static fields by reflected <span class="inline-code">Type.member</span> name, then shows watched values as white text in the top-right corner while a world is active.</p>
+      <pre><code>debugwatch add MyNamespace.MyPlugin.healthRate
+debugwatch add MyNamespace.MyPlugin.debugEnabled
+debugwatch list
+debugwatch hide
+debugwatch show
+debugwatch remove MyNamespace.MyPlugin.healthRate
+debugwatch clear</code></pre>
+      <p>V1 supports static fields only. Supported field types are simple values such as numbers, <span class="inline-code">bool</span>, <span class="inline-code">string</span>, enums, and <span class="inline-code">Vector2</span>/<span class="inline-code">Vector3</span>.</p>
+    </section>
   `;
 }
 
@@ -3028,11 +3041,12 @@ function debugTestingPage(): string {
       autohotreload com.example.mymod false
       </code></pre>
       <ul>
-        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> re-reads the currently deployed plugin DLL on disk, clears the mod's previously registered reloadable content, and replays only recognized content methods from that rebuilt assembly.</li>
-        <li><span class="inline-code">autohotreload &lt;modGuid&gt; true</span> enables persistent watch mode for the deployed plugin DLL of a mod that previously called <span class="inline-code">EnableHotReload(GUID)</span>.</li>
+        <li><span class="inline-code">reloadcontent &lt;modGuid&gt;</span> re-reads the mod's configured hot reload source DLL, clears the mod's previously registered reloadable content, and replays only recognized content methods from that rebuilt assembly.</li>
+        <li><span class="inline-code">autohotreload &lt;modGuid&gt; true</span> enables persistent watch mode for the same configured hot reload source DLL of a mod that previously called <span class="inline-code">EnableHotReload(GUID)</span>.</li>
         <li><span class="inline-code">autohotreload &lt;modGuid&gt; false</span> disables the saved watch mode for that mod.</li>
       </ul>
-      <p>Watch mode polls the deployed DLL every few seconds, waits for the file hash to settle, then runs the same reload flow automatically. In practice that means your build or copy step still needs to overwrite the DLL that BepInEx loaded.</p>
+      <p>By default, the hot reload source is still the deployed plugin DLL that BepInEx loaded. If Windows refuses to overwrite that file while the game is open, set <span class="inline-code">[Hot Reload]</span> -&gt; <span class="inline-code">&lt;modGuid&gt;.overridePath</span> in <span class="inline-code">CUCoreLib.cfg</span> to an alternate rebuilt DLL path such as your project's <span class="inline-code">bin\\Debug</span> output.</p>
+      <p>Watch mode polls the selected source DLL every few seconds, waits for the file hash to settle, then runs the same reload flow automatically. That means it can watch either the deployed plugin DLL or your configured override path.</p>
 
       <h2>Automatic discovery rules</h2>
       <ul>

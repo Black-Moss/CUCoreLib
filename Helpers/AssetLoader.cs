@@ -896,7 +896,8 @@ namespace CUCoreLib.Helpers
             if (!LoggedMissingResources.Add(key)) return;
 
             Logger?.LogWarning(
-                $"Could not load embedded {resourceType} '{resourcePath}' (normalized '{normalizedPath}') from assembly '{sourceAssembly.GetName().Name}'.");
+                $"Could not load embedded {resourceType} '{resourcePath}' from assembly '{sourceAssembly.GetName().Name}'. " +
+                $"CUCoreLib looked for normalized resource name '{normalizedPath}' and assembly resource suffix matches.");
         }
 
         private static void LogMissingFileResource(string filePath, string resourceType)

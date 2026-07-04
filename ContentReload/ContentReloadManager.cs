@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using BepInEx;
 using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using CUCoreLib.Helpers;
 using CUCoreLib.Networking;
 using UnityEngine;
@@ -13,20 +14,25 @@ namespace CUCoreLib.ContentReload
     public static class ContentReloadManager
     {
         private const string AutoHotReloadEnabledKeyPrefix = "CUCoreLib.AutoHotReload.Enabled.";
-
+        private const string ConfigSectionName = "Hot Reload";
         private static readonly Dictionary<string, ContentReloadState> StateByModGuid =
             new Dictionary<string, ContentReloadState>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> EnabledModGuids =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, ConfigEntry<string>> OverridePathEntriesByModGuid =
+            new Dictionary<string, ConfigEntry<string>>(StringComparer.OrdinalIgnoreCase);
 
         private static bool initialized;
         private static readonly ContentReloadConfig config = new ContentReloadConfig();
+        private static ConfigFile configFile;
 
         internal static void Initialize()
         {
             if (initialized) return;
 
             initialized = true;
+            InitializeConfigFile();
+            BindLoadedModConfigEntries();
             RestorePersistedAutoHotReloadSettings();
             ContentWatchService.Initialize();
         }
@@ -52,6 +58,8 @@ namespace CUCoreLib.ContentReload
                                 "'. Call ContentReloadManager.EnableHotReload(GUID) from Awake() first.");
                 return result;
             }
+
+            EnsureModConfigBound(modGuid);
 
             if (IsMultiplayerActive())
             {
@@ -94,6 +102,7 @@ namespace CUCoreLib.ContentReload
                 throw new InvalidOperationException(reason);
 
             EnabledModGuids.Add(normalizedModGuid);
+            EnsureModConfigBound(normalizedModGuid);
             var normalizedOptions = options ?? new HotReloadOptions();
             GetOrCreateState(normalizedModGuid).Mode = normalizedOptions.Mode;
             PersistAutoHotReloadSetting(normalizedModGuid, true);
@@ -137,6 +146,8 @@ namespace CUCoreLib.ContentReload
                 return false;
             }
 
+            EnsureModConfigBound(normalizedModGuid);
+
             if (config.Mods == null)
                 config.Mods = new Dictionary<string, ContentReloadModConfig>(StringComparer.OrdinalIgnoreCase);
 
@@ -166,6 +177,7 @@ namespace CUCoreLib.ContentReload
             {
                 if (!ContentAssemblyResolver.IsWatchEnabled(config, modGuid)) continue;
 
+                EnsureModConfigBound(modGuid);
                 var state = GetOrCreateState(modGuid);
                 var candidate = ContentAssemblyResolver.ResolveCandidate(modGuid, config, state);
                 if (string.IsNullOrWhiteSpace(candidate.SelectedPath) ||
@@ -245,6 +257,7 @@ namespace CUCoreLib.ContentReload
                 }
 
                 modConfig.WatchEnabled = watchEnabled;
+                modConfig.OverridePath = GetConfiguredOverridePath(normalizedModGuid);
             }
         }
 
@@ -260,6 +273,58 @@ namespace CUCoreLib.ContentReload
         private static string GetAutoHotReloadEnabledKey(string modGuid)
         {
             return AutoHotReloadEnabledKeyPrefix + modGuid;
+        }
+
+        private static void InitializeConfigFile()
+        {
+            if (configFile != null) return;
+
+            var configPath = Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg");
+            configFile = new ConfigFile(configPath, true);
+        }
+
+        private static void BindLoadedModConfigEntries()
+        {
+            foreach (var modGuid in GetLoadedModGuids())
+            {
+                EnsureModConfigBound(modGuid);
+            }
+
+            configFile?.Save();
+        }
+
+        private static void EnsureModConfigBound(string modGuid)
+        {
+            var normalizedModGuid = (modGuid ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedModGuid) || configFile == null) return;
+
+            if (!config.Mods.TryGetValue(normalizedModGuid, out var modConfig) || modConfig == null)
+            {
+                modConfig = new ContentReloadModConfig();
+                config.Mods[normalizedModGuid] = modConfig;
+            }
+
+            if (!OverridePathEntriesByModGuid.TryGetValue(normalizedModGuid, out var overrideEntry) || overrideEntry == null)
+            {
+                overrideEntry = configFile.Bind(
+                    ConfigSectionName,
+                    normalizedModGuid + ".overridePath",
+                    string.Empty,
+                    "Optional absolute DLL path for hot reloading mod '" + normalizedModGuid + "'. " +
+                    "When set to an existing file, CUCoreLib reloads from that path instead of the deployed plugin DLL.");
+                OverridePathEntriesByModGuid[normalizedModGuid] = overrideEntry;
+            }
+
+            modConfig.OverridePath = GetConfiguredOverridePath(normalizedModGuid);
+        }
+
+        private static string GetConfiguredOverridePath(string modGuid)
+        {
+            if (string.IsNullOrWhiteSpace(modGuid)) return null;
+            if (!OverridePathEntriesByModGuid.TryGetValue(modGuid.Trim(), out var entry) || entry == null) return null;
+
+            var value = entry.Value;
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
         private static bool IsMultiplayerActive()

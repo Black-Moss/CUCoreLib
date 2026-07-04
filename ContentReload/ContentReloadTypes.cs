@@ -99,6 +99,7 @@ namespace CUCoreLib.ContentReload
     internal sealed class ContentReloadModConfig
     {
         public bool WatchEnabled { get; set; }
+        public string OverridePath { get; set; }
     }
 
     internal sealed class ContentReloadCandidate

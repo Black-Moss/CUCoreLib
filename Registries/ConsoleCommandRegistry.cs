@@ -15,10 +15,17 @@ namespace CUCoreLib.Registries
             ContentReloadSession.AssertNotActive("ConsoleCommandRegistry.Register()",
                 "Console command registration is excluded from strict content reload.");
 
-            if (string.IsNullOrWhiteSpace(name) || action == null)
+            if (string.IsNullOrWhiteSpace(name))
             {
-                // Probably better then allowing
-                CUCoreLibPlugin.Log.LogWarning("Ignored console command registration with no action.");
+                CUCoreLibPlugin.Log.LogWarning(
+                    "Ignored console command registration because the command name was null, empty, or whitespace.");
+                return;
+            }
+
+            if (action == null)
+            {
+                CUCoreLibPlugin.Log.LogWarning(
+                    "Ignored console command registration for '" + name.Trim() + "' because the action was null.");
                 return;
             }
 
@@ -32,15 +39,22 @@ namespace CUCoreLib.Registries
             ContentReloadSession.AssertNotActive("ConsoleCommandRegistry.Register()",
                 "Console command registration is excluded from strict content reload.");
 
-            if (command == null || string.IsNullOrWhiteSpace(command.name))
+            if (command == null)
             {
-                CUCoreLibPlugin.Log.LogWarning("Ignored null console command registration.");
+                CUCoreLibPlugin.Log.LogWarning("Ignored console command registration because the command object was null.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(command.name))
+            {
+                CUCoreLibPlugin.Log.LogWarning(
+                    "Ignored console command registration because command.name was null, empty, or whitespace.");
                 return;
             }
 
             if (RegisteredCommands.Any(c => c.name.Equals(command.name, StringComparison.OrdinalIgnoreCase)))
             {
-                CUCoreLibPlugin.Log.LogWarning($"Duplicate console command '{command.name}'!.");
+                CUCoreLibPlugin.Log.LogWarning($"Ignored duplicate console command registration for '{command.name}'.");
                 return;
             }
 

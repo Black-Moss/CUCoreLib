@@ -28,10 +28,24 @@ namespace CUCoreLib.ContentReload
             }
 
             var modConfig = GetModConfig(config, normalizedModGuid);
+            candidate.OverridePath = NormalizeExistingPath(modConfig?.OverridePath);
+            var overrideHash = GetFileHash(candidate.OverridePath, state);
+            var overrideChanged = !string.IsNullOrWhiteSpace(overrideHash) &&
+                                  !string.Equals(overrideHash, state?.LastSuccessfulHash,
+                                      StringComparison.OrdinalIgnoreCase);
             var loadedHash = GetFileHash(candidate.LoadedPluginPath, state);
             var loadedChanged = !string.IsNullOrWhiteSpace(loadedHash) &&
                                 !string.Equals(loadedHash, state?.LastSuccessfulHash,
                                     StringComparison.OrdinalIgnoreCase);
+
+            if (!string.IsNullOrWhiteSpace(candidate.OverridePath) &&
+                overrideChanged)
+            {
+                candidate.SelectedPath = candidate.OverridePath;
+                candidate.SelectedHash = overrideHash;
+                candidate.SelectedSourceLabel = "override path";
+                return candidate;
+            }
 
             if (!string.IsNullOrWhiteSpace(candidate.LoadedPluginPath) &&
                 loadedChanged)
@@ -39,6 +53,14 @@ namespace CUCoreLib.ContentReload
                 candidate.SelectedPath = candidate.LoadedPluginPath;
                 candidate.SelectedHash = loadedHash;
                 candidate.SelectedSourceLabel = "loaded plugin";
+                return candidate;
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate.OverridePath))
+            {
+                candidate.SelectedPath = candidate.OverridePath;
+                candidate.SelectedHash = overrideHash;
+                candidate.SelectedSourceLabel = "override path";
                 return candidate;
             }
 
@@ -87,7 +109,7 @@ namespace CUCoreLib.ContentReload
 
         internal static string[] GetCandidatePaths(ContentReloadCandidate candidate)
         {
-            return new[] { candidate.LoadedPluginPath }
+            return new[] { candidate.OverridePath, candidate.LoadedPluginPath }
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();

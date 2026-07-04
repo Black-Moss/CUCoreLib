@@ -102,7 +102,7 @@ namespace CUCoreLib.Helpers
             if (sprite != null) return sprite;
 
             Logger?.LogWarning(
-                $"Image by the name of {filename} does not exist. Check capitalization and file extension");
+                BuildMissingEmbeddedSpriteMessage(filename, asm));
             return null;
         }
 
@@ -143,6 +143,18 @@ namespace CUCoreLib.Helpers
                 builder.Append(string.Join(", ", attemptedPaths.Select(path => "'" + path + "'")));
 
             return builder.ToString();
+        }
+
+        private static string BuildMissingEmbeddedSpriteMessage(string filename, Assembly assembly)
+        {
+            var assemblyName = assembly?.GetName().Name ?? "<unknown>";
+            var normalizedName = string.IsNullOrWhiteSpace(filename)
+                ? string.Empty
+                : filename.Trim().Replace('/', '.').Replace('\\', '.');
+
+            return "Embedded image not found: '" + filename + "' in assembly '" + assemblyName +
+                   "'. Checked embedded resource name '" + normalizedName +
+                   "' and assembly resource suffix matches. Check capitalization, file extension, and build action.";
         }
     }
 }
