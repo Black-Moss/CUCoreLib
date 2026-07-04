@@ -26,6 +26,8 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      - uses: NuGet/setup-nuget@v2
+
       - name: Download private game refs
         id: refs
         shell: powershell
@@ -60,7 +62,7 @@ jobs:
       - name: Restore
         shell: powershell
         run: |
-          msbuild 'CUCoreLib.csproj' /t:Restore /p:Configuration=Release /p:Platform=AnyCPU /p:BepInExDir=
+          nuget restore 'CUCoreLib.sln'
 
       - name: Build
         shell: powershell
