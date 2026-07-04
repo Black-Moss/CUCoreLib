@@ -279,7 +279,7 @@ namespace CUCoreLib.Data
     public class BatteryProperties
     {
         /// <summary>
-        /// Initial battery charge when the item spawns. Leave below zero to use the preset's full default charge.
+        /// Initial battery charge when the item spawns. Values from 0 to 1 are treated as a percentage of the preset max charge; higher values are treated as absolute charge. Leave below zero to use the preset's full default charge.
         /// </summary>
         public float StartCharge = -1f;
 

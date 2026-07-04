@@ -310,7 +310,7 @@ export const hoverPanels: Record<string, HoverPanel> = {
   },
   StartCharge: {
     title: "StartCharge",
-    body: "BatteryProperties initial charge for fresh spawned items. Leave it below zero to start with a full preset-sized battery."
+    body: "BatteryProperties initial charge for fresh spawned items. Values from 0 to 1 are treated as a percentage of the preset max charge; higher values are absolute charge. Leave it below zero to start with a full preset-sized battery."
   },
   Preset: {
     title: "Preset",

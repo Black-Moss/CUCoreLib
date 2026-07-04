@@ -378,9 +378,14 @@ namespace CUCoreLib.Patches
             bat.batteryType = PresetToBatteryId(def.Battery.Preset);
             bat.maxCharge = maxCharge;
 
-            var startCharge = def.Battery.StartCharge >= 0f
-                ? Mathf.Min(def.Battery.StartCharge, maxCharge)
-                : maxCharge;
+            var startCharge = maxCharge;
+            if (def.Battery.StartCharge >= 0f)
+            {
+                startCharge = def.Battery.StartCharge <= 1f
+                    ? maxCharge * def.Battery.StartCharge
+                    : Mathf.Min(def.Battery.StartCharge, maxCharge);
+            }
+
             item.condition = Mathf.Clamp01(startCharge / Mathf.Max(1f, maxCharge));
         }
 

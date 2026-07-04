@@ -2378,7 +2378,7 @@ function advancedItemPage(): string {
         <table class="field-table">
           <thead><tr><th>Field</th><th>Type</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><span class="inline-code">StartCharge</span></td><td><span class="inline-code">float</span></td><td>Starting charge amount for fresh spawned items. Leave it below zero to spawn with a full preset-sized battery.</td></tr>
+            <tr><td><span class="inline-code">StartCharge</span></td><td><span class="inline-code">float</span></td><td>Starting charge amount for fresh spawned items. Values from <span class="inline-code">0f</span> to <span class="inline-code">1f</span> are treated as a percentage of the preset max charge. Higher values are treated as absolute charge. Leave it below zero to spawn with a full preset-sized battery.</td></tr>
             <tr><td><span class="inline-code">Preset</span></td><td><span class="inline-code">BatteryItem.BatteryPreset</span></td><td>Vanilla preset for accepted battery size: <span class="inline-code">Small</span>, <span class="inline-code">Medium</span>, or <span class="inline-code">Large</span>.</td></tr>
             <tr><td><span class="inline-code">SpawnWithBattery</span></td><td><span class="inline-code">bool</span></td><td>If true, fresh items start with the preset-sized vanilla battery already loaded. If false, the item starts empty.</td></tr>
           </tbody>
@@ -2579,7 +2579,7 @@ function advancedItemPage(): string {
 
     <section class="lesson-card">
       <h2>Battery-powered items</h2>
-      <p>Battery-powered tools use the vanilla <span class="inline-code">BatteryItem</span> component. CUCoreLib's battery module adds one, chooses the vanilla battery size from <span class="inline-code">Preset</span>, and uses <span class="inline-code">StartCharge</span> only for the initial fill amount. Use this when the item itself stores charge or accepts battery behavior; use vanilla <span class="inline-code">BatteryInfo</span> when you are registering an actual battery item.</p>
+      <p>Battery-powered tools use the vanilla <span class="inline-code">BatteryItem</span> component. CUCoreLib's battery module adds one, chooses the vanilla battery size from <span class="inline-code">Preset</span>, and uses <span class="inline-code">StartCharge</span> only for the initial fill amount. Use values from <span class="inline-code">0f</span> to <span class="inline-code">1f</span> when you want a percentage of the preset size, or values above <span class="inline-code">1f</span> when you want an absolute charge amount. Use this when the item itself stores charge or accepts battery behavior; use vanilla <span class="inline-code">BatteryInfo</span> when you are registering an actual battery item.</p>
       <p>Battery items automatically gain <span class="inline-code">BatteryDecay</span>, so you usually just set <span class="inline-code">decayMinutes</span> to control how quickly charge drains.</p>
       <pre><code>ItemRegistry.Register(
     "portablelamp",
