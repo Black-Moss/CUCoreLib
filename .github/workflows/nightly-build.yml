@@ -1,0 +1,78 @@
+name: Nightly Build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'
+
+permissions:
+  contents: read
+
+env:
+  GCS_REFS_OBJECT: gs://cucorelib-game-files/cu-build-refs.zip
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Download private game refs
+        id: refs
+        shell: powershell
+        run: |
+          $zipPath = Join-Path $env:RUNNER_TEMP 'cu-game-refs.zip'
+          $extractRoot = Join-Path $env:RUNNER_TEMP 'cu-game-refs'
+
+          if (Test-Path $extractRoot)
+          {
+              Remove-Item -LiteralPath $extractRoot -Recurse -Force
+          }
+
+          gcloud storage cp $env:GCS_REFS_OBJECT $zipPath
+          Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot
+
+          $assembly = Get-ChildItem -Path $extractRoot -Recurse -Filter 'Assembly-CSharp.dll' |
+              Where-Object { $_.FullName -like '*CasualtiesUnknown_Data\Managed\Assembly-CSharp.dll' } |
+              Select-Object -First 1
+
+          if (-not $assembly)
+          {
+              throw "Could not find CasualtiesUnknown_Data\\Managed\\Assembly-CSharp.dll in extracted refs."
+          }
+
+          $managedDir = Split-Path -Parent $assembly.FullName
+          $dataDir = Split-Path -Parent $managedDir
+          $baseGamePath = Split-Path -Parent $dataDir
+
+          "CUCORELIB_BASE_GAME_PATH=$baseGamePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Resolved CUCORELIB_BASE_GAME_PATH to $baseGamePath"
+
+      - name: Restore
+        shell: powershell
+        run: |
+          msbuild 'CUCoreLib.csproj' /t:Restore /p:Configuration=Release /p:Platform=AnyCPU /p:BepInExDir=
+
+      - name: Build
+        shell: powershell
+        run: |
+          msbuild 'CUCoreLib.csproj' /t:Compile /p:Configuration=Release /p:Platform=AnyCPU /p:BepInExDir=
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CUCoreLib-nightly
+          path: |
+            bin\Release\CUCoreLib.dll
+            bin\Release\CUCoreLib.pdb
+            bin\Release\CUCoreLib.xml
+          if-no-files-found: error
