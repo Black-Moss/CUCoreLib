@@ -131,6 +131,78 @@ namespace CUCoreLib.Helpers
             return qualities;
         }
 
+        internal static JObject WriteSpriteDictionary(IReadOnlyDictionary<string, Sprite> sprites)
+        {
+            if (sprites == null || sprites.Count == 0) return null;
+
+            var obj = new JObject();
+            foreach (var entry in sprites)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key) || entry.Value == null) continue;
+
+                var sprite = WriteSprite(entry.Value);
+                if (sprite != null) obj[entry.Key] = sprite;
+            }
+
+            return obj;
+        }
+
+        internal static Dictionary<string, Sprite> ReadSpriteDictionary(JToken token)
+        {
+            var obj = token as JObject;
+            var sprites = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+            if (obj == null) return sprites;
+
+            foreach (var property in obj.Properties())
+            {
+                if (string.IsNullOrWhiteSpace(property.Name)) continue;
+
+                var sprite = ReadSprite(property.Value);
+                if (sprite == null) continue;
+
+                sprites[property.Name] = sprite;
+            }
+
+            return sprites;
+        }
+
+        internal static JObject WriteVector2Dictionary(IReadOnlyDictionary<string, Vector2> offsets)
+        {
+            if (offsets == null || offsets.Count == 0) return null;
+
+            var obj = new JObject();
+            foreach (var entry in offsets)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key)) continue;
+
+                obj[entry.Key] = new JObject
+                {
+                    ["x"] = entry.Value.x,
+                    ["y"] = entry.Value.y
+                };
+            }
+
+            return obj;
+        }
+
+        internal static Dictionary<string, Vector2> ReadVector2Dictionary(JToken token)
+        {
+            var obj = token as JObject;
+            var offsets = new Dictionary<string, Vector2>(StringComparer.OrdinalIgnoreCase);
+            if (obj == null) return offsets;
+
+            foreach (var property in obj.Properties())
+            {
+                if (string.IsNullOrWhiteSpace(property.Name) || !(property.Value is JObject vector)) continue;
+
+                offsets[property.Name] = new Vector2(
+                    vector.Value<float?>("x") ?? 0f,
+                    vector.Value<float?>("y") ?? 0f);
+            }
+
+            return offsets;
+        }
+
         internal static JArray WriteTypeNames(IEnumerable<Type> types)
         {
             if (types == null) return null;

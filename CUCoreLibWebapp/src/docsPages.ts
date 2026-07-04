@@ -2309,7 +2309,7 @@ function advancedItemPage(): string {
   return `
     <section class="lesson-card">
       <h2>When to use this page</h2>
-      <p>The basic Item API page uses vanilla <span class="inline-code">ItemInfo</span> to mimic the base game. Advanced items can use <span class="inline-code">CustomItemInfo</span>, which includes normal <span class="inline-code">ItemInfo</span> fields, vanilla <span class="inline-code">LiquidItemInfo</span> fields, and CUCoreLib-only fields like <span class="inline-code">Container</span>, <span class="inline-code">Battery</span>, <span class="inline-code">Light</span>, <span class="inline-code">Tool</span>, <span class="inline-code">WornSprite</span>, <span class="inline-code">WornSpriteOffset</span>, <span class="inline-code">LiquidMask</span>, <span class="inline-code">SpriteScaleDimensions</span>, <span class="inline-code">SpawnFrequency</span>, and <span class="inline-code">CustomData</span>.</p>
+      <p>The basic Item API page uses vanilla <span class="inline-code">ItemInfo</span> to mimic the base game. Advanced items can use <span class="inline-code">CustomItemInfo</span>, which includes normal <span class="inline-code">ItemInfo</span> fields, vanilla <span class="inline-code">LiquidItemInfo</span> fields, and CUCoreLib-only fields like <span class="inline-code">Container</span>, <span class="inline-code">Battery</span>, <span class="inline-code">Light</span>, <span class="inline-code">Tool</span>, <span class="inline-code">WornSprite</span>, <span class="inline-code">MultiWornSprites</span>, <span class="inline-code">WornSpriteOffset</span>, <span class="inline-code">MultiWornSpriteOffsets</span>, <span class="inline-code">LiquidMask</span>, <span class="inline-code">SpriteScaleDimensions</span>, <span class="inline-code">SpawnFrequency</span>, and <span class="inline-code">CustomData</span>.</p>
       <p>Why is the mod doing it this way? Traditonally, the game sets these settings via the Unity prefab editor, and as such does not appear in the game's default item code.</p>
       <pre><code>// Replace new ItemInfo{ ... } with 
       new CustomItemInfo{ ... }</code></pre>
@@ -2331,7 +2331,9 @@ function advancedItemPage(): string {
             <tr><td><span class="inline-code">ID</span></td><td><span class="inline-code">string</span></td><td>Filled by <span class="inline-code">ItemRegistry.Register</span> from the separate ID argument. You normally do not set this yourself.</td></tr>
             <tr><td><span class="inline-code">Icon</span></td><td><span class="inline-code">Sprite</span></td><td>Inventory/world sprite used by custom templates and cached under the item ID. Passing the sprite as the third register argument sets this for you.</td></tr>
             <tr><td><span class="inline-code">WornSprite</span></td><td><span class="inline-code">Sprite</span></td><td>Optional sprite applied while a wearable custom item is worn, then restored to <span class="inline-code">Icon</span> when dropped.</td></tr>
+            <tr><td><span class="inline-code">MultiWornSprites</span></td><td><span class="inline-code">Dictionary&lt;string, Sprite&gt;</span></td><td>Optional extra worn sprites keyed by vanilla limb name. CUCoreLib maps these onto the game's secondary wearable sprite arrays, so one wearable can draw on multiple limbs while equipped.</td></tr>
             <tr><td><span class="inline-code">WornSpriteOffset</span></td><td><span class="inline-code">Vector2</span></td><td>Optional local-space offset applied to the worn item sprite after vanilla attaches it to <span class="inline-code">desiredWearLimb</span>.</td></tr>
+            <tr><td><span class="inline-code">MultiWornSpriteOffsets</span></td><td><span class="inline-code">Dictionary&lt;string, Vector2&gt;</span></td><td>Optional per-limb local offsets for entries in <span class="inline-code">MultiWornSprites</span>. Use matching limb keys, or fill it through <span class="inline-code">SetMultiWornSpriteOffset(...)</span>.</td></tr>
             <tr><td><span class="inline-code">LiquidMask</span></td><td><span class="inline-code">Sprite</span></td><td>Optional liquid-fill overlay mask for custom <span class="inline-code">WaterContainerItem</span> containers. Use a white or neutral grayscale sprite with transparency shaping the visible fill area so the game can tint it to the current liquid color.</td></tr>
             <tr><td><span class="inline-code">SpriteScale</span></td><td><span class="inline-code">float</span></td><td>Scale applied to the generated runtime template. Keep this near <span class="inline-code">1f</span> unless your art was made at a different size.</td></tr>
             <tr><td><span class="inline-code">InventoryIconScale</span></td><td><span class="inline-code">float</span></td><td>Extra multiplier applied only to the inventory icon UI size after the normal sprite scale has been resolved. Leave it at <span class="inline-code">1f</span> unless you want the inventory icon smaller or larger than the in-world sprite.</td></tr>
@@ -2654,7 +2656,7 @@ function advancedItemPage(): string {
 
     <section class="lesson-card">
       <h2>Equippables</h2>
-      <p>Wearables are regular items with wearable fields set. <span class="inline-code">wearSlotId</span> is the save/load and replacement key. <span class="inline-code">desiredWearLimb</span> points the visual/armor behavior at a body region, while <span class="inline-code">wearableArmor</span> and <span class="inline-code">wearableIsolation</span> affect protection and temperature.</p>
+      <p>Wearables are regular items with wearable fields set. <span class="inline-code">wearSlotId</span> is the save/load and replacement key. <span class="inline-code">desiredWearLimb</span> points the primary visual/armor behavior at a body region, while <span class="inline-code">wearableArmor</span> and <span class="inline-code">wearableIsolation</span> affect protection and temperature. Use <span class="inline-code">MultiWornSprites</span> when the same wearable should also draw extra pieces on other limbs.</p>
       <pre><code> ItemRegistry.Register(
      "fieldpack",
      new CustomItemInfo
@@ -2675,6 +2677,11 @@ function advancedItemPage(): string {
          rec = new Recognition(4),
          WornSprite = AssetLoader.LoadEmbeddedSprite("Images.fieldpack-worn.png"),
          WornSpriteOffset = new Vector2(0f, -0.04f),
+         MultiWornSprites = new Dictionary<string, Sprite>
+         {
+             ["DownTorso"] = AssetLoader.LoadEmbeddedSprite("Images.fieldpack-bedroll.png"),
+             ["HandB"] = AssetLoader.LoadEmbeddedSprite("Images.fieldpack-strap.png")
+         },
          Container = new ContainerProperties
          {
              Capacity = 8f,
@@ -2682,12 +2689,14 @@ function advancedItemPage(): string {
              EncumbranceReduction = 0.5f
          },
          SpawnFrequency = 1
-     },
+     }
+     .SetMultiWornSpriteOffset(new Vector2(0f, -0.02f), AssetLoader.LoadEmbeddedSprite("Images.fieldpack-bedroll.png"))
+     .SetMultiWornSpriteOffset("HandB", new Vector2(-0.01f, 0.01f)),
      AssetLoader.LoadEmbeddedSprite("Images.fieldpack.png")
  );</code></pre>
  <img src="images/fieldpack-ingame.png" alt="Field Pack item sprite" class="screenshot" />
 
- <p>In this example, we combined both the prior container tag with the new wearable fields to make a backpack that also functions as a container. <p>
+ <p>In this example, we combined the container tag, a primary <span class="inline-code">WornSprite</span>, and two <span class="inline-code">MultiWornSprites</span> entries to make one backpack draw across multiple limbs while still behaving like a normal wearable container. <p>
  <p>A lot of more unique items such as this can be made with combinations of tags. Give it a try!<p>
     </section>
 
@@ -3214,6 +3223,7 @@ function utilsPage(): string {
           </thead>
           <tbody>
             <tr><td><span class="inline-code">TryGetHeldItem</span> / <span class="inline-code">tryGetHeldItem</span></td><td><span class="inline-code">out Item item</span></td><td>Attempts to get the item currently held by the player.</td></tr>
+            <tr><td><span class="inline-code">HasEquipped</span> / <span class="inline-code">hasEquipped</span></td><td><span class="inline-code">string id</span></td><td>Returns whether the active player currently has an item with that ID in any body slot.</td></tr>
             <tr><td><span class="inline-code">TryGetHoveredItem</span> / <span class="inline-code">tryGetHoveredItem</span></td><td><span class="inline-code">out Item item</span></td><td>Attempts to find the item currently under the mouse, either in UI or in the world.</td></tr>
             <tr><td><span class="inline-code">GiveItem</span> / <span class="inline-code">giveItem</span></td><td><span class="inline-code">string id, int count</span></td><td>Spawns item instances near the player and auto-picks them up.</td></tr>
             <tr><td><span class="inline-code">GiveItemSlot</span> / <span class="inline-code">giveItemSlot</span></td><td><span class="inline-code">string id, int slot, int count</span></td><td>Spawns item instances near the player and tries to put them into a specific slot.</td></tr>

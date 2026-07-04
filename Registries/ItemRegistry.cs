@@ -212,11 +212,14 @@ namespace CUCoreLib.Registries
                     ["icon"] = NetworkSnapshotSerialization.WriteSprite(info.Icon),
                     ["inventoryIconScale"] = info.InventoryIconScale,
                     ["wornSprite"] = NetworkSnapshotSerialization.WriteSprite(info.WornSprite),
+                    ["multiWornSprites"] = NetworkSnapshotSerialization.WriteSpriteDictionary(info.MultiWornSprites),
                     ["liquidMask"] = NetworkSnapshotSerialization.WriteSprite(info.LiquidMask),
                     ["heldSpriteOffsetX"] = info.HeldSpriteOffset.x,
                     ["heldSpriteOffsetY"] = info.HeldSpriteOffset.y,
                     ["wornSpriteOffsetX"] = info.WornSpriteOffset.x,
                     ["wornSpriteOffsetY"] = info.WornSpriteOffset.y,
+                    ["multiWornSpriteOffsets"] =
+                        NetworkSnapshotSerialization.WriteVector2Dictionary(info.MultiWornSpriteOffsets),
                     ["spriteScale"] = info.SpriteScale,
                     ["spriteScaleWidth"] = info.SpriteScaleDimensions.Width,
                     ["spriteScaleHeight"] = info.SpriteScaleDimensions.Height,
@@ -328,6 +331,7 @@ namespace CUCoreLib.Registries
                     Icon = NetworkSnapshotSerialization.ReadSprite(obj["icon"]),
                     InventoryIconScale = obj.Value<float?>("inventoryIconScale") ?? 1f,
                     WornSprite = NetworkSnapshotSerialization.ReadSprite(obj["wornSprite"]),
+                    MultiWornSprites = NetworkSnapshotSerialization.ReadSpriteDictionary(obj["multiWornSprites"]),
                     LiquidMask = NetworkSnapshotSerialization.ReadSprite(obj["liquidMask"]),
                     SpriteScale = obj.Value<float?>("spriteScale") ?? 1f,
                     SpriteScaleDimensions = new SpriteScaleDimensions(
@@ -339,7 +343,9 @@ namespace CUCoreLib.Registries
                         obj.Value<float?>("heldSpriteOffsetY") ?? 0f),
                     WornSpriteOffset = new Vector2(
                         obj.Value<float?>("wornSpriteOffsetX") ?? 0f,
-                        obj.Value<float?>("wornSpriteOffsetY") ?? 0f)
+                        obj.Value<float?>("wornSpriteOffsetY") ?? 0f),
+                    MultiWornSpriteOffsets =
+                        NetworkSnapshotSerialization.ReadVector2Dictionary(obj["multiWornSpriteOffsets"])
                 };
 
                 var container = obj["container"] as JObject;
@@ -541,6 +547,10 @@ namespace CUCoreLib.Registries
 
             if (info.Icon != null) AssetLoader.CacheSprite(id, info.Icon);
             if (info.WornSprite != null) AssetLoader.CacheSprite(id + "_worn", info.WornSprite);
+            if (info.MultiWornSprites != null)
+                foreach (var entry in info.MultiWornSprites)
+                    if (!string.IsNullOrWhiteSpace(entry.Key) && entry.Value != null)
+                        AssetLoader.CacheSprite(id + "_worn_" + entry.Key, entry.Value);
 
             WarnMissingCustomIcon(id, info);
         }

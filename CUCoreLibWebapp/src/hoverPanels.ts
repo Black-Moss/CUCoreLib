@@ -241,7 +241,7 @@ export const hoverPanels: Record<string, HoverPanel> = {
   },
   CustomItemInfo: {
     title: "CustomItemInfo",
-    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, LiquidMask, SpawnFrequency, SpriteScale, InventoryIconScale, SpriteScaleDimensions, or CustomData."
+    body: "CUCoreLib item definition with vanilla ItemInfo fields, vanilla LiquidItemInfo fields such as capacity/defaultContents/autoFill, and extras like Container, Battery, WornSprite, MultiWornSprites, LiquidMask, SpawnFrequency, SpriteScale, InventoryIconScale, SpriteScaleDimensions, or CustomData."
   },
   LiquidMask: {
     title: "LiquidMask",
@@ -250,6 +250,14 @@ export const hoverPanels: Record<string, HoverPanel> = {
   WornSpriteOffset: {
     title: "WornSpriteOffset",
     body: "Vector2 local offset applied after the item is worn. X moves left/right on the limb, Y moves up/down. Start tiny, such as new Vector2(0f, -0.04f)."
+  },
+  MultiWornSprites: {
+    title: "MultiWornSprites",
+    body: "Dictionary keyed by vanilla limb name. Each entry spawns an extra worn sprite on that limb while the item is equipped, using the game's wearable secondary-limb path."
+  },
+  MultiWornSpriteOffsets: {
+    title: "MultiWornSpriteOffsets",
+    body: "Optional per-limb local offsets for MultiWornSprites. Keys should match the limb names used in MultiWornSprites."
   },
   ContainerProperties: {
     title: "ContainerProperties",

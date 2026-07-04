@@ -317,6 +317,19 @@ namespace CUCoreLib.Helpers
             return TryGetHeldItem(out item);
         }
 
+        public static bool HasEquipped(string id)
+        {
+            if (!IsInWorld() || string.IsNullOrWhiteSpace(id)) return false;
+
+            var body = PlayerCamera.main.body;
+            return body != null && body.HoldingItem(id.Trim());
+        }
+
+        public static bool hasEquipped(string id)
+        {
+            return HasEquipped(id);
+        }
+
         public static bool TryGetBody(out Body body)
         {
             body = null;

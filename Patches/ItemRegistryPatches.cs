@@ -220,7 +220,8 @@ namespace CUCoreLib.Patches
 
         private static bool IsCurrentlyWornWearable(Item item, CustomItemInfo def)
         {
-            if (item == null || def == null || def.WornSprite == null) return false;
+            if (item == null || def == null) return false;
+            if (def.WornSprite == null && (def.MultiWornSprites == null || def.MultiWornSprites.Count == 0)) return false;
             if (!item.TryGetComponent<Wearable>(out _)) return false;
 
             var parent = item.transform.parent;

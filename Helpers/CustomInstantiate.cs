@@ -113,6 +113,11 @@ namespace CUCoreLib.Helpers
             var item = obj.GetComponent<Item>();
             if (item) item.id = id;
 
+            if (item != null && info.wearable && obj.GetComponent<Wearable>() == null)
+            {
+                obj.AddComponent<Wearable>();
+            }
+
             var waterContainer = obj.GetComponent<WaterContainerItem>();
             if (waterContainer != null) waterContainer.fillSprite = info.LiquidMask;
 

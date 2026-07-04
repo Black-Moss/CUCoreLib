@@ -1563,6 +1563,7 @@ private void Awake()
         Logger.LogInfo($"Holding: {held.name}");
     }
 
+    bool hasBandageEquipped = CUCoreUtils.HasEquipped("bandage");
     CUCoreUtils.GiveItem("glass", 1);
     CUCoreUtils.GiveItemSlot("glass", 0, 1);
     bool isModded = CUCoreUtils.IsModdedItem("glassworks.someitem");
@@ -1688,6 +1689,8 @@ private void RegisterAdvancedItems()
     Sprite fieldPackIcon = AssetLoader.LoadEmbeddedSprite("Images.fieldpack.png");
     Sprite apronIcon = AssetLoader.LoadEmbeddedSprite("Images.rubberapron.png");
     Sprite apronWorn = AssetLoader.LoadEmbeddedSprite("Images.rubberapron_worn.png");
+    Sprite fieldPackBedroll = AssetLoader.LoadEmbeddedSprite("Images.fieldpack-bedroll.png");
+    Sprite fieldPackStrap = AssetLoader.LoadEmbeddedSprite("Images.fieldpack-strap.png");
     Sprite portableLampIcon = AssetLoader.LoadEmbeddedSprite("Images.portablelamp.png");
     Sprite glassShivIcon = AssetLoader.LoadEmbeddedSprite("Images.glassshiv.png");
 
@@ -1743,8 +1746,15 @@ private void RegisterAdvancedItems()
             rec = new Recognition(4),
             WornSprite = apronWorn,
             WornSpriteOffset = new Vector2(0f, -0.04f),
+            MultiWornSprites = new Dictionary<string, Sprite>
+            {
+                ["DownTorso"] = fieldPackBedroll,
+                ["HandB"] = fieldPackStrap
+            },
             SpawnFrequency = 1
-        },
+        }
+        .SetMultiWornSpriteOffset(new Vector2(0f, -0.03f), fieldPackBedroll)
+        .SetMultiWornSpriteOffset("HandB", new Vector2(-0.01f, 0.01f)),
         apronIcon
     );
 

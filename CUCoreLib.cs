@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using CUCoreLib.ContentReload;
 using CUCoreLib.Helpers;
@@ -26,11 +27,13 @@ namespace CUCoreLib
 
 
         public static CUCoreLibPlugin Instance { get; private set; }
+        internal static ConfigFile SharedConfig { get; private set; }
 
         private void Awake()
         {
             Instance = this;
             Log = Logger;
+            SharedConfig = new ConfigFile(System.IO.Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg"), true);
 
             // Logger.LogInfo($"Starting up {MODNAME} v{VERSION}...");
 

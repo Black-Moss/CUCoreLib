@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace CUCoreLib.Data
@@ -98,6 +99,16 @@ namespace CUCoreLib.Data
         public ToolProperties Tool;
 
         /// <summary>
+        /// Optional extra worn sprites keyed by vanilla limb name. These are spawned as additive wearable visuals while the item is worn.
+        /// </summary>
+        public Dictionary<string, Sprite> MultiWornSprites = new Dictionary<string, Sprite>();
+
+        /// <summary>
+        /// Optional per-limb local offsets for <see cref="MultiWornSprites"/>.
+        /// </summary>
+        public Dictionary<string, Vector2> MultiWornSpriteOffsets = new Dictionary<string, Vector2>();
+
+        /// <summary>
         /// Sprite shown when the item is worn on a body. Spawns at the desiredWearLimb position initally with <see cref="WornSpriteOffset"/> applied.
         /// </summary>
         public Sprite WornSprite;
@@ -111,6 +122,47 @@ namespace CUCoreLib.Data
         /// Local position offset applied to the worn sprite.
         /// </summary>
         public Vector2 WornSpriteOffset;
+
+        /// <summary>
+        /// Sets the local offset for a multi-worn sprite by limb name.
+        /// </summary>
+        public CustomItemInfo SetMultiWornSpriteOffset(string desiredWearLimb, Vector2 offset)
+        {
+            if (string.IsNullOrWhiteSpace(desiredWearLimb)) return this;
+
+            MultiWornSpriteOffsets[desiredWearLimb] = offset;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the local offset for a uniquely-mapped multi-worn sprite.
+        /// </summary>
+        public CustomItemInfo SetMultiWornSpriteOffset(Vector2 offset, Sprite wornSprite)
+        {
+            if (wornSprite == null)
+            {
+                CUCoreLib.CUCoreLibPlugin.Log?.LogWarning(
+                    "SetMultiWornSpriteOffset skipped because no worn sprite was provided. Use the limb-key overload or pass a sprite from MultiWornSprites.");
+                return this;
+            }
+
+            var matches = MultiWornSprites
+                .Where(entry => entry.Value == wornSprite && !string.IsNullOrWhiteSpace(entry.Key))
+                .Select(entry => entry.Key)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (matches.Length != 1)
+            {
+                CUCoreLib.CUCoreLibPlugin.Log?.LogWarning(
+                    "SetMultiWornSpriteOffset could not resolve a unique limb for multi-worn sprite '" +
+                    wornSprite.name + "'. Configure the offset by limb key instead.");
+                return this;
+            }
+
+            MultiWornSpriteOffsets[matches[0]] = offset;
+            return this;
+        }
 
         /// <summary>
         /// Tracks an explicit assignment to the vanilla usable flag so later defaulting logic does not overwrite it.
