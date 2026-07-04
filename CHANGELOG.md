@@ -26,7 +26,8 @@ I figured that this would be nice to have, as to easily take a look at everythin
 - Minor optimization changes
 - Documentation is a neverending battle :)
 - Fixed QoL image integration again
-
+- Fix modded watermark (this is a modded..)
+- Item colliders now ignore image transparent pixels
 
 ## v1.0.2
 

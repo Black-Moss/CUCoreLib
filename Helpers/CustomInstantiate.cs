@@ -11,6 +11,8 @@ namespace CUCoreLib.Helpers
 {
     public static class CustomInstantiate
     {
+        private const byte ColliderAlphaThreshold = 8;
+
         private static readonly Dictionary<string, GameObject> _templateCache =
             new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
 
@@ -140,14 +142,20 @@ namespace CUCoreLib.Helpers
         {
             if (obj == null || sprite == null) return;
 
+            if (!TryGetTrimmedColliderData(sprite, out var trimmedCollider))
+            {
+                trimmedCollider = CreateFullSpriteColliderData(sprite);
+            }
+
             // Preserve current collider settings
             var existingCollider = obj.GetComponent<Collider2D>();
-            if (TryApplyPolygonCollider(obj, sprite, existingCollider)) return;
+            if (TryApplyPolygonCollider(obj, sprite, existingCollider, trimmedCollider)) return;
 
-            ApplyBoxCollider(obj, sprite, existingCollider);
+            ApplyBoxCollider(obj, existingCollider, trimmedCollider);
         }
 
-        private static bool TryApplyPolygonCollider(GameObject obj, Sprite sprite, Collider2D existingCollider)
+        private static bool TryApplyPolygonCollider(GameObject obj, Sprite sprite, Collider2D existingCollider,
+            TrimmedColliderData trimmedCollider)
         {
             var shapeCount = sprite.GetPhysicsShapeCount();
             if (shapeCount <= 0) return false;
@@ -162,6 +170,11 @@ namespace CUCoreLib.Helpers
             {
                 SharedPhysicsShapeBuffer.Clear();
                 sprite.GetPhysicsShape(i, SharedPhysicsShapeBuffer);
+                for (var j = 0; j < SharedPhysicsShapeBuffer.Count; j++)
+                {
+                    SharedPhysicsShapeBuffer[j] = ClampPointToTrimmedBounds(SharedPhysicsShapeBuffer[j], trimmedCollider);
+                }
+
                 polygon.SetPath(i, SharedPhysicsShapeBuffer);
             }
 
@@ -170,15 +183,111 @@ namespace CUCoreLib.Helpers
             return true;
         }
 
-        private static void ApplyBoxCollider(GameObject obj, Sprite sprite, Collider2D existingCollider)
+        private static void ApplyBoxCollider(GameObject obj, Collider2D existingCollider, TrimmedColliderData trimmedCollider)
         {
             var box = obj.GetComponent<BoxCollider2D>();
             if (box == null) box = obj.AddComponent<BoxCollider2D>();
 
             CopyColliderSettings(existingCollider, box);
-            box.size = sprite.bounds.size;
-            box.offset = sprite.bounds.center;
+            box.size = trimmedCollider.Size;
+            box.offset = trimmedCollider.Center;
             RemoveOtherColliders(obj, box);
+        }
+
+        private static bool TryGetTrimmedColliderData(Sprite sprite, out TrimmedColliderData trimmedCollider)
+        {
+            trimmedCollider = default;
+            if (sprite == null || sprite.texture == null) return false;
+
+            var spriteRect = sprite.rect;
+            var texture = sprite.texture;
+            var startX = Mathf.RoundToInt(spriteRect.x);
+            var startY = Mathf.RoundToInt(spriteRect.y);
+            var width = Mathf.RoundToInt(spriteRect.width);
+            var height = Mathf.RoundToInt(spriteRect.height);
+            if (width <= 0 || height <= 0) return false;
+
+            Color32[] pixels;
+            try
+            {
+                pixels = texture.GetPixels32();
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (pixels == null || pixels.Length == 0) return false;
+
+            var minX = width;
+            var minY = height;
+            var maxX = -1;
+            var maxY = -1;
+
+            for (var localY = 0; localY < height; localY++)
+            {
+                var textureY = startY + localY;
+                if (textureY < 0 || textureY >= texture.height) continue;
+
+                var rowIndex = textureY * texture.width;
+                for (var localX = 0; localX < width; localX++)
+                {
+                    var textureX = startX + localX;
+                    if (textureX < 0 || textureX >= texture.width) continue;
+
+                    if (pixels[rowIndex + textureX].a < ColliderAlphaThreshold) continue;
+
+                    if (localX < minX) minX = localX;
+                    if (localY < minY) minY = localY;
+                    if (localX > maxX) maxX = localX;
+                    if (localY > maxY) maxY = localY;
+                }
+            }
+
+            if (maxX < minX || maxY < minY) return false;
+
+            trimmedCollider = CreateTrimmedColliderData(sprite, minX, minY, maxX, maxY);
+            return true;
+        }
+
+        private static TrimmedColliderData CreateTrimmedColliderData(Sprite sprite, int minPixelX, int minPixelY,
+            int maxPixelX, int maxPixelY)
+        {
+            var pixelsPerUnit = sprite.pixelsPerUnit > 0f ? sprite.pixelsPerUnit : 1f;
+            var pivotInPixels = sprite.pivot;
+
+            var left = (minPixelX - pivotInPixels.x) / pixelsPerUnit;
+            var right = (maxPixelX + 1 - pivotInPixels.x) / pixelsPerUnit;
+            var bottom = (minPixelY - pivotInPixels.y) / pixelsPerUnit;
+            var top = (maxPixelY + 1 - pivotInPixels.y) / pixelsPerUnit;
+
+            return new TrimmedColliderData(
+                new Vector2(right - left, top - bottom),
+                new Vector2((left + right) * 0.5f, (bottom + top) * 0.5f),
+                left,
+                right,
+                bottom,
+                top);
+        }
+
+        private static TrimmedColliderData CreateFullSpriteColliderData(Sprite sprite)
+        {
+            var bounds = sprite.bounds;
+            var extents = bounds.extents;
+            return new TrimmedColliderData(
+                bounds.size,
+                bounds.center,
+                bounds.center.x - extents.x,
+                bounds.center.x + extents.x,
+                bounds.center.y - extents.y,
+                bounds.center.y + extents.y);
+        }
+
+        private static Vector2 ClampPointToTrimmedBounds(Vector2 point, TrimmedColliderData trimmedCollider)
+        {
+            return new Vector2(
+                Mathf.Clamp(point.x, trimmedCollider.MinX, trimmedCollider.MaxX),
+                Mathf.Clamp(point.y, trimmedCollider.MinY, trimmedCollider.MaxY));
         }
 
         private static void CopyColliderSettings(Collider2D source, Collider2D target)
@@ -256,6 +365,26 @@ namespace CUCoreLib.Helpers
         private static Light2D.LightType ToLight2DType(CustomLightType type)
         {
             return (Light2D.LightType)(int)type;
+        }
+
+        private readonly struct TrimmedColliderData
+        {
+            public readonly Vector2 Size;
+            public readonly Vector2 Center;
+            public readonly float MinX;
+            public readonly float MaxX;
+            public readonly float MinY;
+            public readonly float MaxY;
+
+            public TrimmedColliderData(Vector2 size, Vector2 center, float minX, float maxX, float minY, float maxY)
+            {
+                Size = size;
+                Center = center;
+                MinX = minX;
+                MaxX = maxX;
+                MinY = minY;
+                MaxY = maxY;
+            }
         }
     }
 }
