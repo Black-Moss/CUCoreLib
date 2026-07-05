@@ -29,11 +29,19 @@ namespace CUCoreLib
         public static CUCoreLibPlugin Instance { get; private set; }
         internal static ConfigFile SharedConfig { get; private set; }
 
+        internal static ConfigFile GetOrCreateSharedConfig()
+        {
+            if (SharedConfig != null) return SharedConfig;
+
+            SharedConfig = new ConfigFile(System.IO.Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg"), true);
+            return SharedConfig;
+        }
+
         private void Awake()
         {
             Instance = this;
             Log = Logger;
-            SharedConfig = new ConfigFile(System.IO.Path.Combine(Paths.ConfigPath, "CUCoreLib.cfg"), true);
+            SharedConfig = GetOrCreateSharedConfig();
 
             // Logger.LogInfo($"Starting up {MODNAME} v{VERSION}...");
 

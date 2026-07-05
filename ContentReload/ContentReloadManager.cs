@@ -30,9 +30,7 @@ namespace CUCoreLib.ContentReload
             if (initialized) return;
 
             initialized = true;
-            configFile = CUCoreLibPlugin.SharedConfig;
-            if (configFile == null)
-                throw new InvalidOperationException("CUCoreLib shared config file was not available during ContentReloadManager initialization.");
+            configFile = CUCoreLibPlugin.GetOrCreateSharedConfig();
             BindLoadedModConfigEntries();
             RestorePersistedAutoHotReloadSettings();
             ContentWatchService.Initialize();

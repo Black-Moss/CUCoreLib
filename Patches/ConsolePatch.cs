@@ -12,6 +12,9 @@ namespace CUCoreLib.Patches
     [HarmonyPatch(typeof(ConsoleScript), "RegisterAllCommands")]
     internal static class ConsolePatch
     {
+        private static readonly System.Reflection.FieldInfo RegisteredSpawnEntitiesField =
+            AccessTools.Field(typeof(ConsoleScript), "registeredSpawnEntities");
+
         internal static void RefreshRuntimeAutofill()
         {
             RefreshSpawnAutofill();
@@ -171,6 +174,18 @@ namespace CUCoreLib.Patches
         }
 
         [HarmonyPatch(typeof(ConsoleScript), "RegisterSpawnEntities")]
+        [HarmonyPrefix]
+        private static bool GuardDuplicateVanillaSpawnAutofill(ConsoleScript __instance)
+        {
+            var spawnCommand = ConsoleScript.SearchExact("spawn");
+            if (spawnCommand?.argAutofill == null) return true;
+            if (!spawnCommand.argAutofill.ContainsKey(0)) return true;
+
+            RegisteredSpawnEntitiesField?.SetValue(__instance, true);
+            return false;
+        }
+
+        [HarmonyPatch(typeof(ConsoleScript), "RegisterSpawnEntities")]
         [HarmonyPostfix]
         private static void AppendSpawnAutofill(ConsoleScript __instance)
         {
@@ -233,8 +248,7 @@ namespace CUCoreLib.Patches
         {
             if (console == null) return false;
 
-            var registeredSpawnEntitiesField = AccessTools.Field(typeof(ConsoleScript), "registeredSpawnEntities");
-            return registeredSpawnEntitiesField != null && registeredSpawnEntitiesField.GetValue(console) is bool registered &&
+            return RegisteredSpawnEntitiesField != null && RegisteredSpawnEntitiesField.GetValue(console) is bool registered &&
                    registered;
         }
 

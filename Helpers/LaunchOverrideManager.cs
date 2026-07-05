@@ -38,9 +38,7 @@ namespace CUCoreLib.Helpers
             if (_configFile != null) return;
 
             _quickTestStatePath = Path.Combine(Paths.ConfigPath, QuickTestStateDirectoryName, QuickTestStateFileName);
-            _configFile = CUCoreLibPlugin.SharedConfig;
-            if (_configFile == null)
-                throw new InvalidOperationException("CUCoreLib shared config file was not available during LaunchOverrideManager initialization.");
+            _configFile = CUCoreLibPlugin.GetOrCreateSharedConfig();
             _launchInSandbox = _configFile.Bind(
                 SectionName,
                 "launchInSandbox",
