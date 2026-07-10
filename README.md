@@ -75,6 +75,14 @@ By default, the project copies the built DLL into `BepInEx\plugins` when `BepInE
 dotnet build "CUCoreLib.sln" -c Debug -p:BepInExDir="C:\EDIT_THIS_PATH\TO\CUCoreLib\_builddeploy\BepInEx"
 ```
 
+## Webapp Build
+
+Due to the nature of this repo housing both the mod as well as the documentation, building the webapp is a bit different:
+1. Open your terminal, and navigate to the `/CUCoreLibWebapp/` directory
+2. Run `npm install` (once)
+3. To have live updates whilst you change the files, run `npm run build` and edit the docs. You should be editing the `docsPages.ts`, `codeSnippets.ts`, and `hoverPanels.ts` files.
+4. Upon finishing, run `npm run build` to autogenerate the machine docs/pages.
+
 ## Contributing
 
 <div align="center">
